@@ -1,0 +1,16 @@
+[package]
+name = "hlbc"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = ["hlbc-gui", "hlbc-cli", "hlbc-macros"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+hlbc-macros = { path = "hlbc-macros" }
+byteorder = "1"
+anyhow = "1"
+strum = "0.24"
+strum_macros = "0.24"
