@@ -11,6 +11,7 @@ use strum_macros::IntoStaticStr;
 use crate::opcodes::Opcode;
 use crate::utils::{vari32, varu32};
 
+pub mod fmt;
 pub mod opcodes;
 mod utils;
 
@@ -247,8 +248,8 @@ impl HlCode {
         let mut natives = Vec::with_capacity(nnatives);
         for _ in 0..nnatives {
             natives.push(HlNative {
-                name: strings[vari32(r)? as usize].clone(),
                 lib: strings[vari32(r)? as usize].clone(),
+                name: strings[vari32(r)? as usize].clone(),
                 t: read_type_ref(r)?,
                 findex: varu32(r)? as usize,
             });
@@ -345,8 +346,14 @@ impl HlCode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct HlTypeRef(usize);
+
+impl HlTypeRef {
+    pub fn resolve<'a>(&self, types: &'a [HlType]) -> &'a HlType {
+        &types[self.0]
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct HlObjField {

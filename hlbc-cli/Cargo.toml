@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 hlbc = { version = "0.1.0", path = ".." }
 termcolor = "1"
+anyhow = "1"
+atty = "0.2"
