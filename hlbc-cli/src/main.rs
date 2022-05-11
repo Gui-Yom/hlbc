@@ -15,10 +15,10 @@ fn main() -> anyhow::Result<()> {
     let tty = atty::is(atty::Stream::Stdout);
 
     let mut code = {
-        let mut r = BufReader::new(
-            fs::File::open("D:/ReverseEngineering/northgard/hlbc/hlboot2.dat").unwrap(),
-        );
-        HlCode::load(&mut r).unwrap()
+        let mut r = BufReader::new(fs::File::open(
+            "D:/ReverseEngineering/northgard/hlbc/hlboot2.dat",
+        )?);
+        Bytecode::load(&mut r)?
     };
 
     if tty {

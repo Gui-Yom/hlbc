@@ -1,101 +1,14 @@
-use std::fmt::{Debug, Display, Formatter};
+use crate::types::{
+    RefBytes, RefField, RefFloat, RefFun, RefGlobal, RefInt, RefString, RefType, Reg, ValBool,
+};
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Reg(u32);
-
-impl Display for Reg {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "reg{}", self.0)
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct ConstInt(usize);
-
-impl Display for ConstInt {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "int@{}", self.0)
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct ConstFloat(usize);
-
-impl Display for ConstFloat {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "float@{}", self.0)
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct ConstBytes(usize);
-
-impl Display for ConstBytes {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "bytes@{}", self.0)
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct ConstString(usize);
-
-impl Display for ConstString {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "string@{}", self.0)
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct ConstType(usize);
-
-impl Display for ConstType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "type@{}", self.0)
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct ValBool(bool);
-
-impl Display for ValBool {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.0, f)
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Fun(usize);
-
-impl Display for Fun {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "fn _@{}", self.0)
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Field(usize);
-
-impl Display for Field {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "field{}", self.0)
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Global(usize);
-
-impl Display for Global {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "global@{}", self.0)
-    }
-}
-
+/*
 static OPCODE_ARGS: &[i8; 99] = &[
     2, 2, 2, 2, 2, 2, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 1, 1, 2, 3, 4, 5, 6, -1, -1,
     -1, -1, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 2, 2, 2,
     2, 2, 2, 2, 0, 1, 1, 1, -1, 1, 2, 1, 3, 3, 3, 3, 3, 3, 3, 3, 1, 2, 2, 2, 2, 2, 2, 2, -1, 2, 2,
     4, 3, 0, 2, 3, 0,
-];
+];*/
 
 pub type JumpOffset = i32;
 
@@ -108,11 +21,11 @@ pub enum Opcode {
     },
     Int {
         dst: Reg,
-        ptr: ConstInt,
+        ptr: RefInt,
     },
     Float {
         dst: Reg,
-        ptr: ConstFloat,
+        ptr: RefFloat,
     },
     Bool {
         dst: Reg,
@@ -120,11 +33,11 @@ pub enum Opcode {
     },
     Bytes {
         dst: Reg,
-        ptr: ConstBytes,
+        ptr: RefBytes,
     },
     String {
         dst: Reg,
-        ptr: ConstString,
+        ptr: RefString,
     },
     Null {
         dst: Reg,
@@ -210,29 +123,29 @@ pub enum Opcode {
     },
     Call0 {
         dst: Reg,
-        fun: Fun,
+        fun: RefFun,
     },
     Call1 {
         dst: Reg,
-        fun: Fun,
+        fun: RefFun,
         arg0: Reg,
     },
     Call2 {
         dst: Reg,
-        fun: Fun,
+        fun: RefFun,
         arg0: Reg,
         arg1: Reg,
     },
     Call3 {
         dst: Reg,
-        fun: Fun,
+        fun: RefFun,
         arg0: Reg,
         arg1: Reg,
         arg2: Reg,
     },
     Call4 {
         dst: Reg,
-        fun: Fun,
+        fun: RefFun,
         arg0: Reg,
         arg1: Reg,
         arg2: Reg,
@@ -240,7 +153,7 @@ pub enum Opcode {
     },
     CallN {
         dst: Reg,
-        fun: Fun,
+        fun: RefFun,
         args: Vec<Reg>,
     },
     CallMethod {
@@ -262,11 +175,11 @@ pub enum Opcode {
     },
     StaticClosure {
         dst: Reg,
-        fun: Fun,
+        fun: RefFun,
     },
     InstanceClosure {
         dst: Reg,
-        fun: Fun,
+        fun: RefFun,
         obj: Reg,
     },
     VirtualClosure {
@@ -276,29 +189,29 @@ pub enum Opcode {
     },
     GetGlobal {
         dst: Reg,
-        global: Global,
+        global: RefGlobal,
     },
     SetGlobal {
-        global: Global,
+        global: RefGlobal,
         src: Reg,
     },
     Field {
         dst: Reg,
         obj: Reg,
-        field: Field,
+        field: RefField,
     },
     SetField {
         obj: Reg,
-        field: Field,
+        field: RefField,
         src: Reg,
     },
-    // Equivalent to Field with obj = reg0
+    // Equivalent to RefField with obj = reg0
     GetThis {
         dst: Reg,
-        field: Field,
+        field: RefField,
     },
     SetThis {
-        field: Field,
+        field: RefField,
         src: Reg,
     },
     DynGet {
@@ -483,7 +396,7 @@ pub enum Opcode {
     },
     Type {
         dst: Reg,
-        ty: ConstType,
+        ty: RefType,
     },
     GetType {
         dst: Reg,
@@ -522,11 +435,11 @@ pub enum Opcode {
         dst: Reg,
         enum_: Reg,
         construct: usize,
-        field: Field,
+        field: RefField,
     },
     SetEnumField {
         enum_: Reg,
-        field: Field,
+        field: RefField,
         src: Reg,
     },
     Assert,
@@ -540,15 +453,4 @@ pub enum Opcode {
         offset: usize,
     },
     Nop,
-}
-
-impl Display for Opcode {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let name: &'static str = self.into();
-        match self {
-            Opcode::Mov { dst, src } => write!(f, "{name} {dst} = {src}"),
-            Opcode::Int { dst, ptr } => write!(f, "{name} {dst} = {ptr}"),
-            other => Debug::fmt(other, f),
-        }
-    }
 }

@@ -13,19 +13,29 @@ pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
     .unwrap();
 
-    let tyusize = parse_str::<Type>("usize").unwrap();
-    let tyJumpOffset = parse_str::<Type>("JumpOffset").unwrap();
-    let tyReg = parse_str::<Type>("Reg").unwrap();
-    let tyVecReg = parse_str::<Type>("Vec<Reg>").unwrap();
-    let tyConstInt = parse_str::<Type>("ConstInt").unwrap();
-    let tyConstFloat = parse_str::<Type>("ConstFloat").unwrap();
-    let tyConstBytes = parse_str::<Type>("ConstBytes").unwrap();
-    let tyConstString = parse_str::<Type>("ConstString").unwrap();
-    let tyConstType = parse_str::<Type>("ConstType").unwrap();
-    let tyValBool = parse_str::<Type>("ValBool").unwrap();
-    let tyFun = parse_str::<Type>("Fun").unwrap();
-    let tyField = parse_str::<Type>("Field").unwrap();
-    let tyGlobal = parse_str::<Type>("Global").unwrap();
+    let ty_usize = parse_str::<Type>("usize").unwrap();
+    let ty_jump_offset = parse_str::<Type>("JumpOffset").unwrap();
+    let ty_reg = parse_str::<Type>("Reg").unwrap();
+    let ty_vec_reg = parse_str::<Type>("Vec<Reg>").unwrap();
+    let ty_ref_int = parse_str::<Type>("RefInt").unwrap();
+    let ty_ref_float = parse_str::<Type>("RefFloat").unwrap();
+    let ty_ref_bytes = parse_str::<Type>("RefBytes").unwrap();
+    let ty_ref_string = parse_str::<Type>("RefString").unwrap();
+    let ty_ref_type = parse_str::<Type>("RefType").unwrap();
+    let ty_val_bool = parse_str::<Type>("ValBool").unwrap();
+    let ty_ref_fun = parse_str::<Type>("RefFun").unwrap();
+    let ty_ref_field = parse_str::<Type>("RefField").unwrap();
+    let ty_ref_global = parse_str::<Type>("RefGlobal").unwrap();
+
+    let rvi32 = quote! {
+        r.read_vari()?
+    };
+    let rvu32 = quote! {
+        r.read_varu()?
+    };
+    let reg = quote! {
+        Reg(#rvi32 as u32)
+    };
 
     let name = &ast.ident;
     let i = 0..variants.len() as u8;
@@ -34,13 +44,13 @@ pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
         if v.ident == "CallMethod" {
             quote! {
                 {
-                    let dst = Reg(vari32(r)? as u32);
-                    let obj = Reg(vari32(r)? as u32);
+                    let dst = #reg;
+                    let obj = #reg;
                     let n = r.read_u8()? as usize;
-                    let field = Reg(vari32(r)? as u32);
+                    let field = #reg;
                     let mut args = Vec::with_capacity(n-1);
                     for _ in 1..n {
-                        args.push(Reg(vari32(r)? as u32));
+                        args.push(#reg);
                     }
                     Ok(#name::CallMethod {
                         dst,
@@ -53,13 +63,13 @@ pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
         } else if v.ident == "Switch" {
             quote! {
                 {
-                    let reg = Reg(varu32(r)?);
-                    let n = varu32(r)? as usize;
+                    let reg = Reg(#rvu32);
+                    let n = #rvu32 as usize;
                     let mut offsets = Vec::with_capacity(n);
                     for _ in 0..n {
-                        offsets.push(varu32(r)? as JumpOffset);
+                        offsets.push(#rvu32 as JumpOffset);
                     }
-                    let end = varu32(r)? as JumpOffset;
+                    let end = #rvu32 as JumpOffset;
                     Ok(#name::Switch {
                         reg,
                         offsets,
@@ -71,64 +81,62 @@ pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
             let vname = &v.ident;
             let fname = v.fields.iter().map(|f| &f.ident);
             let fvalue = v.fields.iter().map(|f| {
-                if f.ty == tyusize {
+                if f.ty == ty_usize {
                     quote! {
-                        vari32(r)? as usize
+                        #rvi32 as usize
                     }
-                } else if f.ty == tyJumpOffset {
+                } else if f.ty == ty_jump_offset {
                     quote! {
-                        vari32(r)? as JumpOffset
+                        #rvi32 as JumpOffset
                     }
-                } else if f.ty == tyReg {
-                    quote! {
-                        Reg(vari32(r)? as u32)
-                    }
-                } else if f.ty == tyVecReg {
+                } else if f.ty == ty_reg {
+                    reg.clone()
+                } else if f.ty == ty_vec_reg {
                     quote! {
                         {
                             let n = r.read_u8()? as usize;
                             let mut regs = Vec::with_capacity(n);
                             for _ in 0..n {
-                                regs.push(Reg(vari32(r)? as u32));
+                                regs.push(#reg);
                             }
                             regs
                         }
                     }
-                } else if f.ty == tyConstInt {
+                } else if f.ty == ty_ref_int {
                     quote! {
-                        ConstInt(vari32(r)? as usize)
+                        RefInt(#rvi32 as usize)
                     }
-                } else if f.ty == tyConstFloat {
+                } else if f.ty == ty_ref_float {
                     quote! {
-                        ConstFloat(vari32(r)? as usize)
+                        RefFloat(#rvi32 as usize)
                     }
-                } else if f.ty == tyConstBytes {
+                } else if f.ty == ty_ref_bytes {
                     quote! {
-                        ConstBytes(vari32(r)? as usize)
+                        RefBytes(#rvi32 as usize)
                     }
-                } else if f.ty == tyConstString {
+                } else if f.ty == ty_ref_string {
                     quote! {
-                        ConstString(vari32(r)? as usize)
+                        RefString(#rvi32 as usize)
                     }
-                } else if f.ty == tyConstType {
+                } else if f.ty == ty_ref_type {
                     quote! {
-                        ConstType(vari32(r)? as usize)
+                        RefType(#rvi32 as usize)
                     }
-                } else if f.ty == tyValBool {
+                } else if f.ty == ty_val_bool {
                     quote! {
-                        ValBool(vari32(r)? == 1)
+                        ValBool(#rvi32 == 1)
                     }
-                } else if f.ty == tyFun {
+                } else if f.ty == ty_ref_fun {
                     quote! {
-                        Fun(vari32(r)? as usize)
+                        RefFun(#rvi32 as usize)
                     }
-                } else if f.ty == tyField {
+                } else if f.ty == ty_ref_field {
                     quote! {
-                        Field(vari32(r)? as usize)
+                        RefField(#rvi32 as usize)
                     }
-                } else if f.ty == tyGlobal {
+                } else if f.ty == ty_ref_global {
                     quote! {
-                        Global(vari32(r)? as usize)
+                        RefGlobal(#rvi32 as usize)
                     }
                 } else {
                     TokenStream2::default()
@@ -149,7 +157,8 @@ pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
             pub fn decode(r: &mut impl std::io::Read) -> anyhow::Result<#name> {
 
                 use byteorder::ReadBytesExt;
-                use crate::utils::{vari32, varu32};
+                use crate::read::ReadHlExt;
+                use crate::types::*;
 
                 let op = r.read_u8()?;
                 match op {

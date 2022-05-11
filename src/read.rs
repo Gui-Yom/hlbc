@@ -1,0 +1,293 @@
+use std::ffi::CStr;
+use std::io::Read;
+
+use anyhow::Result;
+use byteorder::{LittleEndian, ReadBytesExt};
+
+use crate::types::{EnumConstruct, Function, Native, ObjField, ObjProto, RefString, RefType, Type};
+use crate::{ConstantDef, Opcode, RefFun, RefGlobal};
+
+pub(crate) trait ReadHlExt: ReadBytesExt {
+    /// Read a variable size signed integer
+    fn read_vari(&mut self) -> Result<i32>;
+    /// Read a variable size unsigned integer
+    fn read_varu(&mut self) -> Result<u32>;
+    fn read_strings(&mut self, nstrings: usize) -> Result<Vec<String>>;
+    fn read_field(&mut self) -> Result<ObjField>;
+    fn read_type_ref(&mut self) -> Result<RefType>;
+    fn read_type(&mut self) -> Result<Option<Type>>;
+    fn read_native(&mut self) -> Result<Native>;
+    fn read_function(&mut self, has_debug: bool, version: u8) -> Result<Function>;
+    fn read_constant_def(&mut self) -> Result<ConstantDef>;
+}
+
+impl<T: Read> ReadHlExt for T {
+    fn read_vari(&mut self) -> Result<i32> {
+        let b = self.read_u8()? as i32;
+        if b & 0x80 == 0 {
+            Ok(b & 0x7F)
+        } else if b & 0x40 == 0 {
+            let v = self.read_u8()? as i32 | ((b & 31) << 8);
+            Ok(if b & 0x20 == 0 { v } else { -v })
+        } else {
+            let c = self.read_u8()? as i32;
+            let d = self.read_u8()? as i32;
+            let e = self.read_u8()? as i32;
+            let v = ((b & 31) << 24) | (c << 16) | (d << 8) | e;
+            Ok(if b & 0x20 == 0 { v } else { -v })
+        }
+    }
+
+    fn read_varu(&mut self) -> Result<u32> {
+        let i = self.read_vari()?;
+        if i < 0 {
+            anyhow::bail!("Negative index")
+        } else {
+            Ok(i as u32)
+        }
+    }
+
+    fn read_strings(&mut self, nstrings: usize) -> Result<Vec<String>> {
+        let mut strings = Vec::with_capacity(nstrings);
+        let mut string_data = vec![0u8; self.read_i32::<LittleEndian>()? as usize];
+        self.read_exact(&mut string_data)?;
+        let mut acc = 0;
+        for _ in 0..nstrings {
+            let ssize = self.read_varu()? as usize + 1;
+            strings.push(
+                CStr::from_bytes_with_nul(&string_data[acc..(acc + ssize)])?
+                    .to_string_lossy()
+                    .to_string(),
+            );
+            acc += ssize;
+        }
+        Ok(strings)
+    }
+
+    fn read_field(&mut self) -> Result<ObjField> {
+        Ok(ObjField {
+            name: RefString(self.read_vari()? as usize),
+            t: self.read_type_ref()?,
+        })
+    }
+
+    fn read_type_ref(&mut self) -> Result<RefType> {
+        Ok(RefType(self.read_vari()? as usize))
+    }
+
+    fn read_type(&mut self) -> Result<Option<Type>> {
+        match self.read_u8()? {
+            10 => {
+                let nargs = self.read_u8()?;
+                let mut args = Vec::with_capacity(nargs as usize);
+                for _ in 0..nargs {
+                    args.push(self.read_type_ref()?);
+                }
+                Ok(Some(Type::Fun {
+                    args,
+                    ret: self.read_type_ref()?,
+                }))
+            }
+            20 => {
+                let nargs = self.read_u8()?;
+                let mut args = Vec::with_capacity(nargs as usize);
+                for _ in 0..nargs {
+                    args.push(self.read_type_ref()?);
+                }
+                Ok(Some(Type::Method {
+                    args,
+                    ret: self.read_type_ref()?,
+                }))
+            }
+            11 => {
+                let name = RefString(self.read_vari()? as usize);
+                let super_ = self.read_vari()?;
+                let global = self.read_varu()?;
+                let nfields = self.read_varu()? as usize;
+                let nprotos = self.read_varu()? as usize;
+                let nbindings = self.read_varu()? as usize;
+                let mut fields = Vec::with_capacity(nfields);
+                for _ in 0..nfields {
+                    fields.push(self.read_field()?);
+                }
+                let mut protos = Vec::with_capacity(nprotos);
+                for _ in 0..nprotos {
+                    protos.push(ObjProto {
+                        name: RefString(self.read_vari()? as usize),
+                        findex: RefFun(self.read_varu()? as usize),
+                        pindex: self.read_vari()? as usize,
+                    });
+                }
+                let mut bindings = Vec::with_capacity(nbindings);
+                for _ in 0..nbindings {
+                    bindings.push((self.read_varu()?, self.read_varu()?));
+                }
+                Ok(Some(Type::Obj {
+                    name,
+                    super_: if super_ < 0 {
+                        None
+                    } else {
+                        Some(RefType(super_ as usize))
+                    },
+                    fields,
+                    protos,
+                    bindings,
+                }))
+            }
+            21 => {
+                let name = RefString(self.read_vari()? as usize);
+                let super_ = self.read_vari()?;
+                let global = self.read_varu()?;
+                let nfields = self.read_varu()? as usize;
+                let nprotos = self.read_varu()? as usize;
+                let nbindings = self.read_varu()? as usize;
+                let mut fields = Vec::with_capacity(nfields);
+                for _ in 0..nfields {
+                    fields.push(self.read_field()?);
+                }
+                let mut protos = Vec::with_capacity(nprotos);
+                for _ in 0..nprotos {
+                    protos.push(ObjProto {
+                        name: RefString(self.read_vari()? as usize),
+                        findex: RefFun(self.read_varu()? as usize),
+                        pindex: self.read_vari()? as usize,
+                    });
+                }
+                let mut bindings = Vec::with_capacity(nbindings);
+                for _ in 0..nbindings {
+                    bindings.push((self.read_varu()?, self.read_varu()?));
+                }
+                Ok(Some(Type::Struct {
+                    name,
+                    super_: if super_ < 0 {
+                        None
+                    } else {
+                        Some(RefType(super_ as usize))
+                    },
+                    fields,
+                    protos,
+                    bindings,
+                }))
+            }
+            14 => Ok(Some(Type::Ref(self.read_type_ref()?))),
+            15 => {
+                let nfields = self.read_varu()? as usize;
+                let mut fields = Vec::with_capacity(nfields);
+                for _ in 0..nfields {
+                    fields.push(self.read_field()?);
+                }
+                Ok(Some(Type::Virtual { fields }))
+            }
+            17 => Ok(Some(Type::Abstract {
+                name: RefString(self.read_vari()? as usize),
+            })),
+            18 => {
+                let name = RefString(self.read_vari()? as usize);
+                let global = self.read_varu()?;
+                let nconstructs = self.read_varu()? as usize;
+                let mut constructs = Vec::with_capacity(nconstructs);
+                for _ in 0..nconstructs {
+                    let name = RefString(self.read_vari()? as usize);
+                    let nparams = self.read_varu()? as usize;
+                    let mut params = Vec::with_capacity(nparams);
+                    for _ in 0..nparams {
+                        params.push(self.read_type_ref()?);
+                    }
+                    constructs.push(EnumConstruct { name, params })
+                }
+                Ok(Some(Type::Enum { name, constructs }))
+            }
+            19 => Ok(Some(Type::Null(self.read_type_ref()?))),
+            other => {
+                if other >= 22 {
+                    anyhow::bail!("Invalid type kind {other}")
+                } else {
+                    Ok(None)
+                }
+            }
+        }
+    }
+
+    fn read_native(&mut self) -> Result<Native> {
+        Ok(Native {
+            lib: RefString(self.read_vari()? as usize),
+            name: RefString(self.read_vari()? as usize),
+            t: self.read_type_ref()?,
+            findex: RefFun(self.read_varu()? as usize),
+        })
+    }
+
+    fn read_function(&mut self, has_debug: bool, version: u8) -> Result<Function> {
+        let t = self.read_type_ref()?;
+        let findex = RefFun(self.read_varu()? as usize);
+        let nregs = self.read_varu()? as usize;
+        let nops = self.read_varu()? as usize;
+        let mut regs = Vec::with_capacity(nregs);
+        for _ in 0..nregs {
+            regs.push(self.read_type_ref()?);
+        }
+        let mut ops = Vec::with_capacity(nops);
+        for _ in 0..nops {
+            ops.push(Opcode::decode(self)?);
+        }
+        let debug_info = if has_debug {
+            let mut tmp = Vec::with_capacity(nops);
+            let mut currfile: i32 = -1;
+            let mut currline: i32 = 0;
+            let mut i = 0;
+            while i < nops {
+                let mut c = self.read_u8()? as i32;
+                if c & 1 != 0 {
+                    c >>= 1;
+                    currfile = (c << 8) | (self.read_u8()? as i32);
+                } else if c & 2 != 0 {
+                    let delta = c >> 6;
+                    let mut count = (c >> 2) & 15;
+                    while count > 0 {
+                        count -= 1;
+                        tmp.push((currfile, currline));
+                        i += 1;
+                    }
+                    currline += delta;
+                } else if c & 4 != 0 {
+                    currline += c >> 3;
+                    tmp.push((currfile, currline));
+                    i += 1;
+                } else {
+                    let b2 = self.read_u8()? as i32;
+                    let b3 = self.read_u8()? as i32;
+                    currline = (c >> 3) | (b2 << 5) | (b3 << 13);
+                    tmp.push((currfile, currline));
+                    i += 1;
+                }
+            }
+            Some(tmp)
+        } else {
+            None
+        };
+        if has_debug && version >= 3 {
+            let len = self.read_varu()? as usize;
+            for _ in 0..len {
+                self.read_varu()?;
+                self.read_vari()?;
+            }
+        }
+        Ok(Function {
+            t,
+            findex,
+            regs,
+            ops,
+            debug_info,
+        })
+    }
+
+    fn read_constant_def(&mut self) -> Result<ConstantDef> {
+        let global = RefGlobal(self.read_varu()? as usize);
+        let nfields = self.read_varu()? as usize;
+        let mut fields = Vec::with_capacity(nfields);
+        for _ in 0..nfields {
+            fields.push(self.read_varu()? as usize);
+        }
+        Ok(ConstantDef { global, fields })
+    }
+}
