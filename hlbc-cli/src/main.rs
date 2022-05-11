@@ -53,7 +53,15 @@ fn main() -> anyhow::Result<()> {
         let mut cmd = line.split(" ");
         match cmd.next().unwrap() {
             "info" => unsafe {
-                println!("{:#?}", code);
+                println!(
+                    "version: {}\ndebug: {}\nnints: {}\nnfloats: {}\nnstrings: {}\nntypes: {}",
+                    code.version,
+                    code.debug_files.is_some(),
+                    code.ints.len(),
+                    code.floats.len(),
+                    code.strings.len(),
+                    code.types.len()
+                );
             },
             "i" | "int" => {
                 let range = read_range(&mut cmd, code.ints.len())?;
@@ -154,17 +162,25 @@ fn read_range<'a>(
         } else if arg.contains("..") {
             let mut nums = arg.split("..");
             if let Some(a) = nums.next() {
-                if let Some(b) = nums.next() {
-                    Ok(Box::new((a.parse()?..b.parse()?).into_iter()))
-                } else if arg.ends_with(a) {
-                    Ok(Box::new((0..a.parse()?).into_iter()))
-                } else if arg.starts_with(a) {
-                    Ok(Box::new((a.parse()?..max_bound).into_iter()))
+                if a.is_empty() {
+                    if let Some(b) = nums.next() {
+                        Ok(Box::new((0..b.parse()?).into_iter()))
+                    } else {
+                        anyhow::bail!("Invalid range : '{arg}'")
+                    }
                 } else {
-                    anyhow::bail!("Invalid range : '{arg}'")
+                    if let Some(b) = nums.next() {
+                        Ok(Box::new((a.parse()?..b.parse()?).into_iter()))
+                    } else if arg.ends_with(a) {
+                        Ok(Box::new((0..a.parse()?).into_iter()))
+                    } else if arg.starts_with(a) {
+                        Ok(Box::new((a.parse()?..max_bound - 1).into_iter()))
+                    } else {
+                        anyhow::bail!("Invalid range : '{arg}'")
+                    }
                 }
             } else {
-                Ok(Box::new((0..max_bound).into_iter()))
+                Ok(Box::new((0..max_bound - 1).into_iter()))
             }
         } else {
             let i = arg.parse()?;
