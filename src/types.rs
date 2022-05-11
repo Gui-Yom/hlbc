@@ -57,26 +57,26 @@ pub struct RefField(pub usize);
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct RefGlobal(pub usize);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ObjField {
     pub name: RefString,
     pub t: RefType,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ObjProto {
     pub name: RefString,
     pub findex: RefFun,
-    pub pindex: usize,
+    pub pindex: i32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EnumConstruct {
     pub name: RefString,
     pub params: Vec<RefType>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Void,
     UI8,

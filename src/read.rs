@@ -15,7 +15,7 @@ pub(crate) trait ReadHlExt: ReadBytesExt {
     fn read_strings(&mut self, nstrings: usize) -> Result<Vec<String>>;
     fn read_field(&mut self) -> Result<ObjField>;
     fn read_type_ref(&mut self) -> Result<RefType>;
-    fn read_type(&mut self) -> Result<Option<Type>>;
+    fn read_type(&mut self) -> Result<Type>;
     fn read_native(&mut self) -> Result<Native>;
     fn read_function(&mut self, has_debug: bool, version: u8) -> Result<Function>;
     fn read_constant_def(&mut self) -> Result<ConstantDef>;
@@ -75,29 +75,28 @@ impl<T: Read> ReadHlExt for T {
         Ok(RefType(self.read_vari()? as usize))
     }
 
-    fn read_type(&mut self) -> Result<Option<Type>> {
+    fn read_type(&mut self) -> Result<Type> {
         match self.read_u8()? {
+            0 => Ok(Type::Void),
+            1 => Ok(Type::UI8),
+            2 => Ok(Type::UI16),
+            3 => Ok(Type::I32),
+            4 => Ok(Type::I64),
+            5 => Ok(Type::F32),
+            6 => Ok(Type::F64),
+            7 => Ok(Type::Bool),
+            8 => Ok(Type::Bytes),
+            9 => Ok(Type::Dyn),
             10 => {
                 let nargs = self.read_u8()?;
                 let mut args = Vec::with_capacity(nargs as usize);
                 for _ in 0..nargs {
                     args.push(self.read_type_ref()?);
                 }
-                Ok(Some(Type::Fun {
+                Ok(Type::Fun {
                     args,
                     ret: self.read_type_ref()?,
-                }))
-            }
-            20 => {
-                let nargs = self.read_u8()?;
-                let mut args = Vec::with_capacity(nargs as usize);
-                for _ in 0..nargs {
-                    args.push(self.read_type_ref()?);
-                }
-                Ok(Some(Type::Method {
-                    args,
-                    ret: self.read_type_ref()?,
-                }))
+                })
             }
             11 => {
                 let name = RefString(self.read_vari()? as usize);
@@ -115,14 +114,14 @@ impl<T: Read> ReadHlExt for T {
                     protos.push(ObjProto {
                         name: RefString(self.read_vari()? as usize),
                         findex: RefFun(self.read_varu()? as usize),
-                        pindex: self.read_vari()? as usize,
+                        pindex: self.read_vari()?,
                     });
                 }
                 let mut bindings = Vec::with_capacity(nbindings);
                 for _ in 0..nbindings {
                     bindings.push((self.read_varu()?, self.read_varu()?));
                 }
-                Ok(Some(Type::Obj {
+                Ok(Type::Obj {
                     name,
                     super_: if super_ < 0 {
                         None
@@ -132,7 +131,50 @@ impl<T: Read> ReadHlExt for T {
                     fields,
                     protos,
                     bindings,
-                }))
+                })
+            }
+            12 => Ok(Type::Array),
+            13 => Ok(Type::Type),
+            14 => Ok(Type::Ref(self.read_type_ref()?)),
+            15 => {
+                let nfields = self.read_varu()? as usize;
+                let mut fields = Vec::with_capacity(nfields);
+                for _ in 0..nfields {
+                    fields.push(self.read_field()?);
+                }
+                Ok(Type::Virtual { fields })
+            }
+            16 => Ok(Type::DynObj),
+            17 => Ok(Type::Abstract {
+                name: RefString(self.read_vari()? as usize),
+            }),
+            18 => {
+                let name = RefString(self.read_vari()? as usize);
+                let global = self.read_varu()?;
+                let nconstructs = self.read_varu()? as usize;
+                let mut constructs = Vec::with_capacity(nconstructs);
+                for _ in 0..nconstructs {
+                    let name = RefString(self.read_vari()? as usize);
+                    let nparams = self.read_varu()? as usize;
+                    let mut params = Vec::with_capacity(nparams);
+                    for _ in 0..nparams {
+                        params.push(self.read_type_ref()?);
+                    }
+                    constructs.push(EnumConstruct { name, params })
+                }
+                Ok(Type::Enum { name, constructs })
+            }
+            19 => Ok(Type::Null(self.read_type_ref()?)),
+            20 => {
+                let nargs = self.read_u8()?;
+                let mut args = Vec::with_capacity(nargs as usize);
+                for _ in 0..nargs {
+                    args.push(self.read_type_ref()?);
+                }
+                Ok(Type::Method {
+                    args,
+                    ret: self.read_type_ref()?,
+                })
             }
             21 => {
                 let name = RefString(self.read_vari()? as usize);
@@ -150,14 +192,14 @@ impl<T: Read> ReadHlExt for T {
                     protos.push(ObjProto {
                         name: RefString(self.read_vari()? as usize),
                         findex: RefFun(self.read_varu()? as usize),
-                        pindex: self.read_vari()? as usize,
+                        pindex: self.read_vari()?,
                     });
                 }
                 let mut bindings = Vec::with_capacity(nbindings);
                 for _ in 0..nbindings {
                     bindings.push((self.read_varu()?, self.read_varu()?));
                 }
-                Ok(Some(Type::Struct {
+                Ok(Type::Struct {
                     name,
                     super_: if super_ < 0 {
                         None
@@ -167,43 +209,10 @@ impl<T: Read> ReadHlExt for T {
                     fields,
                     protos,
                     bindings,
-                }))
+                })
             }
-            14 => Ok(Some(Type::Ref(self.read_type_ref()?))),
-            15 => {
-                let nfields = self.read_varu()? as usize;
-                let mut fields = Vec::with_capacity(nfields);
-                for _ in 0..nfields {
-                    fields.push(self.read_field()?);
-                }
-                Ok(Some(Type::Virtual { fields }))
-            }
-            17 => Ok(Some(Type::Abstract {
-                name: RefString(self.read_vari()? as usize),
-            })),
-            18 => {
-                let name = RefString(self.read_vari()? as usize);
-                let global = self.read_varu()?;
-                let nconstructs = self.read_varu()? as usize;
-                let mut constructs = Vec::with_capacity(nconstructs);
-                for _ in 0..nconstructs {
-                    let name = RefString(self.read_vari()? as usize);
-                    let nparams = self.read_varu()? as usize;
-                    let mut params = Vec::with_capacity(nparams);
-                    for _ in 0..nparams {
-                        params.push(self.read_type_ref()?);
-                    }
-                    constructs.push(EnumConstruct { name, params })
-                }
-                Ok(Some(Type::Enum { name, constructs }))
-            }
-            19 => Ok(Some(Type::Null(self.read_type_ref()?))),
             other => {
-                if other >= 22 {
-                    anyhow::bail!("Invalid type kind {other}")
-                } else {
-                    Ok(None)
-                }
+                anyhow::bail!("Invalid type kind {other}")
             }
         }
     }

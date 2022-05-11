@@ -16,7 +16,7 @@ pub mod types;
 #[derive(Debug)]
 pub struct Bytecode {
     pub version: u8,
-    pub entrypoint: usize,
+    pub entrypoint: RefFun,
     pub ints: Vec<i32>,
     pub floats: Vec<f64>,
     pub strings: Vec<String>,
@@ -54,7 +54,7 @@ impl Bytecode {
         let nnatives = r.read_varu()? as usize;
         let nfunctions = r.read_varu()? as usize;
         let nconstants = r.read_varu()? as usize;
-        let entrypoint = r.read_varu()? as usize;
+        let entrypoint = RefFun(r.read_varu()? as usize);
 
         let mut ints = vec![0i32; nints];
         for i in ints.iter_mut() {
@@ -79,9 +79,7 @@ impl Bytecode {
 
         let mut types = Vec::with_capacity(ntypes);
         for _ in 0..ntypes {
-            if let Some(t) = r.read_type()? {
-                types.push(t);
-            }
+            types.push(r.read_type()?);
         }
 
         let mut globals = Vec::with_capacity(nglobals);
