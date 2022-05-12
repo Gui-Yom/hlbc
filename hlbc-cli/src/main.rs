@@ -6,6 +6,7 @@ use std::io::{stdin, stdout, BufReader, Write};
 use std::ops::{Range, RangeBounds};
 use std::os::raw::c_char;
 use std::ptr::{null, null_mut};
+use std::time::Instant;
 
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -14,15 +15,17 @@ use hlbc::*;
 fn main() -> anyhow::Result<()> {
     let tty = atty::is(atty::Stream::Stdout);
 
+    let start = Instant::now();
+
     let mut code = {
         let mut r = BufReader::new(fs::File::open(
-            "D:/ReverseEngineering/northgard/hlbc/hlboot2.dat",
+            "D:/ReverseEngineering/northgard/hlbc/hlboot_.dat",
         )?);
         Bytecode::load(&mut r)?
     };
 
     if tty {
-        println!("Loaded !");
+        println!("Loaded ! ({} ms)", start.elapsed().as_millis());
     }
 
     let mut stdout = StandardStream::stdout(if tty {
@@ -133,11 +136,11 @@ fn main() -> anyhow::Result<()> {
                 }
             }
             "c" | "constant" => {
-                let range = read_range(&mut cmd, code.constants.len())?;
+                let range = read_range(&mut cmd, code.constants.as_ref().unwrap().len())?;
                 //println!("Constants :");
                 for i in range {
                     print_i!(i);
-                    println!("{:#?}", code.constants[i]);
+                    println!("{:#?}", code.constants.as_ref().unwrap()[i]);
                 }
             }
             _ => {
@@ -179,7 +182,11 @@ fn read_range<'a>(
                     }
                 } else {
                     if let Some(b) = nums.next() {
-                        Ok(Box::new((a.parse()?..b.parse()?).into_iter()))
+                        if b.is_empty() {
+                            Ok(Box::new((a.parse()?..max_bound - 1).into_iter()))
+                        } else {
+                            Ok(Box::new((a.parse()?..b.parse()?).into_iter()))
+                        }
                     } else if arg.ends_with(a) {
                         Ok(Box::new((0..a.parse()?).into_iter()))
                     } else if arg.starts_with(a) {

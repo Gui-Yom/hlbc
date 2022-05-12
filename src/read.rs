@@ -54,11 +54,10 @@ impl<T: Read> ReadHlExt for T {
         let mut acc = 0;
         for _ in 0..nstrings {
             let ssize = self.read_varu()? as usize + 1;
-            strings.push(
-                CStr::from_bytes_with_nul(&string_data[acc..(acc + ssize)])?
-                    .to_string_lossy()
-                    .to_string(),
-            );
+            //println!("size: {ssize} {:?}", &string_data[acc..(acc + ssize)]);
+            let cstr =
+                unsafe { CStr::from_bytes_with_nul_unchecked(&string_data[acc..(acc + ssize)]) };
+            strings.push(cstr.to_string_lossy().to_string());
             acc += ssize;
         }
         Ok(strings)

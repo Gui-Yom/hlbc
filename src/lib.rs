@@ -20,12 +20,13 @@ pub struct Bytecode {
     pub ints: Vec<i32>,
     pub floats: Vec<f64>,
     pub strings: Vec<String>,
+    pub bytes: Option<Vec<u8>>,
     pub debug_files: Option<Vec<String>>,
     pub types: Vec<Type>,
     pub globals: Vec<RefType>,
     pub natives: Vec<Native>,
     pub functions: Vec<Function>,
-    pub constants: Vec<ConstantDef>,
+    pub constants: Option<Vec<ConstantDef>>,
 }
 
 impl Bytecode {
@@ -53,7 +54,11 @@ impl Bytecode {
         let nglobals = r.read_varu()? as usize;
         let nnatives = r.read_varu()? as usize;
         let nfunctions = r.read_varu()? as usize;
-        let nconstants = r.read_varu()? as usize;
+        let nconstants = if version >= 4 {
+            Some(r.read_varu()? as usize)
+        } else {
+            None
+        };
         let entrypoint = RefFun(r.read_varu()? as usize);
 
         let mut ints = vec![0i32; nints];
@@ -68,7 +73,17 @@ impl Bytecode {
 
         let strings = r.read_strings(nstrings)?;
 
-        // TODO bytes
+        let bytes = if version >= 5 {
+            let size = r.read_i32::<LittleEndian>()? as usize;
+            let mut bytes = vec![0; size];
+            r.read_exact(&mut bytes)?;
+            for _ in 0..nbytes.unwrap() {
+                r.read_varu()?;
+            }
+            Some(bytes)
+        } else {
+            None
+        };
 
         let debug_files = if has_debug {
             let n = r.read_varu()? as usize;
@@ -97,10 +112,15 @@ impl Bytecode {
             functions.push(r.read_function(has_debug, version)?);
         }
 
-        let mut constants = Vec::with_capacity(nconstants);
-        for _ in 0..nconstants {
-            constants.push(r.read_constant_def()?)
-        }
+        let constants = if let Some(n) = nconstants {
+            let mut constants = Vec::with_capacity(n);
+            for _ in 0..n {
+                constants.push(r.read_constant_def()?)
+            }
+            Some(constants)
+        } else {
+            None
+        };
 
         for t in &types {
             match t {
@@ -149,6 +169,7 @@ impl Bytecode {
             ints,
             floats,
             strings,
+            bytes,
             debug_files,
             types,
             globals,
