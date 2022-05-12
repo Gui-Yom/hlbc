@@ -97,7 +97,7 @@ pub enum Type {
         super_: Option<RefType>,
         fields: Vec<ObjField>,
         protos: Vec<ObjProto>,
-        bindings: Vec<(u32, u32)>,
+        bindings: Vec<(usize, usize)>,
     },
     Array,
     Type,
@@ -123,7 +123,7 @@ pub enum Type {
         super_: Option<RefType>,
         fields: Vec<ObjField>,
         protos: Vec<ObjProto>,
-        bindings: Vec<(u32, u32)>,
+        bindings: Vec<(usize, usize)>,
     },
 }
 
@@ -137,6 +137,7 @@ pub struct Native {
 
 #[derive(Debug, Clone)]
 pub struct Function {
+    pub name: Option<RefString>,
     pub t: RefType,
     pub findex: RefFun,
     pub regs: Vec<RefType>,

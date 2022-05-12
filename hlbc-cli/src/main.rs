@@ -34,7 +34,7 @@ fn main() -> anyhow::Result<()> {
     macro_rules! print_i {
         ($i:expr) => {
             stdout.set_color(ColorSpec::new().set_fg(Some(Color::Ansi256(242))))?;
-            write!(&mut stdout, "{:3}: ", $i)?;
+            write!(&mut stdout, "{:<3}: ", $i)?;
             stdout.reset()?;
         };
     }
@@ -54,13 +54,15 @@ fn main() -> anyhow::Result<()> {
         match cmd.next().unwrap() {
             "info" => unsafe {
                 println!(
-                    "version: {}\ndebug: {}\nnints: {}\nnfloats: {}\nnstrings: {}\nntypes: {}",
+                    "version: {}\ndebug: {}\nnints: {}\nnfloats: {}\nnstrings: {}\nntypes: {}\nnnatives: {}\nnfunctions: {}",
                     code.version,
                     code.debug_files.is_some(),
                     code.ints.len(),
                     code.floats.len(),
                     code.strings.len(),
-                    code.types.len()
+                    code.types.len(),
+                    code.natives.len(),
+                    code.functions.len()
                 );
             },
             "i" | "int" => {
@@ -116,11 +118,18 @@ fn main() -> anyhow::Result<()> {
                     println!("{}", code.natives[i].display(&code));
                 }
             }
+            "fnh" | "functionh" => {
+                let range = read_range(&mut cmd, code.functions.len())?;
+                for i in range {
+                    print_i!(i);
+                    println!("{}", code.functions[i].display_header(&code));
+                }
+            }
             "fn" | "function" => {
                 let range = read_range(&mut cmd, code.functions.len())?;
                 for i in range {
                     print_i!(i);
-                    println!("{:#?}", code.functions[i]);
+                    println!("{}", code.functions[i].display(&code));
                 }
             }
             "c" | "constant" => {

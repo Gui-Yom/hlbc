@@ -47,7 +47,7 @@ pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
                     let dst = #reg;
                     let obj = #reg;
                     let n = r.read_u8()? as usize;
-                    let field = #reg;
+                    let field = RefField(#rvi32 as usize);
                     let mut args = Vec::with_capacity(n-1);
                     for _ in 1..n {
                         args.push(#reg);

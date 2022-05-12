@@ -159,13 +159,13 @@ pub enum Opcode {
     CallMethod {
         dst: Reg,
         obj: Reg,
-        field: Reg,
+        field: RefField,
         args: Vec<Reg>,
     },
     // Equivalent to CallMethod with obj = reg0
     CallThis {
         dst: Reg,
-        field: Reg,
+        field: RefField,
         args: Vec<Reg>,
     },
     CallClosure {
@@ -217,11 +217,11 @@ pub enum Opcode {
     DynGet {
         dst: Reg,
         obj: Reg,
-        field: Reg,
+        field: RefString,
     },
     DynSet {
         obj: Reg,
-        field: Reg,
+        field: RefString,
         src: Reg,
     },
     JTrue {

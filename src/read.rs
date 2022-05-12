@@ -119,7 +119,7 @@ impl<T: Read> ReadHlExt for T {
                 }
                 let mut bindings = Vec::with_capacity(nbindings);
                 for _ in 0..nbindings {
-                    bindings.push((self.read_varu()?, self.read_varu()?));
+                    bindings.push((self.read_varu()? as usize, self.read_varu()? as usize));
                 }
                 Ok(Type::Obj {
                     name,
@@ -197,7 +197,7 @@ impl<T: Read> ReadHlExt for T {
                 }
                 let mut bindings = Vec::with_capacity(nbindings);
                 for _ in 0..nbindings {
-                    bindings.push((self.read_varu()?, self.read_varu()?));
+                    bindings.push((self.read_varu()? as usize, self.read_varu()? as usize));
                 }
                 Ok(Type::Struct {
                     name,
@@ -282,6 +282,7 @@ impl<T: Read> ReadHlExt for T {
             }
         }
         Ok(Function {
+            name: None,
             t,
             findex,
             regs,

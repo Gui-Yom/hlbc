@@ -1,7 +1,7 @@
-use std::fmt::{Debug, Display, Formatter, Result};
+use std::fmt::{format, Debug, Display, Formatter, Result};
 
 use crate::types::{ObjField, RefInt, RefString, Reg};
-use crate::{Bytecode, Native, Opcode, RefType, Type};
+use crate::{Bytecode, Function, Native, Opcode, RefType, Type};
 
 /*
 pub trait CodeDisplay {
@@ -31,18 +31,17 @@ impl RefType {
         self.resolve(&ctx.types).display(ctx)
     }
 
-    fn display_rec(&self, ctx: &Bytecode, parents: &mut Vec<*const Type>) -> String {
+    fn display_rec(&self, ctx: &Bytecode, parents: Vec<*const Type>) -> String {
         self.resolve(&ctx.types).display_rec(ctx, parents)
     }
 }
 
 impl Type {
     pub fn display(&self, ctx: &Bytecode) -> String {
-        let mut parents = Vec::new();
-        self.display_rec(ctx, &mut parents)
+        self.display_rec(ctx, Vec::new())
     }
 
-    fn display_rec<'a>(&'a self, ctx: &Bytecode, parents: &'a mut Vec<*const Type>) -> String {
+    fn display_rec<'a>(&'a self, ctx: &Bytecode, mut parents: Vec<*const Type>) -> String {
         //println!("{:#?}", self);
         if parents.contains(&(self as *const Type)) {
             return "<loop>".to_string();
@@ -60,23 +59,32 @@ impl Type {
             Type::Bytes => "bytes".to_string(),
             Type::Dyn => "dynamic".to_string(),
             Type::Fun { args, ret } => {
-                let args: Vec<String> = args.iter().map(|a| a.display_rec(ctx, parents)).collect();
+                let args: Vec<String> = args
+                    .iter()
+                    .map(|a| a.display_rec(ctx, parents.clone()))
+                    .collect();
                 format!(
                     "({}) -> ({})",
                     args.join(", "),
-                    ret.display_rec(ctx, parents)
+                    ret.display_rec(ctx, parents.clone())
                 )
             }
             Type::Obj { name, .. } => name.display(ctx),
             Type::Array => "array".to_string(),
             Type::Type => "type".to_string(),
             Type::Ref(reftype) => {
-                format!("ref<{}>", reftype.display_rec(ctx, parents))
+                format!("ref<{}>", reftype.display_rec(ctx, parents.clone()))
             }
             Type::Virtual { fields } => {
                 let fields: Vec<String> = fields
                     .iter()
-                    .map(|a| format!("{}: {}", a.name.display(ctx), a.t.display_rec(ctx, parents)))
+                    .map(|a| {
+                        format!(
+                            "{}: {}",
+                            a.name.display(ctx),
+                            a.t.display_rec(ctx, parents.clone())
+                        )
+                    })
                     .collect();
                 format!("virtual<{}>", fields.join(", "))
             }
@@ -84,20 +92,29 @@ impl Type {
             Type::Abstract { name } => name.display(ctx),
             Type::Enum { name, .. } => name.display(ctx),
             Type::Null(reftype) => {
-                format!("null<{}>", reftype.display_rec(ctx, parents))
+                format!("null<{}>", reftype.display_rec(ctx, parents.clone()))
             }
             Type::Method { args, ret } => {
-                let args: Vec<String> = args.iter().map(|a| a.display_rec(ctx, parents)).collect();
+                let args: Vec<String> = args
+                    .iter()
+                    .map(|a| a.display_rec(ctx, parents.clone()))
+                    .collect();
                 format!(
                     "({}) -> ({})",
                     args.join(", "),
-                    ret.display_rec(ctx, parents)
+                    ret.display_rec(ctx, parents.clone())
                 )
             }
             Type::Struct { fields, .. } => {
                 let fields: Vec<String> = fields
                     .iter()
-                    .map(|a| format!("{}: {}", a.name.display(ctx), a.t.display_rec(ctx, parents)))
+                    .map(|a| {
+                        format!(
+                            "{}: {}",
+                            a.name.display(ctx),
+                            a.t.display_rec(ctx, parents.clone())
+                        )
+                    })
                     .collect();
                 format!("virtual<{}>", fields.join(", "))
             }
@@ -118,7 +135,7 @@ impl Native {
 }
 
 impl Opcode {
-    pub fn display(&self, ctx: &Bytecode) -> impl Display {
+    pub fn display(&self, ctx: &Bytecode, parent: &Function) -> impl Display {
         let name: &'static str = self.into();
 
         macro_rules! op {
@@ -130,46 +147,225 @@ impl Opcode {
         match self {
             Opcode::Mov { dst, src } => op!("{} = {src}", dst),
             Opcode::Int { dst, ptr } => op!("{dst} = {}", ptr.display(ctx)),
+            Opcode::Bool { dst, value } => op!("{dst} = {}", value.0),
+            Opcode::String { dst, ptr } => op!("{dst} = \"{}\"", ptr.display(ctx)),
+            Opcode::Null { dst } => op!("{dst} = null"),
+            Opcode::Call0 { dst, fun } => op!(
+                "{dst} = {}()",
+                fun.resolve(&ctx.functions).display_call(ctx)
+            ),
+            Opcode::Call1 { dst, fun, arg0 } => op!(
+                "{dst} = {}({arg0})",
+                fun.resolve(&ctx.functions).display_call(ctx)
+            ),
+            Opcode::Call2 {
+                dst,
+                fun,
+                arg0,
+                arg1,
+            } => op!(
+                "{dst} = {}({arg0}, {arg1})",
+                fun.resolve(&ctx.functions).display_call(ctx)
+            ),
+            Opcode::Call3 {
+                dst,
+                fun,
+                arg0,
+                arg1,
+                arg2,
+            } => op!(
+                "{dst} = {}({arg0}, {arg1}, {arg2})",
+                fun.resolve(&ctx.functions).display_call(ctx)
+            ),
+            Opcode::Call4 {
+                dst,
+                fun,
+                arg0,
+                arg1,
+                arg2,
+                arg3,
+            } => op!(
+                "{dst} = {}({arg0}, {arg1},{arg2}, {arg3})",
+                fun.resolve(&ctx.functions).display_call(ctx)
+            ),
+            Opcode::CallN { dst, fun, args } => {
+                let args: Vec<String> = args.iter().map(|r| format!("{}", r)).collect();
+                op!(
+                    "{dst} = {}({})",
+                    fun.resolve(&ctx.functions).display_call(ctx),
+                    args.join(", ")
+                )
+            }
+            Opcode::CallMethod {
+                dst,
+                obj,
+                field,
+                args,
+            } => {
+                let args: Vec<String> = args.iter().map(|r| format!("{}", r)).collect();
+                // TODO field name
+                op!("{dst} = {obj}.field{}({})", field.0, args.join(", "))
+            }
+            Opcode::CallThis { dst, field, args } => {
+                let args: Vec<String> = args.iter().map(|r| format!("{}", r)).collect();
+                // TODO field name
+                op!("{dst} = reg0.field{}({})", field.0, args.join(", "))
+            }
+            Opcode::CallClosure { dst, fun, args } => {
+                let args: Vec<String> = args.iter().map(|r| format!("{}", r)).collect();
+                op!("{dst} = {fun}({})", args.join(", "))
+            }
+            Opcode::StaticClosure { dst, fun } => {
+                op!(
+                    "{dst} = {}",
+                    fun.resolve(&ctx.functions).display_header(ctx)
+                )
+            }
+            Opcode::InstanceClosure { dst, fun, obj } => {
+                op!(
+                    "{dst} = {obj}.{}",
+                    fun.resolve(&ctx.functions).display_header(ctx)
+                )
+            }
+            Opcode::GetGlobal { dst, global } => {
+                op!("{dst} = global@{}", global.0)
+            }
+            Opcode::SetGlobal { global, src } => {
+                op!("global@{} = {src}", global.0)
+            }
+            Opcode::Field { dst, obj, field } => {
+                op!("{dst} = {obj}.field{}", field.0)
+            }
+            Opcode::SetField { obj, field, src } => {
+                op!("{obj}.field{} = {src}", field.0)
+            }
+            Opcode::GetThis { dst, field } => {
+                op!("{dst} = this.field{}", field.0)
+            }
+            Opcode::SetThis { field, src } => {
+                op!("this.field{} = {src}", field.0)
+            }
+            Opcode::DynGet { dst, obj, field } => {
+                op!("{dst} = {obj}[{}]", field.resolve(&ctx.strings))
+            }
+            Opcode::DynSet { obj, field, src } => {
+                op!("{obj}[{}] = {src}", field.resolve(&ctx.strings))
+            }
+            Opcode::JTrue { cond, offset } => {
+                op!("if {cond} == true jump {offset}")
+            }
+            Opcode::JFalse { cond, offset } => {
+                op!("if {cond} == false jump {offset}")
+            }
+            Opcode::JNull { reg, offset } => {
+                op!("if {reg} == null jump {offset}")
+            }
+            Opcode::JNotNull { reg, offset } => {
+                op!("if {reg} != null jump {offset}")
+            }
+            Opcode::JEq { a, b, offset } => {
+                op!("if {a} == {b} jump {offset}")
+            }
+            Opcode::JNotEq { a, b, offset } => {
+                op!("if {a} != {b} jump {offset}")
+            }
+            Opcode::JAlways { offset } => {
+                op!("jump {offset}")
+            }
+            Opcode::ToDyn { dst, src } => {
+                op!("{dst} = cast {src}")
+            }
+            Opcode::ToInt { dst, src } => {
+                op!("{dst} = cast {src}")
+            }
+            Opcode::SafeCast { dst, src } => {
+                op!("{dst} = cast {src}")
+            }
+            Opcode::UnsafeCast { dst, src } => {
+                op!("{dst} = cast {src}")
+            }
+            Opcode::ToVirtual { dst, src } => {
+                op!("{dst} = cast {src}")
+            }
+            Opcode::Throw { exc } => {
+                op!("throw {exc}")
+            }
+            Opcode::Rethrow { exc } => {
+                op!("rethrow {exc}")
+            }
+            Opcode::NullCheck { reg } => {
+                op!("if {reg} == null throw exc")
+            }
+            Opcode::ArraySize { dst, array } => {
+                op!("{dst} = {array}.length")
+            }
+            Opcode::Ref { dst, src } => {
+                op!("{dst} = &{src}")
+            }
+            Opcode::Unref { dst, src } => {
+                op!("{dst} = *{src}")
+            }
+            Opcode::Ret { ret } => op!("{ret}"),
+            Opcode::New { dst } => {
+                op!("{dst} = new {}", parent.regs[dst.0 as usize].display(ctx))
+            }
             other => format!("{self:?}"),
         }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::types::{RefInt, Reg};
-    use crate::{Bytecode, Opcode, RefFun};
+impl Function {
+    pub fn display_header(&self, ctx: &Bytecode) -> impl Display {
+        format!(
+            "fn {}@{} {}",
+            self.name.map(|r| r.resolve(&ctx.strings)).unwrap_or("_"),
+            self.findex.0,
+            self.t.display(ctx)
+        )
+    }
 
-    #[test]
-    fn test() {
-        let bc = Bytecode {
-            version: 0,
-            entrypoint: RefFun(0),
-            ints: vec![69],
-            floats: vec![],
-            strings: vec![],
-            debug_files: None,
-            types: vec![],
-            globals: vec![],
-            natives: vec![],
-            functions: vec![],
-            constants: vec![],
+    pub fn display_call(&self, ctx: &Bytecode) -> impl Display {
+        format!(
+            "{}@{}",
+            self.name.map(|r| r.resolve(&ctx.strings)).unwrap_or("_"),
+            self.findex.0
+        )
+    }
+
+    pub fn display(&self, ctx: &Bytecode) -> impl Display {
+        let regs: Vec<String> = self
+            .regs
+            .iter()
+            .enumerate()
+            .map(|(i, r)| format!("reg{} {}", i, r.display(ctx)))
+            .collect();
+        let ops: Vec<String> = if let Some(debug) = &self.debug_info {
+            self.ops
+                .iter()
+                .zip(debug.iter())
+                .map(|(o, (file, line))| {
+                    format!(
+                        "{:>12}:{line:<3}  {}",
+                        ctx.debug_files.as_ref().unwrap()[*file as usize],
+                        o.display(ctx, self)
+                    )
+                })
+                .collect()
+        } else {
+            self.ops
+                .iter()
+                .map(|o| format!("{}", o.display(ctx, self)))
+                .collect()
         };
-        println!(
-            "{}",
-            Opcode::Mov {
-                dst: Reg(0),
-                src: Reg(1),
-            }
-            .display(&bc)
-        );
-        println!(
-            "{}",
-            Opcode::Int {
-                dst: Reg(0),
-                ptr: RefInt(0),
-            }
-            .display(&bc)
-        );
+        format!(
+            "fn {}@{} {} ({} regs, {} ops)\n    {}\n{}",
+            self.name.map(|r| r.resolve(&ctx.strings)).unwrap_or("_"),
+            self.findex.0,
+            self.t.display(ctx),
+            self.regs.len(),
+            self.ops.len(),
+            regs.join("\n    "),
+            ops.join("\n")
+        )
     }
 }

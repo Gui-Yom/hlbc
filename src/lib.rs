@@ -6,7 +6,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 
 use crate::opcodes::Opcode;
 use crate::read::ReadHlExt;
-use crate::types::{ConstantDef, Function, Native, RefFun, RefGlobal, RefType, Type};
+use crate::types::{ConstantDef, Function, Native, ObjField, RefFun, RefGlobal, RefType, Type};
 
 pub mod fmt;
 pub mod opcodes;
@@ -102,6 +102,47 @@ impl Bytecode {
             constants.push(r.read_constant_def()?)
         }
 
+        for t in &types {
+            match t {
+                Type::Obj {
+                    protos,
+                    bindings,
+                    fields,
+                    ..
+                } => {
+                    for p in protos {
+                        if let Some(f) = find_findex_mut(&mut functions, p.findex.0) {
+                            f.name = Some(p.name);
+                        }
+                    }
+                    for (fid, findex) in bindings {
+                        if let Some(field) = find_field(&types, t, *fid) {
+                            if let Some(f) = find_findex_mut(&mut functions, *findex) {
+                                f.name = Some(field.name);
+                            }
+                        }
+                    }
+                }
+                Type::Struct {
+                    protos, bindings, ..
+                } => {
+                    for p in protos {
+                        if let Some(f) = find_findex_mut(&mut functions, p.findex.0) {
+                            f.name = Some(p.name);
+                        }
+                    }
+                    for (fid, findex) in bindings {
+                        if let Some(field) = find_field(&types, t, *fid) {
+                            if let Some(f) = find_findex_mut(&mut functions, *findex) {
+                                f.name = Some(field.name);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
         Ok(Bytecode {
             version,
             entrypoint,
@@ -115,6 +156,42 @@ impl Bytecode {
             functions,
             constants,
         })
+    }
+}
+
+pub fn find_findex_mut(functions: &mut [Function], findex: usize) -> Option<&mut Function> {
+    functions.iter_mut().find(|f| f.findex.0 == findex)
+}
+
+pub fn find_field<'a>(types: &'a [Type], ty: &'a Type, fid: usize) -> Option<&'a ObjField> {
+    match ty {
+        Type::Obj { .. } => Some(fetch_fields_rec(types, ty)[fid]),
+        Type::Struct { .. } => Some(fetch_fields_rec(types, ty)[fid]),
+        _ => None,
+    }
+}
+
+pub fn fetch_fields_rec<'a>(types: &'a [Type], ty: &'a Type) -> Vec<&'a ObjField> {
+    match ty {
+        Type::Obj { super_, fields, .. } => {
+            if let Some(s) = super_ {
+                let mut ret = fetch_fields_rec(types, s.resolve(&types));
+                ret.extend(fields.iter());
+                ret
+            } else {
+                fields.iter().collect()
+            }
+        }
+        Type::Struct { super_, fields, .. } => {
+            if let Some(s) = super_ {
+                let mut ret = fetch_fields_rec(types, s.resolve(&types));
+                ret.extend(fields.iter());
+                ret
+            } else {
+                fields.iter().collect()
+            }
+        }
+        _ => Vec::new(),
     }
 }
 
