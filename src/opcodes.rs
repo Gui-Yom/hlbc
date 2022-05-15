@@ -1,5 +1,6 @@
 use crate::types::{
-    RefBytes, RefField, RefFloat, RefFun, RefGlobal, RefInt, RefString, RefType, Reg, ValBool,
+    RefBytes, RefEnumConstruct, RefField, RefFloat, RefFun, RefGlobal, RefInt, RefString, RefType,
+    Reg, ValBool,
 };
 
 /*
@@ -10,6 +11,7 @@ static OPCODE_ARGS: &[i8; 99] = &[
     4, 3, 0, 2, 3, 0,
 ];*/
 
+/// Offset for jump instruction
 pub type JumpOffset = i32;
 
 #[hlbc_macros::gen_decode]
@@ -158,8 +160,8 @@ pub enum Opcode {
     },
     CallMethod {
         dst: Reg,
-        obj: Reg,
         field: RefField,
+        // obj is the first arg
         args: Vec<Reg>,
     },
     // Equivalent to CallMethod with obj = reg0
@@ -420,25 +422,26 @@ pub enum Opcode {
     },
     MakeEnum {
         dst: Reg,
-        construct: usize,
+        construct: RefEnumConstruct,
         args: Vec<Reg>,
     },
     EnumAlloc {
         dst: Reg,
-        construct: usize,
+        construct: RefEnumConstruct,
     },
+    /// Get the enum value construct index (the enum tag)
     EnumIndex {
         dst: Reg,
-        construct: Reg,
+        value: Reg,
     },
     EnumField {
         dst: Reg,
-        enum_: Reg,
-        construct: usize,
+        value: Reg,
+        construct: RefEnumConstruct,
         field: RefField,
     },
     SetEnumField {
-        enum_: Reg,
+        value: Reg,
         field: RefField,
         src: Reg,
     },
@@ -450,7 +453,7 @@ pub enum Opcode {
     RefOffset {
         dst: Reg,
         reg: Reg,
-        offset: usize,
+        offset: Reg,
     },
     Nop,
 }

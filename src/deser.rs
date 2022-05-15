@@ -206,6 +206,8 @@ impl<T: Read> ReadHlExt for T {
         for _ in 0..nops {
             ops.push(Opcode::decode(self)?);
         }
+
+        // This is extracted from the hashlink source code, do not count on me to explain what it does
         let debug_info = if has_debug {
             let mut tmp = Vec::with_capacity(nops);
             let mut currfile: i32 = -1;
@@ -221,19 +223,19 @@ impl<T: Read> ReadHlExt for T {
                     let mut count = (c >> 2) & 15;
                     while count > 0 {
                         count -= 1;
-                        tmp.push((currfile, currline));
+                        tmp.push((currfile as usize, currline as usize));
                         i += 1;
                     }
                     currline += delta;
                 } else if c & 4 != 0 {
                     currline += c >> 3;
-                    tmp.push((currfile, currline));
+                    tmp.push((currfile as usize, currline as usize));
                     i += 1;
                 } else {
                     let b2 = self.read_u8()? as i32;
                     let b3 = self.read_u8()? as i32;
                     currline = (c >> 3) | (b2 << 5) | (b3 << 13);
-                    tmp.push((currfile, currline));
+                    tmp.push((currfile as usize, currline as usize));
                     i += 1;
                 }
             }
@@ -241,6 +243,8 @@ impl<T: Read> ReadHlExt for T {
         } else {
             None
         };
+
+        // TODO assigns
         if has_debug && version >= 3 {
             let len = self.read_varu()? as usize;
             for _ in 0..len {

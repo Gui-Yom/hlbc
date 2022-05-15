@@ -1,4 +1,4 @@
-use crate::Opcode;
+use crate::{Bytecode, Opcode};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Reg(pub u32);
@@ -28,31 +28,8 @@ impl RefString {
     }
 }
 
-/// Reference to a type in the constant pool
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct RefType(pub usize);
-
-impl RefType {
-    pub fn resolve<'a>(&self, types: &'a [Type]) -> &'a Type {
-        &types[self.0]
-    }
-}
-
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ValBool(pub bool);
-
-/// Reference to a function in the constant pool
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct RefFun(pub usize);
-
-impl RefFun {
-    pub fn resolve<'a>(&self, functions: &'a [Function]) -> &'a Function {
-        &functions[self.0]
-    }
-}
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct RefField(pub usize);
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct RefGlobal(pub usize);
@@ -62,6 +39,9 @@ pub struct ObjField {
     pub name: RefString,
     pub t: RefType,
 }
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct RefField(pub usize);
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObjProto {
@@ -75,6 +55,9 @@ pub struct EnumConstruct {
     pub name: RefString,
     pub params: Vec<RefType>,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RefEnumConstruct(pub usize);
 
 // For Type::Fun and Type::Method
 #[derive(Debug, Clone, PartialEq)]
@@ -152,6 +135,16 @@ impl Type {
     }
 }
 
+/// Reference to a type in the constant pool
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct RefType(pub usize);
+
+impl RefType {
+    pub fn resolve<'a>(&self, types: &'a [Type]) -> &'a Type {
+        &types[self.0]
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Native {
     pub name: RefString,
@@ -167,7 +160,31 @@ pub struct Function {
     pub findex: RefFun,
     pub regs: Vec<RefType>,
     pub ops: Vec<Opcode>,
-    pub debug_info: Option<Vec<(i32, i32)>>,
+    pub debug_info: Option<Vec<(usize, usize)>>,
+}
+
+/// Reference to a function or a native in the constant pool (findex)
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+pub struct RefFun(pub usize);
+
+#[derive(Debug, Copy, Clone)]
+pub enum RefFunPointee<'a> {
+    Fun(&'a Function),
+    Native(&'a Native),
+}
+
+impl RefFun {
+    pub fn resolve<'a>(&self, bc: &'a Bytecode) -> RefFunPointee<'a> {
+        if let Some(&(i, f)) = bc.findexes.get(self) {
+            if f {
+                RefFunPointee::Fun(&bc.functions[i])
+            } else {
+                RefFunPointee::Native(&bc.natives[i])
+            }
+        } else {
+            unreachable!()
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

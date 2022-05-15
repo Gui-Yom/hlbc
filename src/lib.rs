@@ -5,15 +5,15 @@ use std::io::Read;
 use anyhow::Result;
 use byteorder::{LittleEndian, ReadBytesExt};
 
+use crate::deser::ReadHlExt;
 use crate::opcodes::Opcode;
-use crate::read::ReadHlExt;
 use crate::types::{
     ConstantDef, Function, Native, ObjField, RefFun, RefGlobal, RefType, Type, TypeObj,
 };
 
+mod deser;
 pub mod fmt;
 pub mod opcodes;
-mod read;
 pub mod types;
 
 #[derive(Debug)]

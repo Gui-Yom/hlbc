@@ -14,6 +14,7 @@ pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
     .unwrap();
 
     let ty_usize = parse_str::<Type>("usize").unwrap();
+    let ty_i32 = parse_str::<Type>("i32").unwrap();
     let ty_jump_offset = parse_str::<Type>("JumpOffset").unwrap();
     let ty_reg = parse_str::<Type>("Reg").unwrap();
     let ty_vec_reg = parse_str::<Type>("Vec<Reg>").unwrap();
@@ -26,6 +27,7 @@ pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
     let ty_ref_fun = parse_str::<Type>("RefFun").unwrap();
     let ty_ref_field = parse_str::<Type>("RefField").unwrap();
     let ty_ref_global = parse_str::<Type>("RefGlobal").unwrap();
+    let ty_ref_construct = parse_str::<Type>("RefEnumConstruct").unwrap();
 
     let rvi32 = quote! {
         r.read_vari()?
@@ -45,16 +47,14 @@ pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
             quote! {
                 {
                     let dst = #reg;
-                    let obj = #reg;
-                    let n = r.read_u8()? as usize;
                     let field = RefField(#rvi32 as usize);
-                    let mut args = Vec::with_capacity(n-1);
-                    for _ in 1..n {
+                    let n = r.read_u8()? as usize;
+                    let mut args = Vec::with_capacity(n);
+                    for _ in 0..n {
                         args.push(#reg);
                     }
                     Ok(#name::CallMethod {
                         dst,
-                        obj,
                         field,
                         args
                     })
@@ -84,6 +84,10 @@ pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
                 if f.ty == ty_usize {
                     quote! {
                         #rvi32 as usize
+                    }
+                } else if f.ty == ty_i32 {
+                    quote! {
+                        #rvi32 as JumpOffset
                     }
                 } else if f.ty == ty_jump_offset {
                     quote! {
@@ -138,6 +142,10 @@ pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
                     quote! {
                         RefGlobal(#rvi32 as usize)
                     }
+                } else if f.ty == ty_ref_construct {
+                    quote! {
+                        RefEnumConstruct(#rvi32 as usize)
+                    }
                 } else {
                     TokenStream2::default()
                 }
@@ -157,7 +165,7 @@ pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
             pub fn decode(r: &mut impl std::io::Read) -> anyhow::Result<#name> {
 
                 use byteorder::ReadBytesExt;
-                use crate::read::ReadHlExt;
+                use crate::deser::ReadHlExt;
                 use crate::types::*;
 
                 let op = r.read_u8()?;

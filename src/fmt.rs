@@ -2,9 +2,10 @@ use std::fmt::{Display, Formatter, Result};
 
 use crate::opcodes::Opcode;
 use crate::types::{
-    Function, Native, RefField, RefInt, RefString, RefType, Reg, Type, TypeFun, TypeObj,
+    Function, Native, RefEnumConstruct, RefField, RefFunPointee, RefInt, RefString, RefType, Reg,
+    Type, TypeFun, TypeObj,
 };
-use crate::Bytecode;
+use crate::{Bytecode, RefFun};
 
 /*
 pub trait CodeDisplay {
@@ -40,13 +41,22 @@ impl RefType {
 }
 
 impl RefField {
-    pub fn display(&self, parent: &Type, ctx: &Bytecode) -> impl Display {
+    pub fn display_obj(&self, parent: &Type, ctx: &Bytecode) -> impl Display {
         if let Some(obj) = parent.get_type_obj() {
             obj.fields[self.0].name.display(ctx)
         } else if let Type::Virtual { fields } = parent {
             fields[self.0].name.display(ctx)
         } else {
             format!("field{}", self.0)
+        }
+    }
+}
+
+impl RefEnumConstruct {
+    pub fn display(&self, parent: RefType, ctx: &Bytecode) -> impl Display {
+        match parent.resolve(&ctx.types) {
+            Type::Enum { constructs, .. } => constructs[self.0].name.display(ctx),
+            _ => "_".to_string(),
         }
     }
 }
@@ -131,14 +141,47 @@ impl Type {
     }
 }
 
+impl RefFun {
+    pub fn display_header(&self, ctx: &Bytecode) -> impl Display {
+        self.resolve(ctx).display_header(ctx)
+    }
+
+    pub fn display_call(&self, ctx: &Bytecode) -> impl Display {
+        self.resolve(ctx).display_call(ctx)
+    }
+}
+
+impl<'a> RefFunPointee<'a> {
+    pub fn display_header(&'a self, ctx: &Bytecode) -> impl Display {
+        match self {
+            RefFunPointee::Fun(fun) => fun.display_header(ctx),
+            RefFunPointee::Native(n) => n.display_header(ctx),
+        }
+    }
+
+    pub fn display_call(&'a self, ctx: &Bytecode) -> impl Display {
+        match self {
+            RefFunPointee::Fun(fun) => fun.display_call(ctx),
+            RefFunPointee::Native(n) => n.display_call(ctx),
+        }
+    }
+}
+
 impl Native {
-    pub fn display(&self, ctx: &Bytecode) -> impl Display {
+    pub fn display_header(&self, ctx: &Bytecode) -> String {
         format!(
-            "fn:native {}/{}@{} {}",
+            "fn:native {} {}",
+            self.display_call(ctx),
+            self.t.display(ctx)
+        )
+    }
+
+    pub fn display_call(&self, ctx: &Bytecode) -> String {
+        format!(
+            "{}/{}@{}",
             self.lib.resolve(&ctx.strings),
             self.name.resolve(&ctx.strings),
-            self.findex.0,
-            self.t.display(ctx)
+            self.findex.0
         )
     }
 }
@@ -176,33 +219,21 @@ impl Opcode {
             Opcode::Not { dst, src } => op!("{dst} = !{src}"),
             Opcode::Incr { dst } => op!("{dst}++"),
             Opcode::Decr { dst } => op!("{dst}--"),
-            Opcode::Call0 { dst, fun } => op!(
-                "{dst} = {}()",
-                fun.resolve(&ctx.functions).display_call(ctx)
-            ),
-            Opcode::Call1 { dst, fun, arg0 } => op!(
-                "{dst} = {}({arg0})",
-                fun.resolve(&ctx.functions).display_call(ctx)
-            ),
+            Opcode::Call0 { dst, fun } => op!("{dst} = {}()", fun.display_call(ctx)),
+            Opcode::Call1 { dst, fun, arg0 } => op!("{dst} = {}({arg0})", fun.display_call(ctx)),
             Opcode::Call2 {
                 dst,
                 fun,
                 arg0,
                 arg1,
-            } => op!(
-                "{dst} = {}({arg0}, {arg1})",
-                fun.resolve(&ctx.functions).display_call(ctx)
-            ),
+            } => op!("{dst} = {}({arg0}, {arg1})", fun.display_call(ctx)),
             Opcode::Call3 {
                 dst,
                 fun,
                 arg0,
                 arg1,
                 arg2,
-            } => op!(
-                "{dst} = {}({arg0}, {arg1}, {arg2})",
-                fun.resolve(&ctx.functions).display_call(ctx)
-            ),
+            } => op!("{dst} = {}({arg0}, {arg1}, {arg2})", fun.display_call(ctx)),
             Opcode::Call4 {
                 dst,
                 fun,
@@ -212,36 +243,28 @@ impl Opcode {
                 arg3,
             } => op!(
                 "{dst} = {}({arg0}, {arg1},{arg2}, {arg3})",
-                fun.resolve(&ctx.functions).display_call(ctx)
+                fun.display_call(ctx)
             ),
             Opcode::CallN { dst, fun, args } => {
                 let args: Vec<String> = args.iter().map(|r| format!("{}", r)).collect();
-                op!(
-                    "{dst} = {}({})",
-                    fun.resolve(&ctx.functions).display_call(ctx),
-                    args.join(", ")
-                )
+                op!("{dst} = {}({})", fun.display_call(ctx), args.join(", "))
             }
-            Opcode::CallMethod {
-                dst,
-                obj,
-                field,
-                args,
-            } => {
-                let args: Vec<String> = args.iter().map(|r| format!("{}", r)).collect();
-                // TODO field name
+            Opcode::CallMethod { dst, field, args } => {
+                let mut args = args.iter();
+                let arg0 = args.next().unwrap();
+                let args: Vec<String> = args.map(|r| format!("{}", r)).collect();
                 op!(
-                    "{dst} = {obj}.{}({})",
-                    field.display(parent.regs[obj.0 as usize].resolve(&ctx.types), ctx),
+                    "{dst} = {}.{}({})",
+                    arg0,
+                    field.display_obj(parent.regs[arg0.0 as usize].resolve(&ctx.types), ctx),
                     args.join(", ")
                 )
             }
             Opcode::CallThis { dst, field, args } => {
                 let args: Vec<String> = args.iter().map(|r| format!("{}", r)).collect();
-                // TODO field name
                 op!(
                     "{dst} = reg0.{}({})",
-                    field.display(parent.regs[0].resolve(&ctx.types), ctx),
+                    field.display_obj(parent.regs[0].resolve(&ctx.types), ctx),
                     args.join(", ")
                 )
             }
@@ -250,16 +273,10 @@ impl Opcode {
                 op!("{dst} = {fun}({})", args.join(", "))
             }
             Opcode::StaticClosure { dst, fun } => {
-                op!(
-                    "{dst} = {}",
-                    fun.resolve(&ctx.functions).display_header(ctx)
-                )
+                op!("{dst} = {}", fun.display_header(ctx))
             }
             Opcode::InstanceClosure { dst, fun, obj } => {
-                op!(
-                    "{dst} = {obj}.{}",
-                    fun.resolve(&ctx.functions).display_header(ctx)
-                )
+                op!("{dst} = {obj}.{}", fun.display_header(ctx))
             }
             Opcode::GetGlobal { dst, global } => {
                 op!("{dst} = global@{}", global.0)
@@ -270,25 +287,25 @@ impl Opcode {
             Opcode::Field { dst, obj, field } => {
                 op!(
                     "{dst} = {obj}.{}",
-                    field.display(parent.regs[obj.0 as usize].resolve(&ctx.types), ctx)
+                    field.display_obj(parent.regs[obj.0 as usize].resolve(&ctx.types), ctx)
                 )
             }
             Opcode::SetField { obj, field, src } => {
                 op!(
                     "{obj}.{} = {src}",
-                    field.display(parent.regs[obj.0 as usize].resolve(&ctx.types), ctx)
+                    field.display_obj(parent.regs[obj.0 as usize].resolve(&ctx.types), ctx)
                 )
             }
             Opcode::GetThis { dst, field } => {
                 op!(
                     "{dst} = this.{}",
-                    field.display(parent.regs[0].resolve(&ctx.types), ctx)
+                    field.display_obj(parent.regs[0].resolve(&ctx.types), ctx)
                 )
             }
             Opcode::SetThis { field, src } => {
                 op!(
                     "this.{} = {src}",
-                    field.display(parent.regs[0].resolve(&ctx.types), ctx)
+                    field.display_obj(parent.regs[0].resolve(&ctx.types), ctx)
                 )
             }
             Opcode::DynGet { dst, obj, field } => {
@@ -308,6 +325,30 @@ impl Opcode {
             }
             Opcode::JNotNull { reg, offset } => {
                 op!("if {reg} != null jump {offset}")
+            }
+            Opcode::JSLt { a, b, offset } => {
+                op!("if {a} < {b} jump {offset}")
+            }
+            Opcode::JSGte { a, b, offset } => {
+                op!("if {a} >= {b} jump {offset}")
+            }
+            Opcode::JSGt { a, b, offset } => {
+                op!("if {a} > {b} jump {offset}")
+            }
+            Opcode::JSLte { a, b, offset } => {
+                op!("if {a} <= {b} jump {offset}")
+            }
+            Opcode::JULt { a, b, offset } => {
+                op!("if {a} < {b} jump {offset}")
+            }
+            Opcode::JUGte { a, b, offset } => {
+                op!("if {a} >= {b} jump {offset}")
+            }
+            Opcode::JNotLt { a, b, offset } => {
+                op!("if {a} !< {b} jump {offset}")
+            }
+            Opcode::JNotGte { a, b, offset } => {
+                op!("if {a} !>= {b} jump {offset}")
             }
             Opcode::JEq { a, b, offset } => {
                 op!("if {a} == {b} jump {offset}")
@@ -333,6 +374,7 @@ impl Opcode {
             Opcode::ToVirtual { dst, src } => {
                 op!("{dst} = cast {src}")
             }
+            Opcode::Ret { ret } => op!("{ret}"),
             Opcode::Throw { exc } => {
                 op!("throw {exc}")
             }
@@ -341,6 +383,18 @@ impl Opcode {
             }
             Opcode::NullCheck { reg } => {
                 op!("if {reg} == null throw exc")
+            }
+            Opcode::Trap { exc, offset } => {
+                op!("try {exc} jump {offset}")
+            }
+            Opcode::EndTrap { exc } => {
+                op!("catch {exc}")
+            }
+            Opcode::GetArray { dst, array, index } => {
+                op!("{dst} = {array}[{index}]")
+            }
+            Opcode::New { dst } => {
+                op!("{dst} = new {}", parent.regs[dst.0 as usize].display(ctx))
             }
             Opcode::ArraySize { dst, array } => {
                 op!("{dst} = {array}.length")
@@ -354,9 +408,41 @@ impl Opcode {
             Opcode::Unref { dst, src } => {
                 op!("{dst} = *{src}")
             }
-            Opcode::Ret { ret } => op!("{ret}"),
-            Opcode::New { dst } => {
-                op!("{dst} = new {}", parent.regs[dst.0 as usize].display(ctx))
+            Opcode::MakeEnum {
+                dst,
+                construct,
+                args,
+            } => {
+                let args: Vec<String> = args.iter().map(|r| format!("{}", r)).collect();
+                op!(
+                    "{dst} = variant {} ({})",
+                    construct.display(parent.regs[dst.0 as usize], ctx),
+                    args.join(", ")
+                )
+            }
+            Opcode::EnumAlloc { dst, construct } => {
+                op!(
+                    "{dst} = new {}",
+                    construct.display(parent.regs[dst.0 as usize], ctx)
+                )
+            }
+            Opcode::EnumIndex { dst, value } => {
+                op!("{dst} = variant of {value}")
+            }
+            Opcode::EnumField {
+                dst,
+                value,
+                construct,
+                field,
+            } => {
+                op!(
+                    "{dst} = ({value} as {}).{}",
+                    construct.display(parent.regs[dst.0 as usize], ctx),
+                    field.0
+                )
+            }
+            Opcode::SetEnumField { value, field, src } => {
+                op!("{value}.{} = {src}", field.0)
             }
             other => format!("{self:?}"),
         }
@@ -364,16 +450,11 @@ impl Opcode {
 }
 
 impl Function {
-    pub fn display_header(&self, ctx: &Bytecode) -> impl Display {
-        format!(
-            "fn {}@{} {}",
-            self.name.map(|r| r.resolve(&ctx.strings)).unwrap_or("_"),
-            self.findex.0,
-            self.t.display(ctx)
-        )
+    pub fn display_header(&self, ctx: &Bytecode) -> String {
+        format!("fn {} {}", self.display_call(ctx), self.t.display(ctx))
     }
 
-    pub fn display_call(&self, ctx: &Bytecode) -> impl Display {
+    pub fn display_call(&self, ctx: &Bytecode) -> String {
         format!(
             "{}@{}",
             self.name.map(|r| r.resolve(&ctx.strings)).unwrap_or("_"),
@@ -407,10 +488,8 @@ impl Function {
                 .collect()
         };
         format!(
-            "fn {}@{} {} ({} regs, {} ops)\n    {}\n{}",
-            self.name.map(|r| r.resolve(&ctx.strings)).unwrap_or("_"),
-            self.findex.0,
-            self.t.display(ctx),
+            "{} ({} regs, {} ops)\n    {}\n{}",
+            self.display_header(ctx),
             self.regs.len(),
             self.ops.len(),
             regs.join("\n    "),

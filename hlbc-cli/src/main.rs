@@ -112,7 +112,7 @@ fn main() -> anyhow::Result<()> {
                 let range = read_range(&mut cmd, code.natives.len())?;
                 for i in range {
                     print_i!(i);
-                    println!("{}", code.natives[i].display(&code));
+                    println!("{}", code.natives[i].display_header(&code));
                 }
             }
             "entrypoint" => {
@@ -141,7 +141,7 @@ fn main() -> anyhow::Result<()> {
                         if fun {
                             println!("{}", code.functions[i].display_header(&code));
                         } else {
-                            println!("{}", code.natives[i].display(&code));
+                            println!("{}", code.natives[i].display_header(&code));
                         }
                     } else {
                         println!("unknown");
@@ -156,7 +156,7 @@ fn main() -> anyhow::Result<()> {
                         if fun {
                             println!("{}", code.functions[i].display(&code));
                         } else {
-                            println!("{}", code.natives[i].display(&code));
+                            println!("{}", code.natives[i].display_header(&code));
                         }
                     } else {
                         println!("unknown");
@@ -177,7 +177,7 @@ fn main() -> anyhow::Result<()> {
                 if let Some((idx, _)) = fileidx {
                     println!("Finding functions in file index : {idx}");
                     for f in &code.functions {
-                        if f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0 == idx as i32 {
+                        if f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0 == idx {
                             println!("{}", f.display_header(&code));
                         }
                     }
