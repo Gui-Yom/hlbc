@@ -171,6 +171,20 @@ fn main() -> anyhow::Result<()> {
                     println!("unknown");
                 }
             }
+            "infile" => {
+                let name = cmd.next().unwrap();
+                let fileidx = code.debug_files.as_ref().and_then(|files| files.iter().enumerate().find(|(i, s)| { s.as_str() == name }));
+                if let Some((idx, _)) = fileidx {
+                    println!("Finding functions in file index : {idx}");
+                    for f in &code.functions {
+                        if f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0 == idx as i32 {
+                            println!("{}", f.display_header(&code));
+                        }
+                    }
+                } else {
+                    println!("File {name} not found !");
+                }
+            }
             "c" | "constant" => {
                 let range = read_range(&mut cmd, code.constants.as_ref().unwrap().len())?;
                 //println!("Constants :");
