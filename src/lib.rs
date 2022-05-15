@@ -1,3 +1,4 @@
+use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
 use std::io::Read;
 
@@ -6,7 +7,9 @@ use byteorder::{LittleEndian, ReadBytesExt};
 
 use crate::opcodes::Opcode;
 use crate::read::ReadHlExt;
-use crate::types::{ConstantDef, Function, Native, ObjField, RefFun, RefGlobal, RefType, Type};
+use crate::types::{
+    ConstantDef, Function, Native, ObjField, RefFun, RefGlobal, RefType, Type, TypeObj,
+};
 
 pub mod fmt;
 pub mod opcodes;
@@ -27,6 +30,9 @@ pub struct Bytecode {
     pub natives: Vec<Native>,
     pub functions: Vec<Function>,
     pub constants: Option<Vec<ConstantDef>>,
+    pub findexes: HashMap<RefFun, (usize, bool)>,
+    pub fnames: HashMap<String, usize>,
+    pub max_findex: usize,
 }
 
 impl Bytecode {
@@ -122,46 +128,77 @@ impl Bytecode {
             None
         };
 
+        // Parsing is finished, we now build links between everything
+
+        // Function indexes
+        let mut max_findex = 0;
+        let mut findexes = HashMap::with_capacity(functions.len() + natives.len());
+        for (i, f) in functions.iter().enumerate() {
+            findexes.insert(f.findex, (i, true));
+            max_findex = max_findex.max(f.findex.0);
+        }
+        for (i, n) in natives.iter().enumerate() {
+            findexes.insert(n.findex, (i, false));
+            max_findex = max_findex.max(n.findex.0);
+        }
+
+        let mut new_fields: Vec<Option<Vec<ObjField>>> = Vec::with_capacity(types.len());
+        // Flatten types fields
+        // Start by collecting every fields in the hierarchy
+        // The order is important because we refer to fields by index
         for t in &types {
-            match t {
-                Type::Obj {
-                    protos,
-                    bindings,
-                    fields,
-                    ..
-                } => {
-                    for p in protos {
-                        if let Some(f) = find_findex_mut(&mut functions, p.findex.0) {
-                            f.name = Some(p.name);
-                        }
+            if let Some(obj) = t.get_type_obj() {
+                let mut parent = obj.super_.as_ref().map(|s| s.resolve(&types));
+                let mut acc = VecDeque::with_capacity(obj.fields.len());
+                acc.extend(obj.fields.clone());
+                while let Some(p) = parent.and_then(|t| t.get_type_obj()) {
+                    for f in p.fields.iter().rev() {
+                        acc.push_front(f.clone());
                     }
-                    for (fid, findex) in bindings {
-                        if let Some(field) = find_field(&types, t, *fid) {
-                            if let Some(f) = find_findex_mut(&mut functions, *findex) {
-                                f.name = Some(field.name);
-                            }
-                        }
-                    }
+                    parent = p.super_.as_ref().map(|s| s.resolve(&types));
                 }
-                Type::Struct {
-                    protos, bindings, ..
-                } => {
-                    for p in protos {
-                        if let Some(f) = find_findex_mut(&mut functions, p.findex.0) {
-                            f.name = Some(p.name);
-                        }
-                    }
-                    for (fid, findex) in bindings {
-                        if let Some(field) = find_field(&types, t, *fid) {
-                            if let Some(f) = find_findex_mut(&mut functions, *findex) {
-                                f.name = Some(field.name);
-                            }
-                        }
-                    }
-                }
-                _ => {}
+                new_fields.push(Some(acc.into()));
+            } else {
+                new_fields.push(None);
             }
         }
+        // Apply new fields
+        for (t, new) in types.iter_mut().zip(new_fields.into_iter()) {
+            if let Some(fields) = new {
+                t.get_type_obj_mut().unwrap().fields = fields;
+            }
+        }
+
+        // Function names based on object fields bindings and methods
+        for t in &types {
+            if let Some(TypeObj {
+                protos, bindings, ..
+            }) = t.get_type_obj()
+            {
+                for p in protos {
+                    if let Some(f) = findexes.get(&p.findex).map(|(i, _)| &mut functions[*i]) {
+                        f.name = Some(p.name);
+                    }
+                }
+                for (fid, findex) in bindings {
+                    if let Some(field) = t.get_type_obj().map(|o| &o.fields[fid.0]) {
+                        if let Some(f) = findexes.get(findex).map(|(i, _)| &mut functions[*i]) {
+                            f.name = Some(field.name);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Function names
+        let mut fnames = HashMap::with_capacity(functions.len());
+        for (i, f) in functions.iter().enumerate() {
+            if let Some(s) = f.name {
+                // FIXME we possibly overwrite some values here, is that a problem ?
+                fnames.insert(s.resolve(&strings).to_string(), i);
+            }
+        }
+        fnames.insert("init".to_string(), findexes.get(&entrypoint).unwrap().0);
 
         Ok(Bytecode {
             version,
@@ -176,43 +213,10 @@ impl Bytecode {
             natives,
             functions,
             constants,
+            findexes,
+            fnames,
+            max_findex,
         })
-    }
-}
-
-pub fn find_findex_mut(functions: &mut [Function], findex: usize) -> Option<&mut Function> {
-    functions.iter_mut().find(|f| f.findex.0 == findex)
-}
-
-pub fn find_field<'a>(types: &'a [Type], ty: &'a Type, fid: usize) -> Option<&'a ObjField> {
-    match ty {
-        Type::Obj { .. } => Some(fetch_fields_rec(types, ty)[fid]),
-        Type::Struct { .. } => Some(fetch_fields_rec(types, ty)[fid]),
-        _ => None,
-    }
-}
-
-pub fn fetch_fields_rec<'a>(types: &'a [Type], ty: &'a Type) -> Vec<&'a ObjField> {
-    match ty {
-        Type::Obj { super_, fields, .. } => {
-            if let Some(s) = super_ {
-                let mut ret = fetch_fields_rec(types, s.resolve(&types));
-                ret.extend(fields.iter());
-                ret
-            } else {
-                fields.iter().collect()
-            }
-        }
-        Type::Struct { super_, fields, .. } => {
-            if let Some(s) = super_ {
-                let mut ret = fetch_fields_rec(types, s.resolve(&types));
-                ret.extend(fields.iter());
-                ret
-            } else {
-                fields.iter().collect()
-            }
-        }
-        _ => Vec::new(),
     }
 }
 

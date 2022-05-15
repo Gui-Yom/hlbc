@@ -42,7 +42,7 @@ impl RefType {
 pub struct ValBool(pub bool);
 
 /// Reference to a function in the constant pool
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct RefFun(pub usize);
 
 impl RefFun {
@@ -76,6 +76,23 @@ pub struct EnumConstruct {
     pub params: Vec<RefType>,
 }
 
+// For Type::Fun and Type::Method
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeFun {
+    pub args: Vec<RefType>,
+    pub ret: RefType,
+}
+
+// For Type::Obj and Type::Struct
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeObj {
+    pub name: RefString,
+    pub super_: Option<RefType>,
+    pub fields: Vec<ObjField>,
+    pub protos: Vec<ObjProto>,
+    pub bindings: Vec<(RefField, RefFun)>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Void,
@@ -88,17 +105,8 @@ pub enum Type {
     Bool,
     Bytes,
     Dyn,
-    Fun {
-        args: Vec<RefType>,
-        ret: RefType,
-    },
-    Obj {
-        name: RefString,
-        super_: Option<RefType>,
-        fields: Vec<ObjField>,
-        protos: Vec<ObjProto>,
-        bindings: Vec<(usize, usize)>,
-    },
+    Fun(TypeFun),
+    Obj(TypeObj),
     Array,
     Type,
     Ref(RefType),
@@ -114,17 +122,34 @@ pub enum Type {
         constructs: Vec<EnumConstruct>,
     },
     Null(RefType),
-    Method {
-        args: Vec<RefType>,
-        ret: RefType,
-    },
-    Struct {
-        name: RefString,
-        super_: Option<RefType>,
-        fields: Vec<ObjField>,
-        protos: Vec<ObjProto>,
-        bindings: Vec<(usize, usize)>,
-    },
+    Method(TypeFun),
+    Struct(TypeObj),
+}
+
+impl Type {
+    pub fn get_type_obj(&self) -> Option<&TypeObj> {
+        match self {
+            Type::Obj(obj) => Some(obj),
+            Type::Struct(obj) => Some(obj),
+            _ => None,
+        }
+    }
+
+    pub fn get_type_obj_mut(&mut self) -> Option<&mut TypeObj> {
+        match self {
+            Type::Obj(obj) => Some(obj),
+            Type::Struct(obj) => Some(obj),
+            _ => None,
+        }
+    }
+
+    pub fn get_type_fun(&self) -> Option<&TypeFun> {
+        match self {
+            Type::Fun(fun) => Some(fun),
+            Type::Method(fun) => Some(fun),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

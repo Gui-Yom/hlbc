@@ -1,15 +1,11 @@
-use std::cmp::max;
-use std::ffi::c_void;
-use std::fmt::{Debug, Display};
-use std::fs;
-use std::io::{stdin, stdout, BufReader, Write};
-use std::ops::{Range, RangeBounds};
-use std::os::raw::c_char;
-use std::ptr::{null, null_mut};
+use std::io::{stdin, BufReader, Write};
+use std::ops::RangeBounds;
 use std::time::Instant;
+use std::{env, fs};
 
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
+use hlbc::types::RefFun;
 use hlbc::*;
 
 fn main() -> anyhow::Result<()> {
@@ -17,10 +13,10 @@ fn main() -> anyhow::Result<()> {
 
     let start = Instant::now();
 
-    let mut code = {
-        let mut r = BufReader::new(fs::File::open(
-            "D:/ReverseEngineering/northgard/hlbc/hlboot_.dat",
-        )?);
+    let code = {
+        let mut args = env::args();
+        let filename = args.nth(1).unwrap();
+        let mut r = BufReader::new(fs::File::open(&filename)?);
         Bytecode::load(&mut r)?
     };
 
@@ -55,19 +51,17 @@ fn main() -> anyhow::Result<()> {
         }
         let mut cmd = line.split(" ");
         match cmd.next().unwrap() {
-            "info" => unsafe {
-                println!(
-                    "version: {}\ndebug: {}\nnints: {}\nnfloats: {}\nnstrings: {}\nntypes: {}\nnnatives: {}\nnfunctions: {}",
-                    code.version,
-                    code.debug_files.is_some(),
-                    code.ints.len(),
-                    code.floats.len(),
-                    code.strings.len(),
-                    code.types.len(),
-                    code.natives.len(),
-                    code.functions.len()
-                );
-            },
+            "info" => println!(
+                "version: {}\ndebug: {}\nnints: {}\nnfloats: {}\nnstrings: {}\nntypes: {}\nnnatives: {}\nnfunctions: {}",
+                code.version,
+                code.debug_files.is_some(),
+                code.ints.len(),
+                code.floats.len(),
+                code.strings.len(),
+                code.types.len(),
+                code.natives.len(),
+                code.functions.len()
+            ),
             "i" | "int" => {
                 let range = read_range(&mut cmd, code.ints.len())?;
                 for i in range {
@@ -121,6 +115,9 @@ fn main() -> anyhow::Result<()> {
                     println!("{}", code.natives[i].display(&code));
                 }
             }
+            "entrypoint" => {
+                println!("{}", code.functions[code.findexes.get(&code.entrypoint).unwrap().0].display_header(&code));
+            }
             "fnh" | "functionh" => {
                 let range = read_range(&mut cmd, code.functions.len())?;
                 for i in range {
@@ -128,11 +125,50 @@ fn main() -> anyhow::Result<()> {
                     println!("{}", code.functions[i].display_header(&code));
                 }
             }
+            // Function by index
             "fn" | "function" => {
                 let range = read_range(&mut cmd, code.functions.len())?;
                 for i in range {
                     print_i!(i);
                     println!("{}", code.functions[i].display(&code));
+                }
+            }
+            "fih" | "findexh" => {
+                let range = read_range(&mut cmd, code.max_findex + 1)?;
+                for findex in range {
+                    print_i!(findex);
+                    if let Some(&(i, fun)) = code.findexes.get(&RefFun(findex)) {
+                        if fun {
+                            println!("{}", code.functions[i].display_header(&code));
+                        } else {
+                            println!("{}", code.natives[i].display(&code));
+                        }
+                    } else {
+                        println!("unknown");
+                    }
+                }
+            }
+            "fi" | "findex" => {
+                let range = read_range(&mut cmd, code.max_findex + 1)?;
+                for findex in range {
+                    print_i!(findex);
+                    if let Some(&(i, fun)) = code.findexes.get(&RefFun(findex)) {
+                        if fun {
+                            println!("{}", code.functions[i].display(&code));
+                        } else {
+                            println!("{}", code.natives[i].display(&code));
+                        }
+                    } else {
+                        println!("unknown");
+                    }
+                }
+            }
+            "fname" => {
+                let name = cmd.next().unwrap();
+                if let Some(&i) = code.fnames.get(name) {
+                    println!("{}", code.functions[i].display(&code));
+                } else {
+                    println!("unknown");
                 }
             }
             "c" | "constant" => {
