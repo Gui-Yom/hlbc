@@ -159,6 +159,23 @@ impl Opcode {
             Opcode::Bool { dst, value } => op!("{dst} = {}", value.0),
             Opcode::String { dst, ptr } => op!("{dst} = \"{}\"", ptr.display(ctx)),
             Opcode::Null { dst } => op!("{dst} = null"),
+            Opcode::Add { dst, a, b } => op!("{dst} = {a} + {b}"),
+            Opcode::Sub { dst, a, b } => op!("{dst} = {a} - {b}"),
+            Opcode::Mul { dst, a, b } => op!("{dst} = {a} * {b}"),
+            Opcode::SDiv { dst, a, b } => op!("{dst} = {a} / {b}"),
+            Opcode::UDiv { dst, a, b } => op!("{dst} = {a} / {b}"),
+            Opcode::SMod { dst, a, b } => op!("{dst} = {a} % {b}"),
+            Opcode::UMod { dst, a, b } => op!("{dst} = {a} % {b}"),
+            Opcode::Shl { dst, a, b } => op!("{dst} = {a} << {b}"),
+            Opcode::SShr { dst, a, b } => op!("{dst} = {a} >> {b}"),
+            Opcode::UShr { dst, a, b } => op!("{dst} = {a} >> {b}"),
+            Opcode::And { dst, a, b } => op!("{dst} = {a} & {b}"),
+            Opcode::Or { dst, a, b } => op!("{dst} = {a} | {b}"),
+            Opcode::Xor { dst, a, b } => op!("{dst} = {a} ^ {b}"),
+            Opcode::Neg { dst, src } => op!("{dst} = -{src}"),
+            Opcode::Not { dst, src } => op!("{dst} = !{src}"),
+            Opcode::Incr { dst } => op!("{dst}++"),
+            Opcode::Decr { dst } => op!("{dst}--"),
             Opcode::Call0 { dst, fun } => op!(
                 "{dst} = {}()",
                 fun.resolve(&ctx.functions).display_call(ctx)
@@ -327,6 +344,9 @@ impl Opcode {
             }
             Opcode::ArraySize { dst, array } => {
                 op!("{dst} = {array}.length")
+            }
+            Opcode::Type { dst, ty } => {
+                op!("{dst} = {}", ty.display(ctx))
             }
             Opcode::Ref { dst, src } => {
                 op!("{dst} = &{src}")
