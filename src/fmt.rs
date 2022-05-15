@@ -2,8 +2,8 @@ use std::fmt::{Display, Formatter, Result};
 
 use crate::opcodes::Opcode;
 use crate::types::{
-    Function, Native, RefEnumConstruct, RefField, RefFunPointee, RefInt, RefString, RefType, Reg,
-    Type, TypeFun, TypeObj,
+    Function, Native, RefEnumConstruct, RefField, RefFloat, RefFunPointee, RefInt, RefString,
+    RefType, Reg, Type, TypeFun, TypeObj,
 };
 use crate::{Bytecode, RefFun};
 
@@ -20,7 +20,13 @@ impl Display for Reg {
 
 impl RefInt {
     pub fn display(&self, ctx: &Bytecode) -> impl Display {
-        *self.resolve(&ctx.ints)
+        self.resolve(&ctx.ints)
+    }
+}
+
+impl RefFloat {
+    pub fn display(&self, ctx: &Bytecode) -> impl Display {
+        self.resolve(&ctx.floats)
     }
 }
 
@@ -187,7 +193,7 @@ impl Native {
 }
 
 impl Opcode {
-    pub fn display(&self, ctx: &Bytecode, parent: &Function) -> impl Display {
+    pub fn display(&self, ctx: &Bytecode, parent: &Function, pos: i32) -> impl Display {
         let name: &'static str = self.into();
 
         macro_rules! op {
@@ -199,6 +205,7 @@ impl Opcode {
         match self {
             Opcode::Mov { dst, src } => op!("{} = {src}", dst),
             Opcode::Int { dst, ptr } => op!("{dst} = {}", ptr.display(ctx)),
+            Opcode::Float { dst, ptr } => op!("{dst} = {}", ptr.display(ctx)),
             Opcode::Bool { dst, value } => op!("{dst} = {}", value.0),
             Opcode::String { dst, ptr } => op!("{dst} = \"{}\"", ptr.display(ctx)),
             Opcode::Null { dst } => op!("{dst} = null"),
@@ -315,49 +322,49 @@ impl Opcode {
                 op!("{obj}[{}] = {src}", field.resolve(&ctx.strings))
             }
             Opcode::JTrue { cond, offset } => {
-                op!("if {cond} == true jump {offset}")
+                op!("if {cond} == true jump to {}", pos + offset)
             }
             Opcode::JFalse { cond, offset } => {
-                op!("if {cond} == false jump {offset}")
+                op!("if {cond} == false jump to {}", pos + offset)
             }
             Opcode::JNull { reg, offset } => {
-                op!("if {reg} == null jump {offset}")
+                op!("if {reg} == null jump to {}", pos + offset)
             }
             Opcode::JNotNull { reg, offset } => {
-                op!("if {reg} != null jump {offset}")
+                op!("if {reg} != null jump to {}", pos + offset)
             }
             Opcode::JSLt { a, b, offset } => {
-                op!("if {a} < {b} jump {offset}")
+                op!("if {a} < {b} jump to {}", pos + offset)
             }
             Opcode::JSGte { a, b, offset } => {
-                op!("if {a} >= {b} jump {offset}")
+                op!("if {a} >= {b} jump to {}", pos + offset)
             }
             Opcode::JSGt { a, b, offset } => {
-                op!("if {a} > {b} jump {offset}")
+                op!("if {a} > {b} jump to {}", pos + offset)
             }
             Opcode::JSLte { a, b, offset } => {
-                op!("if {a} <= {b} jump {offset}")
+                op!("if {a} <= {b} jump to {}", pos + offset)
             }
             Opcode::JULt { a, b, offset } => {
-                op!("if {a} < {b} jump {offset}")
+                op!("if {a} < {b} jump to {}", pos + offset)
             }
             Opcode::JUGte { a, b, offset } => {
-                op!("if {a} >= {b} jump {offset}")
+                op!("if {a} >= {b} jump to {}", pos + offset)
             }
             Opcode::JNotLt { a, b, offset } => {
-                op!("if {a} !< {b} jump {offset}")
+                op!("if {a} !< {b} jump to {}", pos + offset)
             }
             Opcode::JNotGte { a, b, offset } => {
-                op!("if {a} !>= {b} jump {offset}")
+                op!("if {a} !>= {b} jump to {}", pos + offset)
             }
             Opcode::JEq { a, b, offset } => {
-                op!("if {a} == {b} jump {offset}")
+                op!("if {a} == {b} jump to {}", pos + offset)
             }
             Opcode::JNotEq { a, b, offset } => {
-                op!("if {a} != {b} jump {offset}")
+                op!("if {a} != {b} jump to {}", pos + offset)
             }
             Opcode::JAlways { offset } => {
-                op!("jump {offset}")
+                op!("jump {}", pos + offset)
             }
             Opcode::ToDyn { dst, src } => {
                 op!("{dst} = cast {src}")
@@ -385,7 +392,7 @@ impl Opcode {
                 op!("if {reg} == null throw exc")
             }
             Opcode::Trap { exc, offset } => {
-                op!("try {exc} jump {offset}")
+                op!("try {exc} jump to {}", pos + offset)
             }
             Opcode::EndTrap { exc } => {
                 op!("catch {exc}")
@@ -472,28 +479,38 @@ impl Function {
         let ops: Vec<String> = if let Some(debug) = &self.debug_info {
             self.ops
                 .iter()
+                .enumerate()
                 .zip(debug.iter())
-                .map(|(o, (file, line))| {
+                .map(|((i, o), (file, line))| {
                     format!(
-                        "{:>12}:{line:<3}  {}",
+                        "{:>12}:{line:<3} {i}: {}",
                         ctx.debug_files.as_ref().unwrap()[*file as usize],
-                        o.display(ctx, self)
+                        o.display(ctx, self, i as i32)
                     )
                 })
                 .collect()
         } else {
             self.ops
                 .iter()
-                .map(|o| format!("{}", o.display(ctx, self)))
+                .enumerate()
+                .map(|(i, o)| format!("{i}: {}", o.display(ctx, self, i as i32)))
                 .collect()
         };
+        let assigns: Vec<String> = self
+            .assigns
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|(s, i)| format!("{} at opcode {i}", s.resolve(&ctx.strings)))
+            .collect();
         format!(
-            "{} ({} regs, {} ops)\n    {}\n{}",
+            "{} ({} regs, {} ops)\n    {}\n\n{}\n{}",
             self.display_header(ctx),
             self.regs.len(),
             self.ops.len(),
             regs.join("\n    "),
-            ops.join("\n")
+            ops.join("\n"),
+            assigns.join("\n")
         )
     }
 }

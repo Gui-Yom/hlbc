@@ -11,6 +11,7 @@ use crate::types::{
     ConstantDef, Function, Native, ObjField, RefFun, RefGlobal, RefType, Type, TypeObj,
 };
 
+pub mod analysis;
 mod deser;
 pub mod fmt;
 pub mod opcodes;
@@ -217,24 +218,5 @@ impl Bytecode {
             fnames,
             max_findex,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::fs::File;
-    use std::io::BufReader;
-
-    use anyhow::Result;
-
-    use crate::Bytecode;
-
-    #[test]
-    fn test() -> Result<()> {
-        let mut reader = BufReader::new(File::open(
-            "D:/ReverseEngineering/northgard/hlbc/hlboot2.dat",
-        )?);
-        println!("{:#?}", Bytecode::load(&mut reader)?);
-        Ok(())
     }
 }

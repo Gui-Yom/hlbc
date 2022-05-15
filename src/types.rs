@@ -7,13 +7,19 @@ pub struct Reg(pub u32);
 pub struct RefInt(pub usize);
 
 impl RefInt {
-    pub fn resolve<'a>(&self, ints: &'a [i32]) -> &'a i32 {
-        &ints[self.0]
+    pub fn resolve(&self, ints: &[i32]) -> i32 {
+        ints[self.0]
     }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct RefFloat(pub usize);
+
+impl RefFloat {
+    pub fn resolve(&self, floats: &[f64]) -> f64 {
+        floats[self.0]
+    }
+}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct RefBytes(pub usize);
@@ -161,6 +167,7 @@ pub struct Function {
     pub regs: Vec<RefType>,
     pub ops: Vec<Opcode>,
     pub debug_info: Option<Vec<(usize, usize)>>,
+    pub assigns: Option<Vec<(RefString, usize)>>,
 }
 
 /// Reference to a function or a native in the constant pool (findex)

@@ -244,14 +244,19 @@ impl<T: Read> ReadHlExt for T {
             None
         };
 
-        // TODO assigns
-        if has_debug && version >= 3 {
+        let assigns = if has_debug && version >= 3 {
             let len = self.read_varu()? as usize;
+            let mut assigns = Vec::with_capacity(len);
             for _ in 0..len {
-                self.read_varu()?;
-                self.read_vari()?;
+                assigns.push((
+                    RefString(self.read_varu()? as usize),
+                    self.read_vari()? as usize,
+                ));
             }
-        }
+            Some(assigns)
+        } else {
+            None
+        };
         Ok(Function {
             name: None,
             t,
@@ -259,6 +264,7 @@ impl<T: Read> ReadHlExt for T {
             regs,
             ops,
             debug_info,
+            assigns,
         })
     }
 
