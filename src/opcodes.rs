@@ -457,3 +457,9 @@ pub enum Opcode {
     },
     Nop,
 }
+
+impl Opcode {
+    pub fn name(&self) -> &'static str {
+        Into::into(self)
+    }
+}

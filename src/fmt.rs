@@ -38,7 +38,7 @@ impl RefString {
 
 impl RefType {
     pub fn display(&self, ctx: &Bytecode) -> String {
-        self.resolve(&ctx.types).display(ctx)
+        format!("{}@{}", self.resolve(&ctx.types).display(ctx), self.0)
     }
 
     fn display_rec(&self, ctx: &Bytecode, parents: Vec<*const Type>) -> String {
@@ -49,7 +49,11 @@ impl RefType {
 impl RefField {
     pub fn display_obj(&self, parent: &Type, ctx: &Bytecode) -> impl Display {
         if let Some(obj) = parent.get_type_obj() {
-            obj.fields[self.0].name.display(ctx)
+            if self.0 < obj.fields.len() {
+                obj.fields[self.0].name.display(ctx)
+            } else {
+                format!("field{}", self.0)
+            }
         } else if let Type::Virtual { fields } = parent {
             fields[self.0].name.display(ctx)
         } else {
@@ -125,7 +129,7 @@ impl Type {
             }
             Type::DynObj => "dynobj".to_string(),
             Type::Abstract { name } => name.display(ctx),
-            Type::Enum { name, .. } => name.display(ctx),
+            Type::Enum { name, .. } => format!("enum<{}>", name.display(ctx)),
             Type::Null(reftype) => {
                 format!("null<{}>", reftype.display_rec(ctx, parents.clone()))
             }
@@ -194,11 +198,9 @@ impl Native {
 
 impl Opcode {
     pub fn display(&self, ctx: &Bytecode, parent: &Function, pos: i32) -> impl Display {
-        let name: &'static str = self.into();
-
         macro_rules! op {
             ($($arg:tt)*) => {
-                format!("{name:<16} {}", format_args!($($arg)*))
+                format!("{:<16} {}", self.name(), format_args!($($arg)*))
             };
         }
 
@@ -474,7 +476,7 @@ impl Function {
             .regs
             .iter()
             .enumerate()
-            .map(|(i, r)| format!("reg{} {}", i, r.display(ctx)))
+            .map(|(i, r)| format!("reg{:<2} {}", i, r.display(ctx)))
             .collect();
         let ops: Vec<String> = if let Some(debug) = &self.debug_info {
             self.ops
@@ -483,7 +485,7 @@ impl Function {
                 .zip(debug.iter())
                 .map(|((i, o), (file, line))| {
                     format!(
-                        "{:>12}:{line:<3} {i}: {}",
+                        "{:>12}:{line:<3} {i:>3}: {}",
                         ctx.debug_files.as_ref().unwrap()[*file as usize],
                         o.display(ctx, self, i as i32)
                     )
@@ -493,7 +495,7 @@ impl Function {
             self.ops
                 .iter()
                 .enumerate()
-                .map(|(i, o)| format!("{i}: {}", o.display(ctx, self, i as i32)))
+                .map(|(i, o)| format!("{i:>3}: {}", o.display(ctx, self, i as i32)))
                 .collect()
         };
         let assigns: Vec<String> = self

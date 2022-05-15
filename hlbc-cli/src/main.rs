@@ -1,12 +1,11 @@
 use std::io::{stdin, BufReader, Write};
-use std::ops::RangeBounds;
 use std::time::Instant;
 use std::{env, fs};
 
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use hlbc::opcodes::Opcode;
-use hlbc::types::RefFun;
+use hlbc::types::{Function, RefFun, RefFunPointee};
 use hlbc::*;
 
 fn main() -> anyhow::Result<()> {
@@ -74,6 +73,14 @@ fn main() -> anyhow::Result<()> {
                         println!("{}", code.strings[i]);
                     }
                 }
+                "fstr" => {
+                    for (i, s) in code.strings.iter().enumerate() {
+                        if s.contains(args) {
+                            print_i!(i);
+                            println!("{}", s);
+                        }
+                    }
+                }
                 "d" | "debugfile" => {
                     if let Some(debug_files) = &code.debug_files {
                         let range = read_range(args, debug_files.len())?;
@@ -85,11 +92,30 @@ fn main() -> anyhow::Result<()> {
                         println!("No debug info in this binary");
                     }
                 }
+                "ffile" => {
+                    if let Some(debug_files) = &code.debug_files {
+                        for (i, s) in debug_files.iter().enumerate() {
+                            if s.contains(args) {
+                                print_i!(i);
+                                println!("{}", s);
+                            }
+                        }
+                    } else {
+                        println!("No debug info in this binary");
+                    }
+                }
                 "t" | "type" => {
                     let range = read_range(args, code.types.len())?;
                     for i in range {
                         print_i!(i);
                         println!("{}", code.types[i].display(&code));
+                    }
+                }
+                "td" | "typed" => {
+                    let range = read_range(args, code.types.len())?;
+                    for i in range {
+                        print_i!(i);
+                        println!("{:#?}", code.types[i]);
                     }
                 }
                 "g" | "global" => {
@@ -166,26 +192,55 @@ fn main() -> anyhow::Result<()> {
                     }
                 }
                 "infile" => {
-                    let fileidx = code.debug_files.as_ref().and_then(|files| {
-                        files.iter().enumerate().find(|(i, s)| s.as_str() == args)
-                    });
-                    if let Some((idx, _)) = fileidx {
-                        println!("Finding functions in file index : {idx}");
-                        for f in &code.functions {
-                            if f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0 == idx {
-                                println!("{}", f.display_header(&code));
+                    if let Some(debug_files) = &code.debug_files {
+                        let fileidx = if args.contains("@") {
+                            if let Some(idx) = args[1..].parse::<usize>().ok() {
+                                Some((idx, &debug_files[idx]))
+                            } else {
+                                println!("Expected a number after @");
+                                None
                             }
+                        } else {
+                            debug_files.iter().enumerate().find(|(i, d)| *d == args)
+                        };
+                        if let Some((idx, d)) = fileidx {
+                            println!("Functions in file@{idx} : {d}");
+                            for (i, f) in code.functions.iter().enumerate() {
+                                if f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0 == idx {
+                                    print_i!(i);
+                                    println!("{}", f.display_header(&code));
+                                }
+                            }
+                        } else {
+                            println!("File {args} not found !");
                         }
                     } else {
-                        println!("File {args} not found !");
+                        println!("No debug info in this binary");
                     }
                 }
-                "fstr" => {
-                    for (i, s) in code.strings.iter().enumerate() {
-                        if s.contains(args) {
-                            print_i!(i);
-                            println!("{}", s);
+                "fileof" => {
+                    if let Some(debug_files) = &code.debug_files {
+                        if let Some(findex) = args.parse::<usize>().ok() {
+                            let p = RefFun(findex).resolve(&code);
+                            match p {
+                                RefFunPointee::Fun(f) => {
+                                    let idx = f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0;
+                                    println!(
+                                        "{} is in file@{idx} : {}",
+                                        f.display_header(&code),
+                                        &debug_files[idx]
+                                    );
+                                }
+                                RefFunPointee::Native(n) => {
+                                    println!("{} can't be in any file", n.display_header(&code))
+                                }
+                            }
+                        } else {
+                            println!("Expected a number after @");
+                            continue;
                         }
+                    } else {
+                        println!("No debug info in this binary");
                     }
                 }
                 // Find all functions referencing the given argument
@@ -195,21 +250,88 @@ fn main() -> anyhow::Result<()> {
                     match args[0].as_str() {
                         "string" => {
                             println!(
-                                "Finding functions referencing string@{idx} : {}",
+                                "Finding references to string@{idx} : {}\n",
                                 code.strings[idx]
                             );
-                            for f in &code.functions {
-                                for (i, o) in f.ops.iter().enumerate() {
-                                    match o {
-                                        Opcode::String { ptr, .. } => {
-                                            if ptr.0 == idx {
-                                                println!("in {} at {i}", f.display_header(&code));
+                            if let Some(constants) = &code.constants {
+                                for (i, c) in constants.iter().enumerate() {
+                                    if c.fields[0] == idx {
+                                        println!(
+                                            "constant@{i} expanding to global@{} (now also searching for global)",
+                                            c.global.0
+                                        );
+                                        match_op(&code, |f, i, o| match o {
+                                            Opcode::GetGlobal { global, .. } => {
+                                                if global == c.global {
+                                                    println!(
+                                                        "in {} at {i}: GetGlobal",
+                                                        f.display_header(&code)
+                                                    );
+                                                }
                                             }
-                                        }
-                                        _ => {}
+                                            _ => {}
+                                        });
+                                        println!();
                                     }
                                 }
                             }
+                            match_op(&code, |f, i, o| match o {
+                                Opcode::String { ptr, .. } => {
+                                    if ptr.0 == idx {
+                                        println!("{} at {i}: String", f.display_header(&code));
+                                    }
+                                }
+                                _ => {}
+                            });
+                        }
+                        "global" => {
+                            println!(
+                                "Finding references to global@{idx} : {}\n",
+                                code.globals[idx].display(&code)
+                            );
+                            if let Some(constants) = &code.constants {
+                                for (i, c) in constants.iter().enumerate() {
+                                    if c.global.0 == idx {
+                                        println!("constant@{i} : {:?}", c);
+                                    }
+                                }
+                            }
+                            println!();
+
+                            match_op(&code, |f, i, o| match o {
+                                Opcode::GetGlobal { global, .. } => {
+                                    if global.0 == idx {
+                                        println!("{} at {i}: GetGlobal", f.display_header(&code));
+                                    }
+                                }
+                                Opcode::SetGlobal { global, .. } => {
+                                    if global.0 == idx {
+                                        println!("{} at {i}: SetGlobal", f.display_header(&code));
+                                    }
+                                }
+                                _ => {}
+                            });
+                        }
+                        "fi" => {
+                            println!(
+                                "Finding references to fn@{idx} : {}\n",
+                                RefFun(idx).display_header(&code)
+                            );
+                            let test = |f: &Function, i: usize, o: Opcode, fun: RefFun| {
+                                if fun.0 == idx {
+                                    println!("{} at {i}: {}", f.display_header(&code), o.name());
+                                }
+                            };
+                            match_op(&code, |f, i, o| match o {
+                                Opcode::Call0 { fun, .. } => test(f, i, o, fun),
+                                Opcode::Call1 { fun, .. } => test(f, i, o, fun),
+                                Opcode::Call2 { fun, .. } => test(f, i, o, fun),
+                                Opcode::Call3 { fun, .. } => test(f, i, o, fun),
+                                Opcode::Call4 { fun, .. } => test(f, i, o, fun),
+                                Opcode::CallN { fun, .. } => test(f, i, o, fun),
+                                Opcode::StaticClosure { fun, .. } => test(f, i, o, fun),
+                                _ => {}
+                            });
                         }
                         _ => {}
                     }
@@ -221,7 +343,7 @@ fn main() -> anyhow::Result<()> {
         } else {
             match line {
                 "info" => println!(
-                    "version: {}\ndebug: {}\nnints: {}\nnfloats: {}\nnstrings: {}\nntypes: {}\nnnatives: {}\nnfunctions: {}",
+                    "version: {}\ndebug: {}\nnints: {}\nnfloats: {}\nnstrings: {}\nntypes: {}\nnnatives: {}\nnfunctions: {}\nnconstants: {}",
                     code.version,
                     code.debug_files.is_some(),
                     code.ints.len(),
@@ -229,7 +351,8 @@ fn main() -> anyhow::Result<()> {
                     code.strings.len(),
                     code.types.len(),
                     code.natives.len(),
-                    code.functions.len()
+                    code.functions.len(),
+                    code.constants.as_ref().map_or(0, |c| c.len())
                 ),
                 "entrypoint" => {
                     println!(
@@ -293,5 +416,13 @@ fn read_range(arg: &str, max_bound: usize) -> anyhow::Result<Box<dyn Iterator<It
     } else {
         let i = arg.parse()?;
         Ok(Box::new((i..(i + 1)).into_iter()))
+    }
+}
+
+fn match_op(code: &Bytecode, body: impl Fn(&Function, usize, Opcode)) {
+    for f in &code.functions {
+        for (i, o) in f.ops.iter().enumerate() {
+            body(f, i, o.clone());
+        }
     }
 }
