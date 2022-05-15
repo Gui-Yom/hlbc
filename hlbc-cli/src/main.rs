@@ -342,6 +342,30 @@ fn main() -> anyhow::Result<()> {
             }
         } else {
             match line {
+                "help" => println!(r#"Commands :
+info                   | General information about the bytecode
+help                   | This message
+entrypoint             | Get the bytecode entrypoint
+i,int       <idx>      | Get the int at index
+f,float     <idx>      | Get the float at index
+s,string    <idx>      | Get the string at index
+fstr        <str>      | Find a string
+d,debugfile <idx>      | Get the debug file name at index
+ffile       <str>      | Find the debug file named
+t,type      <idx>      | Get the type at index
+td,typed    <idx>      | Get full information of type at index
+g,global    <idx>      | Get global at index
+c,constant  <idx>      | Get constant at index
+n,native    <idx>      | Get native at index
+fnh         <idx>      | Get header of function at index
+fn          <idx>      | Get function at index
+fih         <findex>   | Get header of function (findex)
+fi          <findex>   | Get function at index (findex)
+fname       <str>      | Get function named
+infile      <@idx|str> | Find functions in file
+fileof      <findex>   | Get the file where findex is defined
+refto       <any@idx>  | Find references to a given bytecode element
+                "#),
                 "info" => println!(
                     "version: {}\ndebug: {}\nnints: {}\nnfloats: {}\nnstrings: {}\nntypes: {}\nnnatives: {}\nnfunctions: {}\nnconstants: {}",
                     code.version,
