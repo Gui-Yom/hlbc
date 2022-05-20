@@ -1,4 +1,4 @@
-use std::io::{stdin, BufReader, Write};
+use std::io::{stdin, BufReader, BufWriter, Write};
 use std::time::Instant;
 use std::{env, fs};
 
@@ -336,6 +336,10 @@ fn main() -> anyhow::Result<()> {
                         _ => {}
                     }
                 }
+                "saveto" => {
+                    let mut w = BufWriter::new(fs::File::create(args)?);
+                    code.serialize(&mut w)?;
+                }
                 _ => {
                     println!("Unknown command : '{line}'");
                 }
@@ -365,6 +369,7 @@ fname       <str>      | Get function named
 infile      <@idx|str> | Find functions in file
 fileof      <findex>   | Get the file where findex is defined
 refto       <any@idx>  | Find references to a given bytecode element
+saveto      <filename> | Serialize the bytecode to a file
                 "#),
                 "info" => println!(
                     "version: {}\ndebug: {}\nnints: {}\nnfloats: {}\nnstrings: {}\nntypes: {}\nnnatives: {}\nnfunctions: {}\nnconstants: {}",

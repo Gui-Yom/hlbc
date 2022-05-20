@@ -19,3 +19,4 @@ Hashlink bytecode disassembler and analyzer
 - Gui to render the graph on in real time
 - Gui to render everything
 - C API to integrate with other tools
+- Text search engine to search for strings and names
