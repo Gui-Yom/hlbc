@@ -1,4 +1,5 @@
 use std::io::{stdin, BufReader, BufWriter, Write};
+use std::iter::repeat;
 use std::time::Instant;
 use std::{env, fs};
 
@@ -7,6 +8,12 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 use hlbc::opcodes::Opcode;
 use hlbc::types::{Function, RefFun, RefFunPointee};
 use hlbc::*;
+
+use crate::utils::{find_fun_refs, iter_ops, read_range};
+
+#[cfg(feature = "petgraph")]
+mod graph;
+mod utils;
 
 fn main() -> anyhow::Result<()> {
     let tty = atty::is(atty::Stream::Stdout);
@@ -49,7 +56,7 @@ fn main() -> anyhow::Result<()> {
         if line == "exit" {
             break;
         }
-        let mut split = line.split_once(" ");
+        let split = line.split_once(" ");
         if let Some((cmd, args)) = split {
             match cmd {
                 "i" | "int" => {
@@ -201,7 +208,7 @@ fn main() -> anyhow::Result<()> {
                                 None
                             }
                         } else {
-                            debug_files.iter().enumerate().find(|(i, d)| *d == args)
+                            debug_files.iter().enumerate().find(|(_, d)| *d == args)
                         };
                         if let Some((idx, d)) = fileidx {
                             println!("Functions in file@{idx} : {d}");
@@ -221,19 +228,22 @@ fn main() -> anyhow::Result<()> {
                 "fileof" => {
                     if let Some(debug_files) = &code.debug_files {
                         if let Some(findex) = args.parse::<usize>().ok() {
-                            let p = RefFun(findex).resolve(&code);
-                            match p {
-                                RefFunPointee::Fun(f) => {
-                                    let idx = f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0;
-                                    println!(
-                                        "{} is in file@{idx} : {}",
-                                        f.display_header(&code),
-                                        &debug_files[idx]
-                                    );
+                            if let Some(p) = RefFun(findex).resolve(&code) {
+                                match p {
+                                    RefFunPointee::Fun(f) => {
+                                        let idx = f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0;
+                                        println!(
+                                            "{} is in file@{idx} : {}",
+                                            f.display_header(&code),
+                                            &debug_files[idx]
+                                        );
+                                    }
+                                    RefFunPointee::Native(n) => {
+                                        println!("{} can't be in any file", n.display_header(&code))
+                                    }
                                 }
-                                RefFunPointee::Native(n) => {
-                                    println!("{} can't be in any file", n.display_header(&code))
-                                }
+                            } else {
+                                println!("Unknown findex");
                             }
                         } else {
                             println!("Expected a number after @");
@@ -260,9 +270,9 @@ fn main() -> anyhow::Result<()> {
                                             "constant@{i} expanding to global@{} (now also searching for global)",
                                             c.global.0
                                         );
-                                        match_op(&code, |f, i, o| match o {
+                                        iter_ops(&code).for_each(|(f, (i, o))| match o {
                                             Opcode::GetGlobal { global, .. } => {
-                                                if global == c.global {
+                                                if *global == c.global {
                                                     println!(
                                                         "in {} at {i}: GetGlobal",
                                                         f.display_header(&code)
@@ -275,7 +285,7 @@ fn main() -> anyhow::Result<()> {
                                     }
                                 }
                             }
-                            match_op(&code, |f, i, o| match o {
+                            iter_ops(&code).for_each(|(f, (i, o))| match o {
                                 Opcode::String { ptr, .. } => {
                                     if ptr.0 == idx {
                                         println!("{} at {i}: String", f.display_header(&code));
@@ -298,7 +308,7 @@ fn main() -> anyhow::Result<()> {
                             }
                             println!();
 
-                            match_op(&code, |f, i, o| match o {
+                            iter_ops(&code).for_each(|(f, (i, o))| match o {
                                 Opcode::GetGlobal { global, .. } => {
                                     if global.0 == idx {
                                         println!("{} at {i}: GetGlobal", f.display_header(&code));
@@ -317,21 +327,18 @@ fn main() -> anyhow::Result<()> {
                                 "Finding references to fn@{idx} : {}\n",
                                 RefFun(idx).display_header(&code)
                             );
-                            let test = |f: &Function, i: usize, o: Opcode, fun: RefFun| {
-                                if fun.0 == idx {
-                                    println!("{} at {i}: {}", f.display_header(&code), o.name());
-                                }
-                            };
-                            match_op(&code, |f, i, o| match o {
-                                Opcode::Call0 { fun, .. } => test(f, i, o, fun),
-                                Opcode::Call1 { fun, .. } => test(f, i, o, fun),
-                                Opcode::Call2 { fun, .. } => test(f, i, o, fun),
-                                Opcode::Call3 { fun, .. } => test(f, i, o, fun),
-                                Opcode::Call4 { fun, .. } => test(f, i, o, fun),
-                                Opcode::CallN { fun, .. } => test(f, i, o, fun),
-                                Opcode::StaticClosure { fun, .. } => test(f, i, o, fun),
-                                _ => {}
-                            });
+                            code.functions
+                                .iter()
+                                .flat_map(|f| repeat(f).zip(find_fun_refs(f)))
+                                .for_each(|(f, (i, o, fun))| {
+                                    if fun.0 == idx {
+                                        println!(
+                                            "{} at {i}: {}",
+                                            f.display_header(&code),
+                                            o.name()
+                                        );
+                                    }
+                                });
                         }
                         _ => {}
                     }
@@ -339,6 +346,19 @@ fn main() -> anyhow::Result<()> {
                 "saveto" => {
                     let mut w = BufWriter::new(fs::File::create(args)?);
                     code.serialize(&mut w)?;
+                }
+                #[cfg(feature = "petgraph")]
+                "callgraph" => {
+                    use crate::graph::build_graph;
+                    use crate::graph::CodeDisplay;
+
+                    if let Some(findex) = args.parse::<usize>().ok() {
+                        let graph = build_graph(&code, RefFun(findex));
+                        println!("{}", graph.display(&code));
+                    } else {
+                        println!("Expected a function index");
+                        continue;
+                    }
                 }
                 _ => {
                     println!("Unknown command : '{line}'");
@@ -397,61 +417,4 @@ saveto      <filename> | Serialize the bytecode to a file
         }
     }
     Ok(())
-}
-
-fn read_range(arg: &str, max_bound: usize) -> anyhow::Result<Box<dyn Iterator<Item = usize>>> {
-    if arg == ".." {
-        Ok(Box::new((0..max_bound).into_iter()))
-    } else if arg.contains("..=") {
-        let mut nums = arg.split("..=");
-        if let Some(a) = nums.next() {
-            if let Some(b) = nums.next() {
-                Ok(Box::new((a.parse()?..=b.parse()?).into_iter()))
-            } else if arg.ends_with(a) {
-                Ok(Box::new((0..=a.parse()?).into_iter()))
-            } else {
-                anyhow::bail!("Inclusive range must be bounded at the end : '{arg}'")
-            }
-        } else {
-            anyhow::bail!("Inclusive range must be bounded at the end : '{arg}'")
-        }
-    } else if arg.contains("..") {
-        let mut nums = arg.split("..");
-        if let Some(a) = nums.next() {
-            if a.is_empty() {
-                if let Some(b) = nums.next() {
-                    Ok(Box::new((0..b.parse()?).into_iter()))
-                } else {
-                    anyhow::bail!("Invalid range : '{arg}'")
-                }
-            } else {
-                if let Some(b) = nums.next() {
-                    if b.is_empty() {
-                        Ok(Box::new((a.parse()?..max_bound - 1).into_iter()))
-                    } else {
-                        Ok(Box::new((a.parse()?..b.parse()?).into_iter()))
-                    }
-                } else if arg.ends_with(a) {
-                    Ok(Box::new((0..a.parse()?).into_iter()))
-                } else if arg.starts_with(a) {
-                    Ok(Box::new((a.parse()?..max_bound - 1).into_iter()))
-                } else {
-                    anyhow::bail!("Invalid range : '{arg}'")
-                }
-            }
-        } else {
-            Ok(Box::new((0..max_bound - 1).into_iter()))
-        }
-    } else {
-        let i = arg.parse()?;
-        Ok(Box::new((i..(i + 1)).into_iter()))
-    }
-}
-
-fn match_op(code: &Bytecode, body: impl Fn(&Function, usize, Opcode)) {
-    for f in &code.functions {
-        for (i, o) in f.ops.iter().enumerate() {
-            body(f, i, o.clone());
-        }
-    }
 }

@@ -176,7 +176,7 @@ pub struct Function {
 }
 
 /// Reference to a function or a native in the constant pool (findex)
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub struct RefFun(pub usize);
 
 #[derive(Debug, Copy, Clone)]
@@ -186,15 +186,15 @@ pub enum RefFunPointee<'a> {
 }
 
 impl RefFun {
-    pub fn resolve<'a>(&self, bc: &'a Bytecode) -> RefFunPointee<'a> {
+    pub fn resolve<'a>(&self, bc: &'a Bytecode) -> Option<RefFunPointee<'a>> {
         if let Some(&(i, f)) = bc.findexes.get(self) {
-            if f {
+            Some(if f {
                 RefFunPointee::Fun(&bc.functions[i])
             } else {
                 RefFunPointee::Native(&bc.natives[i])
-            }
+            })
         } else {
-            unreachable!()
+            None
         }
     }
 }

@@ -76,7 +76,7 @@ impl Type {
         self.display_rec(ctx, Vec::new())
     }
 
-    fn display_rec<'a>(&'a self, ctx: &Bytecode, mut parents: Vec<*const Type>) -> String {
+    fn display_rec(&self, ctx: &Bytecode, mut parents: Vec<*const Type>) -> String {
         //println!("{:#?}", self);
         if parents.contains(&(self as *const Type)) {
             return "Self".to_string();
@@ -152,17 +152,17 @@ impl Type {
 }
 
 impl RefFun {
-    pub fn display_header(&self, ctx: &Bytecode) -> impl Display {
-        self.resolve(ctx).display_header(ctx)
+    pub fn display_header(&self, ctx: &Bytecode) -> String {
+        self.resolve(ctx).unwrap().display_header(ctx)
     }
 
     pub fn display_call(&self, ctx: &Bytecode) -> impl Display {
-        self.resolve(ctx).display_call(ctx)
+        self.resolve(ctx).unwrap().display_call(ctx)
     }
 }
 
 impl<'a> RefFunPointee<'a> {
-    pub fn display_header(&'a self, ctx: &Bytecode) -> impl Display {
+    pub fn display_header(&'a self, ctx: &Bytecode) -> String {
         match self {
             RefFunPointee::Fun(fun) => fun.display_header(ctx),
             RefFunPointee::Native(n) => n.display_header(ctx),

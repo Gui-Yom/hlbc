@@ -5,7 +5,7 @@ use anyhow::Result;
 use byteorder::{LittleEndian, WriteBytesExt};
 
 use crate::types::TypeFun;
-use crate::{ConstantDef, Function, Native, ObjField, Opcode, Type, TypeObj};
+use crate::{ConstantDef, Function, Native, ObjField, Type, TypeObj};
 
 pub(crate) trait WriteHlExt: WriteBytesExt {
     fn write_vi32(&mut self, value: i32) -> Result<()>;

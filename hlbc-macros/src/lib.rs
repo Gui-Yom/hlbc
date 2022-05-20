@@ -67,7 +67,7 @@ fn ident(ty: &Type) -> String {
                         GenericArgument::Type(ty) => ident(ty),
                         other => unreachable!(),
                     };
-                    format!("{}<{}>", seg.ident.to_string(), a)
+                    format!("{}<{}>", seg.ident, a)
                 }
                 other => unreachable!(),
             }
