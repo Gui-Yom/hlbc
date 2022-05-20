@@ -94,13 +94,13 @@ impl<T: Read> ReadHlExt for T {
     fn read_type_obj(&mut self) -> Result<TypeObj> {
         let name = RefString(self.read_vari()? as usize);
         let super_ = self.read_vari()?;
-        let global = self.read_varu()?;
+        let global = RefGlobal(self.read_varu()? as usize);
         let nfields = self.read_varu()? as usize;
         let nprotos = self.read_varu()? as usize;
         let nbindings = self.read_varu()? as usize;
-        let mut fields = Vec::with_capacity(nfields);
+        let mut own_fields = Vec::with_capacity(nfields);
         for _ in 0..nfields {
-            fields.push(self.read_field()?);
+            own_fields.push(self.read_field()?);
         }
         let mut protos = Vec::with_capacity(nprotos);
         for _ in 0..nprotos {
@@ -124,7 +124,9 @@ impl<T: Read> ReadHlExt for T {
             } else {
                 Some(RefType(super_ as usize))
             },
-            fields,
+            global,
+            own_fields,
+            fields: Vec::with_capacity(0),
             protos,
             bindings,
         })
@@ -161,7 +163,7 @@ impl<T: Read> ReadHlExt for T {
             }),
             18 => {
                 let name = RefString(self.read_vari()? as usize);
-                let global = self.read_varu()?;
+                let global = RefGlobal(self.read_varu()? as usize);
                 let nconstructs = self.read_varu()? as usize;
                 let mut constructs = Vec::with_capacity(nconstructs);
                 for _ in 0..nconstructs {
@@ -173,7 +175,11 @@ impl<T: Read> ReadHlExt for T {
                     }
                     constructs.push(EnumConstruct { name, params })
                 }
-                Ok(Type::Enum { name, constructs })
+                Ok(Type::Enum {
+                    name,
+                    global,
+                    constructs,
+                })
             }
             19 => Ok(Type::Null(self.read_type_ref()?)),
             20 => Ok(Type::Method(self.read_type_fun()?)),

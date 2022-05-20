@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 
 use quote::quote;
 use syn::__private::TokenStream2;
-use syn::{parse_str, Data, DeriveInput, Type};
+use syn::{Data, DeriveInput, GenericArgument, Ident, PathArguments, Type, Variant};
 
 #[proc_macro_attribute]
 pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
@@ -13,150 +13,14 @@ pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
     }
     .unwrap();
 
-    let ty_usize = parse_str::<Type>("usize").unwrap();
-    let ty_i32 = parse_str::<Type>("i32").unwrap();
-    let ty_jump_offset = parse_str::<Type>("JumpOffset").unwrap();
-    let ty_reg = parse_str::<Type>("Reg").unwrap();
-    let ty_vec_reg = parse_str::<Type>("Vec<Reg>").unwrap();
-    let ty_ref_int = parse_str::<Type>("RefInt").unwrap();
-    let ty_ref_float = parse_str::<Type>("RefFloat").unwrap();
-    let ty_ref_bytes = parse_str::<Type>("RefBytes").unwrap();
-    let ty_ref_string = parse_str::<Type>("RefString").unwrap();
-    let ty_ref_type = parse_str::<Type>("RefType").unwrap();
-    let ty_val_bool = parse_str::<Type>("ValBool").unwrap();
-    let ty_ref_fun = parse_str::<Type>("RefFun").unwrap();
-    let ty_ref_field = parse_str::<Type>("RefField").unwrap();
-    let ty_ref_global = parse_str::<Type>("RefGlobal").unwrap();
-    let ty_ref_construct = parse_str::<Type>("RefEnumConstruct").unwrap();
-
-    let rvi32 = quote! {
-        r.read_vari()?
-    };
-    let rvu32 = quote! {
-        r.read_varu()?
-    };
-    let reg = quote! {
-        Reg(#rvi32 as u32)
-    };
-
     let name = &ast.ident;
     let i = 0..variants.len() as u8;
 
-    let init = variants.iter().map(|v| {
-        if v.ident == "CallMethod" {
-            quote! {
-                {
-                    let dst = #reg;
-                    let field = RefField(#rvi32 as usize);
-                    let n = r.read_u8()? as usize;
-                    let mut args = Vec::with_capacity(n);
-                    for _ in 0..n {
-                        args.push(#reg);
-                    }
-                    Ok(#name::CallMethod {
-                        dst,
-                        field,
-                        args
-                    })
-                }
-            }
-        } else if v.ident == "Switch" {
-            quote! {
-                {
-                    let reg = Reg(#rvu32);
-                    let n = #rvu32 as usize;
-                    let mut offsets = Vec::with_capacity(n);
-                    for _ in 0..n {
-                        offsets.push(#rvu32 as JumpOffset);
-                    }
-                    let end = #rvu32 as JumpOffset;
-                    Ok(#name::Switch {
-                        reg,
-                        offsets,
-                        end
-                    })
-                }
-            }
-        } else {
-            let vname = &v.ident;
-            let fname = v.fields.iter().map(|f| &f.ident);
-            let fvalue = v.fields.iter().map(|f| {
-                if f.ty == ty_usize {
-                    quote! {
-                        #rvi32 as usize
-                    }
-                } else if f.ty == ty_i32 {
-                    quote! {
-                        #rvi32 as JumpOffset
-                    }
-                } else if f.ty == ty_jump_offset {
-                    quote! {
-                        #rvi32 as JumpOffset
-                    }
-                } else if f.ty == ty_reg {
-                    reg.clone()
-                } else if f.ty == ty_vec_reg {
-                    quote! {
-                        {
-                            let n = r.read_u8()? as usize;
-                            let mut regs = Vec::with_capacity(n);
-                            for _ in 0..n {
-                                regs.push(#reg);
-                            }
-                            regs
-                        }
-                    }
-                } else if f.ty == ty_ref_int {
-                    quote! {
-                        RefInt(#rvi32 as usize)
-                    }
-                } else if f.ty == ty_ref_float {
-                    quote! {
-                        RefFloat(#rvi32 as usize)
-                    }
-                } else if f.ty == ty_ref_bytes {
-                    quote! {
-                        RefBytes(#rvi32 as usize)
-                    }
-                } else if f.ty == ty_ref_string {
-                    quote! {
-                        RefString(#rvi32 as usize)
-                    }
-                } else if f.ty == ty_ref_type {
-                    quote! {
-                        RefType(#rvi32 as usize)
-                    }
-                } else if f.ty == ty_val_bool {
-                    quote! {
-                        ValBool(#rvi32 == 1)
-                    }
-                } else if f.ty == ty_ref_fun {
-                    quote! {
-                        RefFun(#rvi32 as usize)
-                    }
-                } else if f.ty == ty_ref_field {
-                    quote! {
-                        RefField(#rvi32 as usize)
-                    }
-                } else if f.ty == ty_ref_global {
-                    quote! {
-                        RefGlobal(#rvi32 as usize)
-                    }
-                } else if f.ty == ty_ref_construct {
-                    quote! {
-                        RefEnumConstruct(#rvi32 as usize)
-                    }
-                } else {
-                    TokenStream2::default()
-                }
-            });
-            quote! {
-                Ok(#name::#vname {
-                    #( #fname: #fvalue, )*
-                })
-            }
-        }
-    });
+    let initr = variants.iter().map(|v| gen_initr(name, v));
+    let initw = variants
+        .iter()
+        .enumerate()
+        .map(|(i, v)| gen_initw(name, v, i as u8));
 
     TokenStream::from(quote! {
         #ast
@@ -170,10 +34,200 @@ pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
 
                 let op = r.read_u8()?;
                 match op {
-                    #( #i => #init, )*
+                    #( #i => #initr, )*
                     other => anyhow::bail!("Unknown opcode {}", op),
                 }
             }
+
+            pub fn encode(&self, w: &mut impl std::io::Write) -> anyhow::Result<()> {
+
+                use byteorder::WriteBytesExt;
+                use crate::ser::WriteHlExt;
+                use crate::types::*;
+
+                match self {
+                    #( #initw )*
+                }
+
+                Ok(())
+            }
         }
     })
+}
+
+/// Print a type to string
+fn ident(ty: &Type) -> String {
+    match ty {
+        Type::Path(path) => {
+            let seg = &path.path.segments[0];
+            match &seg.arguments {
+                PathArguments::None => seg.ident.to_string(),
+                PathArguments::AngleBracketed(a) => {
+                    let a = match &a.args[0] {
+                        GenericArgument::Type(ty) => ident(ty),
+                        other => unreachable!(),
+                    };
+                    format!("{}<{}>", seg.ident.to_string(), a)
+                }
+                other => unreachable!(),
+            }
+        }
+        other => unreachable!("unkown type {:?}", other),
+    }
+}
+
+fn gen_initr(enum_name: &Ident, v: &Variant) -> TokenStream2 {
+    let rvi32 = quote! {
+        r.read_vari()?
+    };
+    let rvu32 = quote! {
+        r.read_varu()?
+    };
+    let reg = quote! {
+        Reg(#rvi32 as u32)
+    };
+
+    let vname = &v.ident;
+    let fname = v.fields.iter().map(|f| &f.ident);
+    let fvalue = v.fields.iter().map(|f| match ident(&f.ty).as_str() {
+        "usize" => quote! {
+            #rvi32 as usize
+        },
+        "i32" => quote! {
+            #rvi32 as JumpOffset
+        },
+        "JumpOffset" => quote! {
+            #rvi32 as JumpOffset
+        },
+        "Vec<JumpOffset>" => quote! {
+            {
+                let n = #rvu32 as usize;
+                let mut offsets = Vec::with_capacity(n);
+                for _ in 0..n {
+                    offsets.push(#rvu32 as JumpOffset);
+                }
+                offsets
+            }
+        },
+        "Reg" => reg.clone(),
+        "Vec<Reg>" => quote! {
+            {
+                let n = r.read_u8()? as usize;
+                let mut regs = Vec::with_capacity(n);
+                for _ in 0..n {
+                    regs.push(#reg);
+                }
+                regs
+            }
+        },
+        "RefInt" => quote! {
+            RefInt(#rvi32 as usize)
+        },
+        "RefFloat" => quote! {
+            RefFloat(#rvi32 as usize)
+        },
+        "RefBytes" => quote! {
+            RefBytes(#rvi32 as usize)
+        },
+        "RefString" => quote! {
+            RefString(#rvi32 as usize)
+        },
+        "RefType" => quote! {
+            RefType(#rvi32 as usize)
+        },
+        "ValBool" => quote! {
+            ValBool(#rvi32 == 1)
+        },
+        "RefFun" => quote! {
+            RefFun(#rvi32 as usize)
+        },
+        "RefField" => quote! {
+            RefField(#rvi32 as usize)
+        },
+        "RefGlobal" => quote! {
+            RefGlobal(#rvi32 as usize)
+        },
+        "RefEnumConstruct" => quote! {
+            RefEnumConstruct(#rvi32 as usize)
+        },
+        other => TokenStream2::default(),
+    });
+    quote! {
+        Ok(#enum_name::#vname {
+            #( #fname: #fvalue, )*
+        })
+    }
+}
+
+fn gen_initw(enum_name: &Ident, v: &Variant, i: u8) -> TokenStream2 {
+    let vname = &v.ident;
+    let fname = v.fields.iter().map(|f| &f.ident);
+    let fwrite = v.fields.iter().map(|f| {
+        let fname = f.ident.as_ref().unwrap();
+        match ident(&f.ty).as_str() {
+            "usize" => quote!(w.write_vi32(#fname as i32)?;),
+            "i32" => quote! {
+                w.write_vi32(#fname)?;
+            },
+            "JumpOffset" => quote! {
+                w.write_vi32(*#fname as i32)?;
+            },
+            "Vec<JumpOffset>" => quote! {
+                {
+                    w.write_vi32(#fname.len() as i32)?;
+                    for r__ in #fname {
+                        w.write_vi32(*r__ as i32)?;
+                    }
+                }
+            },
+            "Reg" => quote! {
+                w.write_vi32(#fname.0 as i32)?;
+            },
+            "Vec<Reg>" => quote! {
+                {
+                    w.write_u8(#fname.len() as u8)?;
+                    for r__ in #fname {
+                        w.write_vi32(r__.0 as i32)?;
+                    }
+                }
+            },
+            "RefInt" => quote! {
+                w.write_vi32(#fname.0 as i32)?;
+            },
+            "RefFloat" => quote! {
+                w.write_vi32(#fname.0 as i32)?;
+            },
+            "RefBytes" => quote! {
+                w.write_vi32(#fname.0 as i32)?;
+            },
+            "RefString" => quote! {
+                w.write_vi32(#fname.0 as i32)?;
+            },
+            "RefType" => quote! {
+                w.write_vi32(#fname.0 as i32)?;
+            },
+            "ValBool" => quote! {
+                w.write_vi32(if #fname.0 { 1 } else { 0 })?;
+            },
+            "RefFun" => quote! {
+                w.write_vi32(#fname.0 as i32)?;
+            },
+            "RefField" => quote! {
+                w.write_vi32(#fname.0 as i32)?;
+            },
+            "RefGlobal" => quote! {
+                w.write_vi32(#fname.0 as i32)?;
+            },
+            "RefEnumConstruct" => quote! {
+                w.write_vi32(#fname.0 as i32)?;
+            },
+            other => TokenStream2::default(),
+        }
+    });
+    quote! {
+        #enum_name::#vname { #( #fname, )* } => {
+            w.write_u8(#i)?;
+            #( #fwrite )*
+        }
+    }
 }

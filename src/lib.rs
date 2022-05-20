@@ -1,12 +1,13 @@
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
-use std::io::Read;
+use std::io::{Read, Write};
 
 use anyhow::Result;
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::deser::ReadHlExt;
 use crate::opcodes::Opcode;
+use crate::ser::WriteHlExt;
 use crate::types::{
     ConstantDef, Function, Native, ObjField, RefFun, RefGlobal, RefType, Type, TypeObj,
 };
@@ -15,6 +16,7 @@ pub mod analysis;
 mod deser;
 pub mod fmt;
 pub mod opcodes;
+mod ser;
 pub mod types;
 
 #[derive(Debug)]
@@ -85,6 +87,7 @@ impl Bytecode {
             let mut bytes = vec![0; size];
             r.read_exact(&mut bytes)?;
             for _ in 0..nbytes.unwrap() {
+                // TODO bytes pos
                 r.read_varu()?;
             }
             Some(bytes)
@@ -150,10 +153,10 @@ impl Bytecode {
         for t in &types {
             if let Some(obj) = t.get_type_obj() {
                 let mut parent = obj.super_.as_ref().map(|s| s.resolve(&types));
-                let mut acc = VecDeque::with_capacity(obj.fields.len());
-                acc.extend(obj.fields.clone());
+                let mut acc = VecDeque::with_capacity(obj.own_fields.len());
+                acc.extend(obj.own_fields.clone());
                 while let Some(p) = parent.and_then(|t| t.get_type_obj()) {
-                    for f in p.fields.iter().rev() {
+                    for f in p.own_fields.iter().rev() {
                         acc.push_front(f.clone());
                     }
                     parent = p.super_.as_ref().map(|s| s.resolve(&types));
@@ -218,5 +221,59 @@ impl Bytecode {
             fnames,
             max_findex,
         })
+    }
+
+    pub fn serialize(&self, w: &mut impl Write) -> Result<()> {
+        w.write(&[b'H', b'L', b'B'])?;
+        w.write_u8(self.version)?;
+        w.write_vi32(if self.debug_files.is_some() { 1 } else { 0 })?;
+        w.write_vi32(self.ints.len() as i32)?;
+        w.write_vi32(self.floats.len() as i32)?;
+        w.write_vi32(self.strings.len() as i32)?;
+        if let Some(bytes) = &self.bytes {
+            w.write_vi32(bytes.len() as i32)?;
+        }
+        w.write_vi32(self.types.len() as i32)?;
+        w.write_vi32(self.globals.len() as i32)?;
+        w.write_vi32(self.natives.len() as i32)?;
+        w.write_vi32(self.functions.len() as i32)?;
+        if let Some(constants) = &self.constants {
+            w.write_vi32(constants.len() as i32)?;
+        }
+        w.write_vi32(self.entrypoint.0 as i32)?;
+        for &i in &self.ints {
+            w.write_i32::<LittleEndian>(i)?;
+        }
+        for &f in &self.floats {
+            w.write_f64::<LittleEndian>(f)?;
+        }
+        w.write_strings(&self.strings)?;
+        if let Some(bytes) = &self.bytes {
+            w.write_i32::<LittleEndian>(bytes.len() as i32)?;
+            w.write(bytes)?;
+            // TODO write bytes pos
+        }
+        if let Some(debug_files) = &self.debug_files {
+            w.write_vi32(debug_files.len() as i32)?;
+            w.write_strings(debug_files)?;
+        }
+        for t in &self.types {
+            w.write_type(t)?;
+        }
+        for g in &self.globals {
+            w.write_vi32(g.0 as i32)?;
+        }
+        for n in &self.natives {
+            w.write_native(n)?;
+        }
+        for f in &self.functions {
+            w.write_function(f)?;
+        }
+        if let Some(constants) = &self.constants {
+            for c in constants {
+                w.write_constant_def(c)?;
+            }
+        }
+        Ok(())
     }
 }

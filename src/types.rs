@@ -77,6 +77,10 @@ pub struct TypeFun {
 pub struct TypeObj {
     pub name: RefString,
     pub super_: Option<RefType>,
+    pub global: RefGlobal,
+    /// Fields defined in this type
+    pub own_fields: Vec<ObjField>,
+    /// Including other fields in the hierarchy
     pub fields: Vec<ObjField>,
     pub protos: Vec<ObjProto>,
     pub bindings: Vec<(RefField, RefFun)>,
@@ -108,6 +112,7 @@ pub enum Type {
     },
     Enum {
         name: RefString,
+        global: RefGlobal,
         constructs: Vec<EnumConstruct>,
     },
     Null(RefType),
