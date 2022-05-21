@@ -5,14 +5,13 @@ use std::{env, fs};
 
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
+use hlbc::analysis::{find_fun_refs, iter_ops};
 use hlbc::opcodes::Opcode;
 use hlbc::types::{Function, RefFun, RefFunPointee};
 use hlbc::*;
 
-use crate::utils::{find_fun_refs, iter_ops, read_range};
+use crate::utils::read_range;
 
-#[cfg(feature = "petgraph")]
-mod graph;
 mod utils;
 
 fn main() -> anyhow::Result<()> {
@@ -347,18 +346,17 @@ fn main() -> anyhow::Result<()> {
                     let mut w = BufWriter::new(fs::File::create(args)?);
                     code.serialize(&mut w)?;
                 }
-                #[cfg(feature = "petgraph")]
+                #[cfg(feature = "graph")]
                 "callgraph" => {
-                    use crate::graph::build_graph;
-                    use crate::graph::CodeDisplay;
+                    use hlbc::analysis::graph::{call_graph, display_graph};
 
-                    if let Some(findex) = args.parse::<usize>().ok() {
-                        let graph = build_graph(&code, RefFun(findex));
-                        println!("{}", graph.display(&code));
-                    } else {
-                        println!("Expected a function index");
-                        continue;
-                    }
+                    let [findex, depth] = args
+                        .split(" ")
+                        .map(|s| s.parse::<usize>())
+                        .collect::<Result<Vec<_>, _>>()?;
+
+                    let graph = call_graph(&code, RefFun(findex), depth);
+                    println!("{}", display_graph(&graph, &code));
                 }
                 _ => {
                     println!("Unknown command : '{line}'");

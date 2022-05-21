@@ -65,6 +65,7 @@ dependencies = [
  "anyhow",
  "byteorder",
  "hlbc-macros",
+ "petgraph",
  "strum",
  "strum_macros",
 ]
@@ -76,7 +77,6 @@ dependencies = [
  "anyhow",
  "atty",
  "hlbc",
- "petgraph",
  "termcolor",
 ]
 

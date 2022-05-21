@@ -4,6 +4,7 @@ use hlbc::opcodes::Opcode;
 use hlbc::types::{Function, RefFun};
 use hlbc::Bytecode;
 
+// TODO refactor this
 pub fn read_range(arg: &str, max_bound: usize) -> anyhow::Result<Box<dyn Iterator<Item = usize>>> {
     if arg == ".." {
         Ok(Box::new((0..max_bound).into_iter()))
@@ -51,37 +52,4 @@ pub fn read_range(arg: &str, max_bound: usize) -> anyhow::Result<Box<dyn Iterato
         let i = arg.parse()?;
         Ok(Box::new((i..(i + 1)).into_iter()))
     }
-}
-
-pub fn iter_ops(code: &Bytecode) -> impl Iterator<Item = (&Function, (usize, &Opcode))> {
-    code.functions
-        .iter()
-        .map(|f| repeat(f).zip(f.ops.iter().enumerate()))
-        .flatten()
-}
-
-pub fn find_calls(f: &Function) -> impl Iterator<Item = RefFun> + '_ {
-    f.ops.iter().filter_map(|o| match o {
-        Opcode::Call0 { fun, .. } => Some(fun.clone()),
-        Opcode::Call1 { fun, .. } => Some(fun.clone()),
-        Opcode::Call2 { fun, .. } => Some(fun.clone()),
-        Opcode::Call3 { fun, .. } => Some(fun.clone()),
-        Opcode::Call4 { fun, .. } => Some(fun.clone()),
-        Opcode::CallN { fun, .. } => Some(fun.clone()),
-        _ => None,
-    })
-}
-
-pub fn find_fun_refs(f: &Function) -> impl Iterator<Item = (usize, &Opcode, RefFun)> + '_ {
-    f.ops.iter().enumerate().filter_map(|(i, o)| match o {
-        Opcode::Call0 { fun, .. } => Some((i, o, fun.clone())),
-        Opcode::Call1 { fun, .. } => Some((i, o, fun.clone())),
-        Opcode::Call2 { fun, .. } => Some((i, o, fun.clone())),
-        Opcode::Call3 { fun, .. } => Some((i, o, fun.clone())),
-        Opcode::Call4 { fun, .. } => Some((i, o, fun.clone())),
-        Opcode::CallN { fun, .. } => Some((i, o, fun.clone())),
-        Opcode::StaticClosure { fun, .. } => Some((i, o, fun.clone())),
-        Opcode::InstanceClosure { fun, .. } => Some((i, o, fun.clone())),
-        _ => None,
-    })
 }

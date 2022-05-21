@@ -10,4 +10,7 @@ hlbc = { version = "0.1.0", path = ".." }
 termcolor = "1"
 anyhow = "1"
 atty = "0.2"
-petgraph = { version = "0.6", default-features = false, features = ["graphmap"], optional = true }
+
+[features]
+default = []
+graph = ["hlbc/graph"]

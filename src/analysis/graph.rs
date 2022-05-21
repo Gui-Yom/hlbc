@@ -8,19 +8,22 @@ use petgraph::visit::{
     EdgeRef, GraphProp, IntoEdgeReferences, IntoNodeReferences, NodeIndexable, NodeRef,
 };
 
-use hlbc::opcodes::Opcode;
-use hlbc::types::{Function, RefFun, RefFunPointee};
-use hlbc::Bytecode;
+use crate::r#mod::find_calls;
+use crate::types::{Function, RefFun, RefFunPointee};
+use crate::Bytecode;
+use crate::Opcode;
 
-use crate::iter_ops;
+use crate::r#mod::iter_ops;
 use crate::utils::find_calls;
 
-pub fn build_graph(code: &Bytecode, f: RefFun) -> DiGraphMap<RefFun, ()> {
-    let mut g = DiGraphMap::new();
+type Callgraph = DiGraphMap<RefFun, ()>;
+
+pub fn call_graph(code: &Bytecode, f: RefFun, max_depth: usize) -> Callgraph {
+    let mut g = Callgraph::new();
     match f.resolve(code).unwrap() {
         RefFunPointee::Fun(f) => {
             g.add_node(f.findex);
-            build_graph_rec(code, &mut g, f, 20);
+            build_graph_rec(code, &mut g, f, max_depth);
         }
         RefFunPointee::Native(n) => {
             g.add_node(n.findex);
@@ -29,7 +32,7 @@ pub fn build_graph(code: &Bytecode, f: RefFun) -> DiGraphMap<RefFun, ()> {
     g
 }
 
-fn build_graph_rec(code: &Bytecode, g: &mut DiGraphMap<RefFun, ()>, f: &Function, depth: usize) {
+fn build_graph_rec(code: &Bytecode, g: &mut Callgraph, f: &Function, depth: usize) {
     if depth == 0 {
         return;
     }
@@ -57,7 +60,7 @@ static EDGE: [&str; 2] = ["--", "->"];
 static INDENT: &str = "    ";
 
 pub struct GraphDisplay<'a> {
-    g: &'a DiGraphMap<RefFun, ()>,
+    g: &'a Callgraph,
     code: &'a Bytecode,
 }
 
@@ -92,12 +95,7 @@ impl Display for GraphDisplay<'_> {
     }
 }
 
-pub trait CodeDisplay {
-    fn display<'a>(&'a self, code: &'a Bytecode) -> GraphDisplay<'a>;
-}
-
-impl CodeDisplay for DiGraphMap<RefFun, ()> {
-    fn display<'a>(&'a self, code: &'a Bytecode) -> GraphDisplay<'a> {
-        GraphDisplay { g: self, code }
-    }
+/// Generate dot language
+pub fn display_graph<'a>(g: &'a Callgraph, code: &'a Bytecode) -> GraphDisplay<'a> {
+    GraphDisplay { g, code }
 }
