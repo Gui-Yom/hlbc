@@ -64,7 +64,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "byteorder",
- "hlbc-macros",
+ "hlbc-derive",
  "petgraph",
  "strum",
  "strum_macros",
@@ -81,7 +81,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "hlbc-macros"
+name = "hlbc-derive"
 version = "0.1.0"
 dependencies = [
  "quote",

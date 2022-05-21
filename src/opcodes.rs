@@ -14,7 +14,7 @@ static OPCODE_ARGS: &[i8; 99] = &[
 /// Offset for jump instruction
 pub type JumpOffset = i32;
 
-#[hlbc_macros::gen_decode]
+#[hlbc_derive::gen_decode]
 #[derive(Debug, Clone, strum_macros::IntoStaticStr)]
 pub enum Opcode {
     Mov {

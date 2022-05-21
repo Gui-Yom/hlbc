@@ -3,14 +3,20 @@ name = "hlbc"
 version = "0.1.0"
 edition = "2021"
 include = ["src/**/*", "LICENSE", "README.md", "build.rs"]
+license = "MIT"
+description = "Hashlink bytecode disassembler and analyzer"
+authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
+repository = "https://github.com/Gui-Yom/hlbc"
+keywords = ["hashlink", "bytecode", "disassembler", "analysis"]
+categories = ["parsing", "visualization"]
 
 [workspace]
-members = ["hlbc-cli", "hlbc-macros"]
+members = ["hlbc-cli", "hlbc-derive"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hlbc-macros = { path = "hlbc-macros" }
+hlbc-derive = { version = "0.1", path = "hlbc-derive" }
 byteorder = "1"
 anyhow = "1"
 strum = "0.24"
