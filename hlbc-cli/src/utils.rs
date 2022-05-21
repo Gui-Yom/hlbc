@@ -1,9 +1,3 @@
-use std::iter::repeat;
-
-use hlbc::opcodes::Opcode;
-use hlbc::types::{Function, RefFun};
-use hlbc::Bytecode;
-
 // TODO refactor this
 pub fn read_range(arg: &str, max_bound: usize) -> anyhow::Result<Box<dyn Iterator<Item = usize>>> {
     if arg == ".." {

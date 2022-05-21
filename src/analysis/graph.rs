@@ -1,20 +1,12 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use petgraph::dot::Dot;
-use petgraph::graph::NodeIndex;
-use petgraph::graphmap::{DiGraphMap, GraphMap};
-use petgraph::visit::{
-    EdgeRef, GraphProp, IntoEdgeReferences, IntoNodeReferences, NodeIndexable, NodeRef,
-};
+use crate::analysis::find_calls;
+use petgraph::graphmap::DiGraphMap;
+use petgraph::visit::{EdgeRef, IntoEdgeReferences, IntoNodeReferences, NodeIndexable, NodeRef};
 
-use crate::r#mod::find_calls;
 use crate::types::{Function, RefFun, RefFunPointee};
 use crate::Bytecode;
-use crate::Opcode;
-
-use crate::r#mod::iter_ops;
-use crate::utils::find_calls;
 
 type Callgraph = DiGraphMap<RefFun, ()>;
 

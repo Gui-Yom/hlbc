@@ -453,7 +453,7 @@ impl Opcode {
             Opcode::SetEnumField { value, field, src } => {
                 op!("{value}.{} = {src}", field.0)
             }
-            other => format!("{self:?}"),
+            _ => format!("{self:?}"),
         }
     }
 }

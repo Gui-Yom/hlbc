@@ -5,7 +5,7 @@ use syn::__private::TokenStream2;
 use syn::{Data, DeriveInput, GenericArgument, Ident, PathArguments, Type, Variant};
 
 #[proc_macro_attribute]
-pub fn gen_decode(attr: TokenStream, input: TokenStream) -> TokenStream {
+pub fn gen_decode(_: TokenStream, input: TokenStream) -> TokenStream {
     let ast = syn::parse_macro_input!(input as DeriveInput);
     let variants = match &ast.data {
         Data::Enum(v) => Some(&v.variants),
@@ -65,11 +65,11 @@ fn ident(ty: &Type) -> String {
                 PathArguments::AngleBracketed(a) => {
                     let a = match &a.args[0] {
                         GenericArgument::Type(ty) => ident(ty),
-                        other => unreachable!(),
+                        _ => unreachable!(),
                     };
                     format!("{}<{}>", seg.ident, a)
                 }
-                other => unreachable!(),
+                _ => unreachable!(),
             }
         }
         other => unreachable!("unkown type {:?}", other),
@@ -150,7 +150,7 @@ fn gen_initr(enum_name: &Ident, v: &Variant) -> TokenStream2 {
         "RefEnumConstruct" => quote! {
             RefEnumConstruct(#rvi32 as usize)
         },
-        other => TokenStream2::default(),
+        _ => TokenStream2::default(),
     });
     quote! {
         Ok(#enum_name::#vname {
@@ -221,7 +221,7 @@ fn gen_initw(enum_name: &Ident, v: &Variant, i: u8) -> TokenStream2 {
             "RefEnumConstruct" => quote! {
                 w.write_vi32(#fname.0 as i32)?;
             },
-            other => TokenStream2::default(),
+            _ => TokenStream2::default(),
         }
     });
     quote! {

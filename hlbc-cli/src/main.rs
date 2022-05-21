@@ -7,7 +7,7 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use hlbc::analysis::{find_fun_refs, iter_ops};
 use hlbc::opcodes::Opcode;
-use hlbc::types::{Function, RefFun, RefFunPointee};
+use hlbc::types::{RefFun, RefFunPointee};
 use hlbc::*;
 
 use crate::utils::read_range;
@@ -350,13 +350,16 @@ fn main() -> anyhow::Result<()> {
                 "callgraph" => {
                     use hlbc::analysis::graph::{call_graph, display_graph};
 
-                    let [findex, depth] = args
+                    if let [findex, depth] = args
                         .split(" ")
                         .map(|s| s.parse::<usize>())
-                        .collect::<Result<Vec<_>, _>>()?;
-
-                    let graph = call_graph(&code, RefFun(findex), depth);
-                    println!("{}", display_graph(&graph, &code));
+                        .collect::<Result<Vec<_>, _>>()?[..]
+                    {
+                        let graph = call_graph(&code, RefFun(findex), depth);
+                        println!("{}", display_graph(&graph, &code));
+                    } else {
+                        println!("Unrecognized arguments '{args}'");
+                    }
                 }
                 _ => {
                     println!("Unknown command : '{line}'");
