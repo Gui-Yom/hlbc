@@ -1,10 +1,10 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use crate::analysis::find_calls;
 use petgraph::graphmap::DiGraphMap;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences, IntoNodeReferences, NodeIndexable, NodeRef};
 
+use crate::analysis::{find_calls, is_std_fn};
 use crate::types::{Function, RefFun, RefFunPointee};
 use crate::Bytecode;
 
@@ -29,19 +29,21 @@ fn build_graph_rec(code: &Bytecode, g: &mut Callgraph, f: &Function, depth: usiz
         return;
     }
     for fun in find_calls(f) {
-        match fun.resolve(code).unwrap() {
-            RefFunPointee::Fun(fun) => {
-                if !g.contains_node(fun.findex) {
-                    g.add_node(fun.findex);
-                    build_graph_rec(code, g, fun, depth - 1);
+        if !is_std_fn(code, fun) {
+            match fun.resolve(code).unwrap() {
+                RefFunPointee::Fun(fun) => {
+                    if !g.contains_node(fun.findex) {
+                        g.add_node(fun.findex);
+                        build_graph_rec(code, g, fun, depth - 1);
+                    }
+                    g.add_edge(f.findex, fun.findex, ());
                 }
-                g.add_edge(f.findex, fun.findex, ());
-            }
-            RefFunPointee::Native(n) => {
-                if !g.contains_node(n.findex) {
-                    g.add_node(n.findex);
+                RefFunPointee::Native(n) => {
+                    if !g.contains_node(n.findex) {
+                        g.add_node(n.findex);
+                    }
+                    g.add_edge(f.findex, n.findex, ());
                 }
-                g.add_edge(f.findex, n.findex, ());
             }
         }
     }

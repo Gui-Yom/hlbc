@@ -65,7 +65,14 @@ impl RefField {
 impl RefEnumConstruct {
     pub fn display(&self, parent: RefType, ctx: &Bytecode) -> impl Display {
         match parent.resolve(&ctx.types) {
-            Type::Enum { constructs, .. } => constructs[self.0].name.display(ctx),
+            Type::Enum { constructs, .. } => {
+                let name = &constructs[self.0].name;
+                if name.0 != 0 {
+                    name.display(ctx)
+                } else {
+                    "_".to_string()
+                }
+            }
             _ => "_".to_string(),
         }
     }
@@ -129,7 +136,14 @@ impl Type {
             }
             Type::DynObj => "dynobj".to_string(),
             Type::Abstract { name } => name.display(ctx),
-            Type::Enum { name, .. } => format!("enum<{}>", name.display(ctx)),
+            Type::Enum { name, .. } => format!(
+                "enum<{}>",
+                if name.0 != 0 {
+                    name.display(ctx)
+                } else {
+                    "_".to_string()
+                }
+            ),
             Type::Null(reftype) => {
                 format!("null<{}>", reftype.display_rec(ctx, parents.clone()))
             }
@@ -324,49 +338,49 @@ impl Opcode {
                 op!("{obj}[{}] = {src}", field.resolve(&ctx.strings))
             }
             Opcode::JTrue { cond, offset } => {
-                op!("if {cond} == true jump to {}", pos + offset)
+                op!("if {cond} == true jump to {}", pos + offset + 1)
             }
             Opcode::JFalse { cond, offset } => {
-                op!("if {cond} == false jump to {}", pos + offset)
+                op!("if {cond} == false jump to {}", pos + offset + 1)
             }
             Opcode::JNull { reg, offset } => {
-                op!("if {reg} == null jump to {}", pos + offset)
+                op!("if {reg} == null jump to {}", pos + offset + 1)
             }
             Opcode::JNotNull { reg, offset } => {
-                op!("if {reg} != null jump to {}", pos + offset)
+                op!("if {reg} != null jump to {}", pos + offset + 1)
             }
             Opcode::JSLt { a, b, offset } => {
-                op!("if {a} < {b} jump to {}", pos + offset)
+                op!("if {a} < {b} jump to {}", pos + offset + 1)
             }
             Opcode::JSGte { a, b, offset } => {
-                op!("if {a} >= {b} jump to {}", pos + offset)
+                op!("if {a} >= {b} jump to {}", pos + offset + 1)
             }
             Opcode::JSGt { a, b, offset } => {
-                op!("if {a} > {b} jump to {}", pos + offset)
+                op!("if {a} > {b} jump to {}", pos + offset + 1)
             }
             Opcode::JSLte { a, b, offset } => {
-                op!("if {a} <= {b} jump to {}", pos + offset)
+                op!("if {a} <= {b} jump to {}", pos + offset + 1)
             }
             Opcode::JULt { a, b, offset } => {
-                op!("if {a} < {b} jump to {}", pos + offset)
+                op!("if {a} < {b} jump to {}", pos + offset + 1)
             }
             Opcode::JUGte { a, b, offset } => {
-                op!("if {a} >= {b} jump to {}", pos + offset)
+                op!("if {a} >= {b} jump to {}", pos + offset + 1)
             }
             Opcode::JNotLt { a, b, offset } => {
-                op!("if {a} !< {b} jump to {}", pos + offset)
+                op!("if {a} !< {b} jump to {}", pos + offset + 1)
             }
             Opcode::JNotGte { a, b, offset } => {
-                op!("if {a} !>= {b} jump to {}", pos + offset)
+                op!("if {a} !>= {b} jump to {}", pos + offset + 1)
             }
             Opcode::JEq { a, b, offset } => {
-                op!("if {a} == {b} jump to {}", pos + offset)
+                op!("if {a} == {b} jump to {}", pos + offset + 1)
             }
             Opcode::JNotEq { a, b, offset } => {
-                op!("if {a} != {b} jump to {}", pos + offset)
+                op!("if {a} != {b} jump to {}", pos + offset + 1)
             }
             Opcode::JAlways { offset } => {
-                op!("jump {}", pos + offset)
+                op!("jump {}", pos + offset + 1)
             }
             Opcode::ToDyn { dst, src } => {
                 op!("{dst} = cast {src}")
@@ -394,13 +408,16 @@ impl Opcode {
                 op!("if {reg} == null throw exc")
             }
             Opcode::Trap { exc, offset } => {
-                op!("try {exc} jump to {}", pos + offset)
+                op!("try {exc} jump to {}", pos + offset + 1)
             }
             Opcode::EndTrap { exc } => {
                 op!("catch {exc}")
             }
             Opcode::GetArray { dst, array, index } => {
                 op!("{dst} = {array}[{index}]")
+            }
+            Opcode::SetArray { array, index, src } => {
+                op!("{array}[{index}] = {src}")
             }
             Opcode::New { dst } => {
                 op!("{dst} = new {}", parent.regs[dst.0 as usize].display(ctx))

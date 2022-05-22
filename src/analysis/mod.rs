@@ -1,5 +1,6 @@
 use std::iter::repeat;
 
+use crate::types::RefFunPointee;
 use crate::{Bytecode, Function, Opcode, RefFun};
 
 #[cfg(feature = "graph")]
@@ -35,4 +36,19 @@ pub fn find_fun_refs(f: &Function) -> impl Iterator<Item = (usize, &Opcode, RefF
         Opcode::InstanceClosure { fun, .. } => Some((i, o, *fun)),
         _ => None,
     })
+}
+
+pub fn is_std_fn(code: &Bytecode, f: RefFun) -> bool {
+    match f.resolve(code).unwrap() {
+        RefFunPointee::Fun(fun) => {
+            if let Some(debug_info) = &fun.debug_info {
+                let (file, _) = debug_info[fun.ops.len() - 1];
+                let filename = &code.debug_files.as_ref().unwrap()[file];
+                filename.contains("std")
+            } else {
+                false
+            }
+        }
+        RefFunPointee::Native(n) => n.lib.resolve(&code.strings) == "std",
+    }
 }

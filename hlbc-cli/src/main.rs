@@ -7,7 +7,7 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use hlbc::analysis::{find_fun_refs, iter_ops};
 use hlbc::opcodes::Opcode;
-use hlbc::types::{RefFun, RefFunPointee};
+use hlbc::types::{RefFun, RefFunPointee, Type};
 use hlbc::*;
 
 use crate::utils::read_range;
@@ -114,14 +114,49 @@ fn main() -> anyhow::Result<()> {
                     let range = read_range(args, code.types.len())?;
                     for i in range {
                         print_i!(i);
-                        println!("{}", code.types[i].display(&code));
-                    }
-                }
-                "td" | "typed" => {
-                    let range = read_range(args, code.types.len())?;
-                    for i in range {
-                        print_i!(i);
-                        println!("{:#?}", code.types[i]);
+                        let t = &code.types[i];
+                        println!("{}", t.display(&code));
+                        match t {
+                            Type::Obj(obj) => {
+                                if let Some(sup) = obj.super_ {
+                                    println!("extends {}", sup.display(&code));
+                                }
+                                println!("global: {}", obj.global.0);
+                                println!("fields:");
+                                for f in &obj.own_fields {
+                                    println!("  {}: {}", f.name.display(&code), f.t.display(&code));
+                                }
+                                println!("protos:");
+                                for p in &obj.protos {
+                                    println!(
+                                        "  {}: {}",
+                                        p.name.display(&code),
+                                        p.findex.display_header(&code)
+                                    );
+                                }
+                                println!("bindings:");
+                                for (fi, fun) in &obj.bindings {
+                                    println!(
+                                        "  {}: {}",
+                                        fi.display_obj(t, &code),
+                                        fun.display_header(&code)
+                                    );
+                                }
+                            }
+                            Type::Enum {
+                                global, constructs, ..
+                            } => {
+                                println!("global: {}", global.0);
+                                println!("constructs:");
+                                for c in constructs {
+                                    println!("  {}:", c.name.display(&code));
+                                    for (i, p) in c.params.iter().enumerate() {
+                                        println!("    {i}: {}", p.display(&code));
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
                     }
                 }
                 "g" | "global" => {
