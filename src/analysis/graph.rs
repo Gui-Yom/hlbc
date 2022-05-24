@@ -8,7 +8,7 @@ use crate::analysis::{find_calls, is_std_fn};
 use crate::types::{Function, RefFun, RefFunPointee};
 use crate::Bytecode;
 
-type Callgraph = DiGraphMap<RefFun, ()>;
+type Callgraph = DiGraphMap<RefFun, bool>;
 
 pub fn call_graph(code: &Bytecode, f: RefFun, max_depth: usize) -> Callgraph {
     let mut g = Callgraph::new();
@@ -28,7 +28,7 @@ fn build_graph_rec(code: &Bytecode, g: &mut Callgraph, f: &Function, depth: usiz
     if depth == 0 {
         return;
     }
-    for fun in find_calls(f) {
+    for (fun, closure) in find_calls(f) {
         if !is_std_fn(code, fun) {
             match fun.resolve(code).unwrap() {
                 RefFunPointee::Fun(fun) => {
@@ -36,13 +36,13 @@ fn build_graph_rec(code: &Bytecode, g: &mut Callgraph, f: &Function, depth: usiz
                         g.add_node(fun.findex);
                         build_graph_rec(code, g, fun, depth - 1);
                     }
-                    g.add_edge(f.findex, fun.findex, ());
+                    g.add_edge(f.findex, fun.findex, closure);
                 }
                 RefFunPointee::Native(n) => {
                     if !g.contains_node(n.findex) {
                         g.add_node(n.findex);
                     }
-                    g.add_edge(f.findex, n.findex, ());
+                    g.add_edge(f.findex, n.findex, closure);
                 }
             }
         }
@@ -62,11 +62,18 @@ impl Display for GraphDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         writeln!(f, "{} {{", TYPE[self.g.is_directed() as usize])?;
 
+        writeln!(f, "fontname=\"Helvetica,Arial,sans-serif\"")?;
+        writeln!(
+            f,
+            "node [fontname=\"Helvetica,Arial,sans-serif\" style=filled fillcolor=\"#f8f8f8\"]"
+        )?;
+        writeln!(f, "edge [fontname=\"Helvetica,Arial,sans-serif\"]")?;
+
         // output all labels
         for node in self.g.node_references() {
             writeln!(
                 f,
-                "{}{} [ label = \"{}\" ]",
+                "{}{} [ label = \"{}\" fontsize=18 shape=box color=\"#b20400\" fillcolor=\"#edd6d5\" ]",
                 INDENT,
                 self.g.to_index(node.id()),
                 node.weight().display_header(self.code)
@@ -76,11 +83,12 @@ impl Display for GraphDisplay<'_> {
         for edge in self.g.edge_references() {
             writeln!(
                 f,
-                "{}{} {} {} [ label = \"\" ]",
+                "{}{} {} {} [ label = \"{}\" ]",
                 INDENT,
                 self.g.to_index(edge.source()),
                 EDGE[self.g.is_directed() as usize],
                 self.g.to_index(edge.target()),
+                if *edge.weight() { "closure" } else { "" }
             )?;
         }
 
