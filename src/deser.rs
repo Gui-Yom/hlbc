@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ffi::CStr;
 use std::io::Read;
 
@@ -110,12 +111,12 @@ impl<T: Read> ReadHlExt for T {
                 pindex: self.read_vari()?,
             });
         }
-        let mut bindings = Vec::with_capacity(nbindings);
+        let mut bindings = HashMap::with_capacity(nbindings);
         for _ in 0..nbindings {
-            bindings.push((
+            bindings.insert(
                 RefField(self.read_varu()? as usize),
                 RefFun(self.read_varu()? as usize),
-            ));
+            );
         }
         Ok(TypeObj {
             name,

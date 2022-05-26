@@ -12,19 +12,6 @@ pub fn iter_ops(code: &Bytecode) -> impl Iterator<Item = (&Function, (usize, &Op
         .flat_map(|f| repeat(f).zip(f.ops.iter().enumerate()))
 }
 
-pub fn find_calls(f: &Function) -> impl Iterator<Item = (RefFun, bool)> + '_ {
-    f.ops.iter().enumerate().filter_map(|(i, o)| match o {
-        Opcode::Call0 { fun, .. } => Some((*fun, false)),
-        Opcode::Call1 { fun, .. } => Some((*fun, false)),
-        Opcode::Call2 { fun, .. } => Some((*fun, false)),
-        Opcode::Call3 { fun, .. } => Some((*fun, false)),
-        Opcode::Call4 { fun, .. } => Some((*fun, false)),
-        Opcode::CallN { fun, .. } => Some((*fun, false)),
-        Opcode::CallClosure { fun, .. } => find_last_closure_assign(f, *fun, i).map(|f| (f, true)),
-        _ => None,
-    })
-}
-
 pub fn find_fun_refs(f: &Function) -> impl Iterator<Item = (usize, &Opcode, RefFun)> + '_ {
     f.ops.iter().enumerate().filter_map(|(i, o)| match o {
         Opcode::Call0 { fun, .. } => Some((i, o, *fun)),
@@ -39,16 +26,13 @@ pub fn find_fun_refs(f: &Function) -> impl Iterator<Item = (usize, &Opcode, RefF
     })
 }
 
-pub fn find_closure_assigns(f: &Function) {
-    f.ops.iter().filter_map(|o| match o {
-        Opcode::StaticClosure { dst, fun } => Some((dst, fun)),
-        Opcode::InstanceClosure { dst, fun, .. } => Some((dst, fun)),
-        // TODO VirtualClosure assign
-        _ => None,
-    });
-}
-
-pub fn find_last_closure_assign(f: &Function, reg: Reg, pos: usize) -> Option<RefFun> {
+// Starting from a position in a function, finds the last time a register has been assigned a function
+pub fn find_last_closure_assign(
+    code: &Bytecode,
+    f: &Function,
+    reg: Reg,
+    pos: usize,
+) -> Option<RefFun> {
     f.ops
         .iter()
         .rev()
@@ -56,6 +40,11 @@ pub fn find_last_closure_assign(f: &Function, reg: Reg, pos: usize) -> Option<Re
         .find_map(|o| match o {
             Opcode::StaticClosure { dst, fun } if *dst == reg => Some(*fun),
             Opcode::InstanceClosure { dst, fun, .. } if *dst == reg => Some(*fun),
+            Opcode::Field { dst, obj, field } if *dst == reg => f.regs[obj.0 as usize]
+                .resolve(&code.types)
+                .get_type_obj()
+                .map(|o| o.bindings.get(field).copied())
+                .flatten(),
             _ => None,
         })
 }

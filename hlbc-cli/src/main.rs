@@ -149,7 +149,14 @@ fn main() -> anyhow::Result<()> {
                                 println!("global: {}", global.0);
                                 println!("constructs:");
                                 for c in constructs {
-                                    println!("  {}:", c.name.display(&code));
+                                    println!(
+                                        "  {}:",
+                                        if c.name.0 == 0 {
+                                            "_".to_string()
+                                        } else {
+                                            c.name.display(&code)
+                                        }
+                                    );
                                     for (i, p) in c.params.iter().enumerate() {
                                         println!("    {i}: {}", p.display(&code));
                                     }
@@ -220,7 +227,7 @@ fn main() -> anyhow::Result<()> {
                 }
                 "fname" => {
                     if let Some(&i) = code.fnames.get(args) {
-                        println!("{}", code.functions[i].display(&code));
+                        println!("{}", code.functions[i].display_header(&code));
                     } else {
                         println!("unknown");
                     }

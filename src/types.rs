@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{Bytecode, Opcode};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -46,7 +48,7 @@ pub struct ObjField {
     pub t: RefType,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct RefField(pub usize);
 
 #[derive(Debug, Clone, PartialEq)]
@@ -83,7 +85,7 @@ pub struct TypeObj {
     /// Including other fields in the hierarchy
     pub fields: Vec<ObjField>,
     pub protos: Vec<ObjProto>,
-    pub bindings: Vec<(RefField, RefFun)>,
+    pub bindings: HashMap<RefField, RefFun>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
