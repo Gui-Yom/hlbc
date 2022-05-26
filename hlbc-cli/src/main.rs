@@ -180,22 +180,7 @@ fn main() -> anyhow::Result<()> {
                         println!("{}", code.natives[i].display_header(&code));
                     }
                 }
-                "fnh" | "functionh" => {
-                    let range = read_range(args, code.functions.len())?;
-                    for i in range {
-                        print_i!(i);
-                        println!("{}", code.functions[i].display_header(&code));
-                    }
-                }
-                // Function by index
-                "fn" | "function" => {
-                    let range = read_range(args, code.functions.len())?;
-                    for i in range {
-                        print_i!(i);
-                        println!("{}", code.functions[i].display(&code));
-                    }
-                }
-                "fih" | "findexh" => {
+                "fnh" | "findexh" => {
                     let range = read_range(args, code.max_findex + 1)?;
                     for findex in range {
                         print_i!(findex);
@@ -210,7 +195,7 @@ fn main() -> anyhow::Result<()> {
                         }
                     }
                 }
-                "fi" | "findex" => {
+                "fn" | "findex" => {
                     let range = read_range(args, code.max_findex + 1)?;
                     for findex in range {
                         print_i!(findex);
@@ -420,19 +405,17 @@ fstr        <str>      | Find a string
 d,debugfile <idx>      | Get the debug file name at index
 ffile       <str>      | Find the debug file named
 t,type      <idx>      | Get the type at index
-td,typed    <idx>      | Get full information of type at index
 g,global    <idx>      | Get global at index
 c,constant  <idx>      | Get constant at index
 n,native    <idx>      | Get native at index
-fnh         <idx>      | Get header of function at index
-fn          <idx>      | Get function at index
-fih         <findex>   | Get header of function (findex)
-fi          <findex>   | Get function at index (findex)
+fnh         <findex>   | Get header of function at index
+fn          <findex>   | Get function at index
 fname       <str>      | Get function named
 infile      <@idx|str> | Find functions in file
 fileof      <findex>   | Get the file where findex is defined
 refto       <any@idx>  | Find references to a given bytecode element
 saveto      <filename> | Serialize the bytecode to a file
+callgraph <findex> <depth> | Create a dot call graph froma function and a max depth
                 "#),
                 "info" => println!(
                     "version: {}\ndebug: {}\nnints: {}\nnfloats: {}\nnstrings: {}\nntypes: {}\nnnatives: {}\nnfunctions: {}\nnconstants: {}",
