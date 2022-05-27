@@ -10,9 +10,9 @@ use hlbc::opcodes::Opcode;
 use hlbc::types::{RefFun, RefFunPointee, Type};
 use hlbc::*;
 
-use crate::utils::read_range;
+use crate::parser::{parse_command, Command, ElementRef, FileOrIndex, ParseContext};
 
-mod utils;
+mod parser;
 
 fn main() -> anyhow::Result<()> {
     let tty = atty::is(atty::Stream::Stdout);
@@ -44,380 +44,68 @@ fn main() -> anyhow::Result<()> {
         };
     }
 
+    macro_rules! require_debug_info {
+        () => {
+            if let Some(debug_files) = &code.debug_files {
+                debug_files
+            } else {
+                println!("No debug info in this binary");
+                continue;
+            }
+        };
+    }
+
     loop {
         let mut line = String::new();
         println!();
         print!("> ");
         stdout.flush()?;
         stdin().read_line(&mut line)?;
-        let line = line.trim();
 
-        if line == "exit" {
-            break;
-        }
-        let split = line.split_once(" ");
-        if let Some((cmd, args)) = split {
-            match cmd {
-                "i" | "int" => {
-                    let range = read_range(args, code.ints.len())?;
-                    for i in range {
-                        print_i!(i);
-                        println!("{}", code.ints[i]);
-                    }
-                }
-                "f" | "float" => {
-                    let range = read_range(args, code.floats.len())?;
-                    for i in range {
-                        print_i!(i);
-                        println!("{}", code.floats[i]);
-                    }
-                }
-                "s" | "string" => {
-                    let range = read_range(args, code.strings.len())?;
-                    for i in range {
-                        print_i!(i);
-                        println!("{}", code.strings[i]);
-                    }
-                }
-                "fstr" => {
-                    for (i, s) in code.strings.iter().enumerate() {
-                        if s.contains(args) {
-                            print_i!(i);
-                            println!("{}", s);
-                        }
-                    }
-                }
-                "d" | "debugfile" => {
-                    if let Some(debug_files) = &code.debug_files {
-                        let range = read_range(args, debug_files.len())?;
-                        for i in range {
-                            print_i!(i);
-                            println!("{}", debug_files[i]);
-                        }
-                    } else {
-                        println!("No debug info in this binary");
-                    }
-                }
-                "ffile" => {
-                    if let Some(debug_files) = &code.debug_files {
-                        for (i, s) in debug_files.iter().enumerate() {
-                            if s.contains(args) {
-                                print_i!(i);
-                                println!("{}", s);
-                            }
-                        }
-                    } else {
-                        println!("No debug info in this binary");
-                    }
-                }
-                "t" | "type" => {
-                    let range = read_range(args, code.types.len())?;
-                    for i in range {
-                        print_i!(i);
-                        let t = &code.types[i];
-                        println!("{}", t.display(&code));
-                        match t {
-                            Type::Obj(obj) => {
-                                if let Some(sup) = obj.super_ {
-                                    println!("extends {}", sup.display(&code));
-                                }
-                                println!("global: {}", obj.global.0);
-                                println!("fields:");
-                                for f in &obj.own_fields {
-                                    println!("  {}: {}", f.name.display(&code), f.t.display(&code));
-                                }
-                                println!("protos:");
-                                for p in &obj.protos {
-                                    println!(
-                                        "  {}: {}",
-                                        p.name.display(&code),
-                                        p.findex.display_header(&code)
-                                    );
-                                }
-                                println!("bindings:");
-                                for (fi, fun) in &obj.bindings {
-                                    println!(
-                                        "  {}: {}",
-                                        fi.display_obj(t, &code),
-                                        fun.display_header(&code)
-                                    );
-                                }
-                            }
-                            Type::Enum {
-                                global, constructs, ..
-                            } => {
-                                println!("global: {}", global.0);
-                                println!("constructs:");
-                                for c in constructs {
-                                    println!(
-                                        "  {}:",
-                                        if c.name.0 == 0 {
-                                            "_".to_string()
-                                        } else {
-                                            c.name.display(&code)
-                                        }
-                                    );
-                                    for (i, p) in c.params.iter().enumerate() {
-                                        println!("    {i}: {}", p.display(&code));
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                "g" | "global" => {
-                    let range = read_range(args, code.globals.len())?;
-                    for i in range {
-                        print_i!(i);
-                        println!("{}", code.globals[i].display(&code));
-                    }
-                }
-                "n" | "native" => {
-                    let range = read_range(args, code.natives.len())?;
-                    for i in range {
-                        print_i!(i);
-                        println!("{}", code.natives[i].display_header(&code));
-                    }
-                }
-                "fnh" | "findexh" => {
-                    let range = read_range(args, code.max_findex + 1)?;
-                    for findex in range {
-                        print_i!(findex);
-                        if let Some(&(i, fun)) = code.findexes.get(&RefFun(findex)) {
-                            if fun {
-                                println!("{}", code.functions[i].display_header(&code));
-                            } else {
-                                println!("{}", code.natives[i].display_header(&code));
-                            }
-                        } else {
-                            println!("unknown");
-                        }
-                    }
-                }
-                "fn" | "findex" => {
-                    let range = read_range(args, code.max_findex + 1)?;
-                    for findex in range {
-                        print_i!(findex);
-                        if let Some(&(i, fun)) = code.findexes.get(&RefFun(findex)) {
-                            if fun {
-                                println!("{}", code.functions[i].display(&code));
-                            } else {
-                                println!("{}", code.natives[i].display_header(&code));
-                            }
-                        } else {
-                            println!("unknown");
-                        }
-                    }
-                }
-                "fname" => {
-                    if let Some(&i) = code.fnames.get(args) {
-                        println!("{}", code.functions[i].display_header(&code));
-                    } else {
-                        println!("unknown");
-                    }
-                }
-                "c" | "constant" => {
-                    let range = read_range(args, code.constants.as_ref().unwrap().len())?;
-                    for i in range {
-                        print_i!(i);
-                        println!("{:#?}", code.constants.as_ref().unwrap()[i]);
-                    }
-                }
-                "infile" => {
-                    if let Some(debug_files) = &code.debug_files {
-                        let fileidx = if args.contains("@") {
-                            if let Some(idx) = args[1..].parse::<usize>().ok() {
-                                Some((idx, &debug_files[idx]))
-                            } else {
-                                println!("Expected a number after @");
-                                None
-                            }
-                        } else {
-                            debug_files.iter().enumerate().find(|(_, d)| *d == args)
-                        };
-                        if let Some((idx, d)) = fileidx {
-                            println!("Functions in file@{idx} : {d}");
-                            for (i, f) in code.functions.iter().enumerate() {
-                                if f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0 == idx {
-                                    print_i!(i);
-                                    println!("{}", f.display_header(&code));
-                                }
-                            }
-                        } else {
-                            println!("File {args} not found !");
-                        }
-                    } else {
-                        println!("No debug info in this binary");
-                    }
-                }
-                "fileof" => {
-                    if let Some(debug_files) = &code.debug_files {
-                        if let Some(findex) = args.parse::<usize>().ok() {
-                            if let Some(p) = RefFun(findex).resolve(&code) {
-                                match p {
-                                    RefFunPointee::Fun(f) => {
-                                        let idx = f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0;
-                                        println!(
-                                            "{} is in file@{idx} : {}",
-                                            f.display_header(&code),
-                                            &debug_files[idx]
-                                        );
-                                    }
-                                    RefFunPointee::Native(n) => {
-                                        println!("{} can't be in any file", n.display_header(&code))
-                                    }
-                                }
-                            } else {
-                                println!("Unknown findex");
-                            }
-                        } else {
-                            println!("Expected a number after @");
-                            continue;
-                        }
-                    } else {
-                        println!("No debug info in this binary");
-                    }
-                }
-                // Find all functions referencing the given argument
-                "refto" => {
-                    let args: Vec<String> = args.split("@").map(|s| s.to_string()).collect();
-                    let idx = args[1].parse::<usize>()?;
-                    match args[0].as_str() {
-                        "string" => {
-                            println!(
-                                "Finding references to string@{idx} : {}\n",
-                                code.strings[idx]
-                            );
-                            if let Some(constants) = &code.constants {
-                                for (i, c) in constants.iter().enumerate() {
-                                    if c.fields[0] == idx {
-                                        println!(
-                                            "constant@{i} expanding to global@{} (now also searching for global)",
-                                            c.global.0
-                                        );
-                                        iter_ops(&code).for_each(|(f, (i, o))| match o {
-                                            Opcode::GetGlobal { global, .. } => {
-                                                if *global == c.global {
-                                                    println!(
-                                                        "in {} at {i}: GetGlobal",
-                                                        f.display_header(&code)
-                                                    );
-                                                }
-                                            }
-                                            _ => {}
-                                        });
-                                        println!();
-                                    }
-                                }
-                            }
-                            iter_ops(&code).for_each(|(f, (i, o))| match o {
-                                Opcode::String { ptr, .. } => {
-                                    if ptr.0 == idx {
-                                        println!("{} at {i}: String", f.display_header(&code));
-                                    }
-                                }
-                                _ => {}
-                            });
-                        }
-                        "global" => {
-                            println!(
-                                "Finding references to global@{idx} : {}\n",
-                                code.globals[idx].display(&code)
-                            );
-                            if let Some(constants) = &code.constants {
-                                for (i, c) in constants.iter().enumerate() {
-                                    if c.global.0 == idx {
-                                        println!("constant@{i} : {:?}", c);
-                                    }
-                                }
-                            }
-                            println!();
-
-                            iter_ops(&code).for_each(|(f, (i, o))| match o {
-                                Opcode::GetGlobal { global, .. } => {
-                                    if global.0 == idx {
-                                        println!("{} at {i}: GetGlobal", f.display_header(&code));
-                                    }
-                                }
-                                Opcode::SetGlobal { global, .. } => {
-                                    if global.0 == idx {
-                                        println!("{} at {i}: SetGlobal", f.display_header(&code));
-                                    }
-                                }
-                                _ => {}
-                            });
-                        }
-                        "fi" => {
-                            println!(
-                                "Finding references to fn@{idx} : {}\n",
-                                RefFun(idx).display_header(&code)
-                            );
-                            code.functions
-                                .iter()
-                                .flat_map(|f| repeat(f).zip(find_fun_refs(f)))
-                                .for_each(|(f, (i, o, fun))| {
-                                    if fun.0 == idx {
-                                        println!(
-                                            "{} at {i}: {}",
-                                            f.display_header(&code),
-                                            o.name()
-                                        );
-                                    }
-                                });
-                        }
-                        _ => {}
-                    }
-                }
-                "saveto" => {
-                    let mut w = BufWriter::new(fs::File::create(args)?);
-                    code.serialize(&mut w)?;
-                }
-                #[cfg(feature = "graph")]
-                "callgraph" => {
-                    use hlbc::analysis::graph::{call_graph, display_graph};
-
-                    if let [findex, depth] = args
-                        .split(" ")
-                        .map(|s| s.parse::<usize>())
-                        .collect::<Result<Vec<_>, _>>()?[..]
-                    {
-                        let graph = call_graph(&code, RefFun(findex), depth);
-                        println!("{}", display_graph(&graph, &code));
-                    } else {
-                        println!("Unrecognized arguments '{args}'");
-                    }
-                }
-                _ => {
-                    println!("Unknown command : '{line}'");
-                }
+        let parse_ctx = ParseContext {
+            int_max: code.ints.len(),
+            float_max: code.floats.len(),
+            string_max: code.strings.len(),
+            debug_file_max: code.debug_files.as_ref().map(|v| v.len()).unwrap_or(0),
+            type_max: code.types.len(),
+            global_max: code.globals.len(),
+            native_max: code.natives.len(),
+            constant_max: code.constants.as_ref().map(|v| v.len()).unwrap_or(0),
+            findex_max: code.findexes.len(),
+        };
+        match parse_command(&parse_ctx, line.trim()) {
+            Ok(Command::Exit) => {
+                break;
             }
-        } else {
-            match line {
-                "help" => println!(r#"Commands :
+            Ok(Command::Help) => {
+                println!(
+                    r#"Commands :
 info                   | General information about the bytecode
 help                   | This message
 entrypoint             | Get the bytecode entrypoint
 i,int       <idx>      | Get the int at index
 f,float     <idx>      | Get the float at index
 s,string    <idx>      | Get the string at index
-fstr        <str>      | Find a string
-d,debugfile <idx>      | Get the debug file name at index
-ffile       <str>      | Find the debug file named
+sstr        <str>      | Find a string
+file,debugfile <idx>      | Get the debug file name at index
+sfile       <str>      | Find the debug file named
 t,type      <idx>      | Get the type at index
 g,global    <idx>      | Get global at index
 c,constant  <idx>      | Get constant at index
 n,native    <idx>      | Get native at index
 fnh         <findex>   | Get header of function at index
 fn          <findex>   | Get function at index
-fname       <str>      | Get function named
-infile      <@idx|str> | Find functions in file
+sfn         <str>      | Get function named
+infile      <idx|str> | Find functions in file
 fileof      <findex>   | Get the file where findex is defined
 refto       <any@idx>  | Find references to a given bytecode element
 saveto      <filename> | Serialize the bytecode to a file
-callgraph <findex> <depth> | Create a dot call graph froma function and a max depth
-                "#),
-                "info" => println!(
+callgraph   <findex> <depth> | Create a dot call graph froma function and a max depth
+                "#
+                );
+            }
+            Ok(Command::Info) => {
+                println!(
                     "version: {}\ndebug: {}\nnints: {}\nnfloats: {}\nnstrings: {}\nntypes: {}\nnnatives: {}\nnfunctions: {}\nnconstants: {}",
                     code.version,
                     code.debug_files.is_some(),
@@ -428,17 +116,316 @@ callgraph <findex> <depth> | Create a dot call graph froma function and a max de
                     code.natives.len(),
                     code.functions.len(),
                     code.constants.as_ref().map_or(0, |c| c.len())
-                ),
-                "entrypoint" => {
+                );
+            }
+            Ok(Command::Entrypoint) => {
+                println!(
+                    "{}",
+                    code.functions[code.findexes.get(&code.entrypoint).unwrap().0]
+                        .display_header(&code)
+                );
+            }
+            Ok(Command::Int(range)) => {
+                for i in range {
+                    print_i!(i);
+                    println!("{}", code.ints[i]);
+                }
+            }
+            Ok(Command::Float(range)) => {
+                for i in range {
+                    print_i!(i);
+                    println!("{}", code.floats[i]);
+                }
+            }
+            Ok(Command::String(range)) => {
+                for i in range {
+                    print_i!(i);
+                    println!("{}", code.strings[i]);
+                }
+            }
+            Ok(Command::SearchStr(str)) => {
+                for (i, s) in code.strings.iter().enumerate() {
+                    if s.contains(&str) {
+                        print_i!(i);
+                        println!("{}", s);
+                    }
+                }
+            }
+            Ok(Command::Debugfile(range)) => {
+                let debug_files = require_debug_info!();
+                for i in range {
+                    print_i!(i);
+                    println!("{}", debug_files[i]);
+                }
+            }
+            Ok(Command::SearchDebugfile(str)) => {
+                let debug_files = require_debug_info!();
+                for (i, s) in debug_files.iter().enumerate() {
+                    if s.contains(&str) {
+                        print_i!(i);
+                        println!("{}", s);
+                    }
+                }
+            }
+            Ok(Command::Type(range)) => {
+                for i in range {
+                    print_i!(i);
+                    let t = &code.types[i];
+                    println!("{}", t.display(&code));
+                    match t {
+                        Type::Obj(obj) => {
+                            if let Some(sup) = obj.super_ {
+                                println!("extends {}", sup.display(&code));
+                            }
+                            println!("global: {}", obj.global.0);
+                            println!("fields:");
+                            for f in &obj.own_fields {
+                                println!("  {}: {}", f.name.display(&code), f.t.display(&code));
+                            }
+                            println!("protos:");
+                            for p in &obj.protos {
+                                println!(
+                                    "  {}: {}",
+                                    p.name.display(&code),
+                                    p.findex.display_header(&code)
+                                );
+                            }
+                            println!("bindings:");
+                            for (fi, fun) in &obj.bindings {
+                                println!(
+                                    "  {}: {}",
+                                    fi.display_obj(t, &code),
+                                    fun.display_header(&code)
+                                );
+                            }
+                        }
+                        Type::Enum {
+                            global, constructs, ..
+                        } => {
+                            println!("global: {}", global.0);
+                            println!("constructs:");
+                            for c in constructs {
+                                println!(
+                                    "  {}:",
+                                    if c.name.0 == 0 {
+                                        "_".to_string()
+                                    } else {
+                                        c.name.display(&code)
+                                    }
+                                );
+                                for (i, p) in c.params.iter().enumerate() {
+                                    println!("    {i}: {}", p.display(&code));
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Ok(Command::Global(range)) => {
+                for i in range {
+                    print_i!(i);
+                    println!("{}", code.globals[i].display(&code));
+                }
+            }
+            Ok(Command::Native(range)) => {
+                for i in range {
+                    print_i!(i);
+                    println!("{}", code.natives[i].display_header(&code));
+                }
+            }
+            Ok(Command::Constant(range)) => {
+                for i in range {
+                    print_i!(i);
+                    println!("{:#?}", code.constants.as_ref().unwrap()[i]);
+                }
+            }
+            Ok(Command::FunctionHeader(range)) => {
+                for findex in range {
+                    print_i!(findex);
+                    if let Some(&(i, fun)) = code.findexes.get(&RefFun(findex)) {
+                        if fun {
+                            println!("{}", code.functions[i].display_header(&code));
+                        } else {
+                            println!("{}", code.natives[i].display_header(&code));
+                        }
+                    } else {
+                        println!("unknown");
+                    }
+                }
+            }
+            Ok(Command::Function(range)) => {
+                for findex in range {
+                    print_i!(findex);
+                    if let Some(&(i, fun)) = code.findexes.get(&RefFun(findex)) {
+                        if fun {
+                            println!("{}", code.functions[i].display(&code));
+                        } else {
+                            println!("{}", code.natives[i].display_header(&code));
+                        }
+                    } else {
+                        println!("unknown");
+                    }
+                }
+            }
+            Ok(Command::SearchFunction(str)) => {
+                // TODO search for function
+                if let Some(&i) = code.fnames.get(&str) {
+                    println!("{}", code.functions[i].display_header(&code));
+                } else {
+                    println!("unknown");
+                }
+            }
+            Ok(Command::InFile(foi)) => {
+                let debug_files = require_debug_info!();
+                match foi {
+                    FileOrIndex::File(str) => {
+                        if let Some(idx) = debug_files.into_iter().enumerate().find_map(
+                            |(i, d): (usize, &String)| {
+                                if d == &str {
+                                    Some(i)
+                                } else {
+                                    None
+                                }
+                            },
+                        ) {
+                            println!("Functions in file@{idx} : {}", debug_files[idx]);
+                            for (i, f) in code.functions.iter().enumerate() {
+                                if f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0 == idx {
+                                    print_i!(i);
+                                    println!("{}", f.display_header(&code));
+                                }
+                            }
+                        } else {
+                            println!("File {str} not found !");
+                        }
+                    }
+                    FileOrIndex::Index(idx) => {
+                        println!("Functions in file@{idx} : {}", debug_files[idx]);
+                        for (i, f) in code.functions.iter().enumerate() {
+                            if f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0 == idx {
+                                print_i!(i);
+                                println!("{}", f.display_header(&code));
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(Command::FileOf(idx)) => {
+                let debug_files = require_debug_info!();
+                if let Some(p) = RefFun(idx).resolve(&code) {
+                    match p {
+                        RefFunPointee::Fun(f) => {
+                            let idx = f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0;
+                            println!(
+                                "{} is in file@{idx} : {}",
+                                f.display_header(&code),
+                                &debug_files[idx]
+                            );
+                        }
+                        RefFunPointee::Native(n) => {
+                            println!("{} can't be in any file", n.display_header(&code))
+                        }
+                    }
+                }
+            }
+            Ok(Command::SaveTo(file)) => {
+                let mut w = BufWriter::new(fs::File::create(&file)?);
+                code.serialize(&mut w)?;
+            }
+            Ok(Command::Callgraph(idx, depth)) => {
+                #[cfg(feature = "graph")]
+                {
+                    use hlbc::analysis::graph::{call_graph, display_graph};
+
+                    let graph = call_graph(&code, RefFun(idx), depth);
+                    println!("{}", display_graph(&graph, &code));
+                }
+
+                #[cfg(not(feature = "graph"))]
+                {
+                    println!("hlbc-cli has been built without graph support. Build with feature 'graph' to enable callgraph generation");
+                }
+            }
+            Ok(Command::RefTo(elem)) => match elem {
+                ElementRef::String(idx) => {
                     println!(
-                        "{}",
-                        code.functions[code.findexes.get(&code.entrypoint).unwrap().0]
-                            .display_header(&code)
+                        "Finding references to string@{idx} : {}\n",
+                        code.strings[idx]
                     );
+                    if let Some(constants) = &code.constants {
+                        for (i, c) in constants.iter().enumerate() {
+                            if c.fields[0] == idx {
+                                println!(
+                                    "constant@{i} expanding to global@{} (now also searching for global)",
+                                    c.global.0
+                                );
+                                iter_ops(&code).for_each(|(f, (i, o))| match o {
+                                    Opcode::GetGlobal { global, .. } => {
+                                        if *global == c.global {
+                                            println!(
+                                                "in {} at {i}: GetGlobal",
+                                                f.display_header(&code)
+                                            );
+                                        }
+                                    }
+                                    _ => {}
+                                });
+                                println!();
+                            }
+                        }
+                    }
+                    iter_ops(&code).for_each(|(f, (i, o))| match o {
+                        Opcode::String { ptr, .. } => {
+                            if ptr.0 == idx {
+                                println!("{} at {i}: String", f.display_header(&code));
+                            }
+                        }
+                        _ => {}
+                    });
                 }
-                _ => {
-                    println!("Unknown command or missing argument : '{line}'");
+                ElementRef::Global(idx) => {
+                    println!(
+                        "Finding references to global@{idx} : {}\n",
+                        code.globals[idx].display(&code)
+                    );
+                    if let Some(constants) = &code.constants {
+                        for (i, c) in constants.iter().enumerate() {
+                            if c.global.0 == idx {
+                                println!("constant@{i} : {:?}", c);
+                            }
+                        }
+                    }
+                    println!();
+
+                    iter_ops(&code).for_each(|(f, (i, o))| match o {
+                        Opcode::GetGlobal { global, .. } | Opcode::SetGlobal { global, .. } => {
+                            if global.0 == idx {
+                                println!("{} at {i}: {}", f.display_header(&code), o.name());
+                            }
+                        }
+                        _ => {}
+                    });
                 }
+                ElementRef::Fn(idx) => {
+                    println!(
+                        "Finding references to fn@{idx} : {}\n",
+                        RefFun(idx).display_header(&code)
+                    );
+                    code.functions
+                        .iter()
+                        .flat_map(|f| repeat(f).zip(find_fun_refs(f)))
+                        .for_each(|(f, (i, o, fun))| {
+                            if fun.0 == idx {
+                                println!("{} at {i}: {}", f.display_header(&code), o.name());
+                            }
+                        });
+                }
+            },
+            Err(e) => {
+                // TODO error reporting
+                println!("{e:?}");
+                continue;
             }
         }
     }
