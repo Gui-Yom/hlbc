@@ -37,6 +37,7 @@ pub enum Command {
     SaveTo(String),
     Callgraph(usize, usize),
     RefTo(ElementRef),
+    DumpType(usize),
 }
 
 #[derive(Debug, Default)]
@@ -79,15 +80,9 @@ pub fn command_parser(ctx: &ParseContext) -> impl Parser<char, Command, Error = 
         cmd!("help").map(|_| Help),
         cmd!("info").map(|_| Info),
         cmd!("entrypoint").map(|_| Entrypoint),
-        cmd!("int", "i"; index_range(ctx.int_max))
-            .map(Int)
-            .labelled("int command"),
-        cmd!("float", "f"; index_range(ctx.float_max))
-            .map(Float)
-            .labelled("float command"),
-        cmd!("string", "s"; index_range(ctx.string_max))
-            .map(String)
-            .labelled("string command"),
+        cmd!("int", "i"; index_range(ctx.int_max)).map(Int),
+        cmd!("float", "f"; index_range(ctx.float_max)).map(Float),
+        cmd!("string", "s"; index_range(ctx.string_max)).map(String),
         cmd!("sstr"; any().repeated()).map(|v| SearchStr(v.into_iter().collect())),
         cmd!("debugfile", "file"; index_range(ctx.debug_file_max)).map(Debugfile),
         cmd!("sfile"; any().repeated()).map(|v| SearchDebugfile(v.into_iter().collect())),
@@ -109,18 +104,17 @@ pub fn command_parser(ctx: &ParseContext) -> impl Parser<char, Command, Error = 
         cmd!("callgraph")
             .ignore_then(num())
             .then(num())
-            .map(|(f, d)| Callgraph(f, d))
-            .labelled("callgraph command"),
+            .map(|(f, d)| Callgraph(f, d)),
         cmd!("refto")
             .ignore_then(choice((
                 just("string@").ignore_then(num()).map(ElementRef::String),
                 just("global@").ignore_then(num()).map(ElementRef::Global),
                 just("fn@").ignore_then(num()).map(ElementRef::Fn),
             )))
-            .map(RefTo)
-            .labelled("refto command"),
+            .map(RefTo),
+        cmd!("dumptype"; num()).map(DumpType),
     ))
-    .labelled("Command")
+    .labelled("command")
 }
 
 fn num() -> impl Parser<char, usize, Error = Simple<char>> {
@@ -155,7 +149,7 @@ fn index_range(max: usize) -> impl Parser<char, IndexIter, Error = Simple<char>>
 mod tests {
     use chumsky::Parser;
 
-    use crate::parser::{index_range, parse_command, Command, FileOrIndex, ParseContext};
+    use crate::command::{index_range, parse_command, Command, FileOrIndex, ParseContext};
 
     #[test]
     fn test_index_range() {
