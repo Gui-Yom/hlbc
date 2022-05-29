@@ -4,12 +4,16 @@
 
 A CLI to navigate through [Hashlink](https://hashlink.haxe.org/) bytecode files.
 
+## Usage
+
+`hlbc-cli <file>`. You then get access to a prompt where you can enter commands.
+
 ## Commands
 
 - `info` General information about the bytecode
 - `help` Help message
 - `entrypoint` Get the bytecode entrypoint
-- `explain` Get information about an opcode
+- `explain <op>` Get information about an opcode
 - `i|int <idx>` Get the int at index
 - `f|float <idx>` Get the float at index
 - `s|string <idx>` Get the string at index
@@ -36,4 +40,3 @@ In most of the commands that accept an index, you can pass a range too : `a..b`,
 ## Planned features
 
 - Support passing a command via the program arguments
-- Support many commands separated with `;`

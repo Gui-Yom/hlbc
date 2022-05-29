@@ -37,13 +37,12 @@ fn main() -> anyhow::Result<()> {
         ColorChoice::Never
     });
 
-    loop {
+    'main: loop {
         let mut line = String::new();
-        println!();
         print!("> ");
         stdout.flush()?;
         stdin().read_line(&mut line)?;
-        let line = line.trim();
+        let commands = line.split(";").map(|s| s.trim());
 
         let parse_ctx = ParseContext {
             int_max: code.ints.len(),
@@ -56,19 +55,22 @@ fn main() -> anyhow::Result<()> {
             constant_max: code.constants.as_ref().map(|v| v.len()).unwrap_or(0),
             findex_max: code.findexes.len(),
         };
-        match parse_command(&parse_ctx, line) {
-            Ok(Command::Exit) => {
-                break;
-            }
-            Ok(cmd) => {
-                process_command(&mut stdout, &code, cmd)?;
-            }
-            Err(errors) => {
-                for e in errors {
-                    eprintln!("Error while parsing command. {e:?}");
+        for cmd in commands {
+            match parse_command(&parse_ctx, cmd) {
+                Ok(Command::Exit) => {
+                    break 'main;
                 }
-                continue;
+                Ok(cmd) => {
+                    process_command(&mut stdout, &code, cmd)?;
+                }
+                Err(errors) => {
+                    for e in errors {
+                        eprintln!("Error while parsing command. {e:?}");
+                    }
+                    continue;
+                }
             }
+            println!();
         }
     }
     Ok(())
@@ -106,6 +108,7 @@ fn process_command(
 info                   | General information about the bytecode
 help                   | This message
 entrypoint             | Get the bytecode entrypoint
+explain     <op>       | Get information about an opcode
 i,int       <idx>      | Get the int at index
 f,float     <idx>      | Get the float at index
 s,string    <idx>      | Get the string at index
