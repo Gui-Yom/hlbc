@@ -11,26 +11,29 @@ static OPCODE_ARGS: &[i8; 99] = &[
     4, 3, 0, 2, 3, 0,
 ];*/
 
-/// Offset for jump instruction
+/// Offset for jump instruction. Can be negative, indicating a backward jump.
 pub type JumpOffset = i32;
 
-/// Opcodes definitions.
-/// The fields are the opcode arguments.
-#[hlbc_derive::derive_opcode]
-#[derive(Debug, Clone)]
+/// Opcodes definitions. The fields are the opcode arguments.
+/// The methods for this struct are generated through a macro because there is no way I would have written code for 98 opcodes.
+#[derive(Debug, Clone, hlbc_derive::OpcodeHelper)]
 pub enum Opcode {
+    /// Copy value from *src* into *dst*
     Mov {
         dst: Reg,
         src: Reg,
     },
+    /// Get an i32 from the constant pool
     Int {
         dst: Reg,
         ptr: RefInt,
     },
+    // Get a f64 from the constant pool
     Float {
         dst: Reg,
         ptr: RefFloat,
     },
+    /// Set a boolean value
     Bool {
         dst: Reg,
         value: ValBool,
@@ -39,13 +42,16 @@ pub enum Opcode {
         dst: Reg,
         ptr: RefBytes,
     },
+    /// Get a string from the constant pool
     String {
         dst: Reg,
         ptr: RefString,
     },
+    /// Set dst as null
     Null {
         dst: Reg,
     },
+    /// Add *a* and *b* into *dst*
     Add {
         dst: Reg,
         a: Reg,
@@ -459,11 +465,3 @@ pub enum Opcode {
     },
     Nop,
 }
-
-/*
-impl Opcode {
-    /// Get the opcode name
-    pub fn name(&self) -> &'static str {
-        Into::into(self)
-    }
-}*/

@@ -1,12 +1,15 @@
 # hlbc-cli
 
-A CLI to navigate through Hashlink bytecode files.
+![Crates.io](https://img.shields.io/crates/v/hlbc-cli?label=hlbc-cli)
+
+A CLI to navigate through [Hashlink](https://hashlink.haxe.org/) bytecode files.
 
 ## Commands
 
 - `info` General information about the bytecode
 - `help` Help message
 - `entrypoint` Get the bytecode entrypoint
+- `explain` Get information about an opcode
 - `i|int <idx>` Get the int at index
 - `f|float <idx>` Get the float at index
 - `s|string <idx>` Get the string at index

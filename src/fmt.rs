@@ -211,10 +211,16 @@ impl Native {
 }
 
 impl Opcode {
-    pub fn display(&self, ctx: &Bytecode, parent: &Function, pos: i32) -> impl Display {
+    pub fn display(
+        &self,
+        ctx: &Bytecode,
+        parent: &Function,
+        pos: i32,
+        align: usize,
+    ) -> impl Display {
         macro_rules! op {
             ($($arg:tt)*) => {
-                format!("{:<16} {}", self.name(), format_args!($($arg)*))
+                format!("{:<align$} {}", self.name(), format_args!($($arg)*))
             };
         }
 
@@ -504,7 +510,7 @@ impl Function {
                     format!(
                         "{:>12}:{line:<3} {i:>3}: {}",
                         ctx.debug_files.as_ref().unwrap()[*file as usize],
-                        o.display(ctx, self, i as i32)
+                        o.display(ctx, self, i as i32, 16)
                     )
                 })
                 .collect()
@@ -512,7 +518,7 @@ impl Function {
             self.ops
                 .iter()
                 .enumerate()
-                .map(|(i, o)| format!("{i:>3}: {}", o.display(ctx, self, i as i32)))
+                .map(|(i, o)| format!("{i:>3}: {}", o.display(ctx, self, i as i32, 16)))
                 .collect()
         };
         let assigns: Vec<String> = self

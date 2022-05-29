@@ -163,7 +163,7 @@ pub fn decompile_function_body(code: &Bytecode, indent: &str, f: &Function) -> S
                 }
             }
             _ => {
-                writeln!(&mut buf, "{}", o.display(code, f, 0)).unwrap();
+                writeln!(&mut buf, "{}", o.display(code, f, 0, 16)).unwrap();
             }
         }
     }

@@ -147,6 +147,14 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                 code.functions[code.findexes.get(&code.entrypoint).unwrap().0].display_header(code)
             );
         }
+        Command::Explain(s) => {
+            if let Some(o) = Opcode::from_name(&s) {
+                println!("{} : {}", o.name(), o.description());
+                println!("Example : {}", o.display(code, &code.functions[0], 0, 0));
+            } else {
+                println!("No opcode named '{s}' exists.");
+            }
+        }
         Command::Int(range) => {
             for i in range {
                 print_i!(i);

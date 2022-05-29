@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use crate::{Bytecode, Opcode};
 
 /// A register argument
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct Reg(pub u32);
 
 /// A reference to the i32 constant pool
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct RefInt(pub usize);
 
 impl RefInt {
@@ -17,7 +17,7 @@ impl RefInt {
 }
 
 /// A reference to the f64 constant pool
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct RefFloat(pub usize);
 
 impl RefFloat {
@@ -27,11 +27,11 @@ impl RefFloat {
 }
 
 /// A reference to the bytes constant pool
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct RefBytes(pub usize);
 
 /// Reference to the string constant pool
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct RefString(pub usize);
 
 impl RefString {
@@ -41,15 +41,15 @@ impl RefString {
 }
 
 /// An inline bool value
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct ValBool(pub bool);
 
 /// A reference to a global
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct RefGlobal(pub usize);
 
 /// An object field definition
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct ObjField {
     /// Field name
     pub name: RefString,
@@ -58,7 +58,7 @@ pub struct ObjField {
 }
 
 /// A reference to an object field
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Default)]
 pub struct RefField(pub usize);
 
 /// An object method definition
@@ -83,7 +83,7 @@ pub struct EnumConstruct {
 }
 
 /// A reference to an enum variant
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct RefEnumConstruct(pub usize);
 
 /// Common type for [Type::Fun] and [Type::Method]
@@ -169,7 +169,7 @@ impl Type {
 }
 
 /// Reference to a type in the constant pool
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct RefType(pub usize);
 
 impl RefType {
@@ -217,7 +217,7 @@ impl Function {
 }
 
 /// Reference to a function or a native in the constant pool (findex)
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Default)]
 pub struct RefFun(pub usize);
 
 /// The possible values behind a function reference

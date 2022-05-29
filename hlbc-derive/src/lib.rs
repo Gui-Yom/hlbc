@@ -4,8 +4,8 @@ use quote::quote;
 use syn::__private::TokenStream2;
 use syn::{Data, DeriveInput, GenericArgument, Ident, LitStr, PathArguments, Type, Variant};
 
-#[proc_macro_attribute]
-pub fn derive_opcode(_: TokenStream, input: TokenStream) -> TokenStream {
+#[proc_macro_derive(OpcodeHelper)]
+pub fn derive_opcode_helper(input: TokenStream) -> TokenStream {
     let ast = syn::parse_macro_input!(input as DeriveInput);
     let variants = match &ast.data {
         Data::Enum(v) => Some(&v.variants),
@@ -22,14 +22,36 @@ pub fn derive_opcode(_: TokenStream, input: TokenStream) -> TokenStream {
         .enumerate()
         .map(|(i, v)| gen_initw(name, v, i as u8));
     let vname = variants.iter().map(|v| &v.ident);
+    let vname2 = vname.clone();
     let vname_str = variants
         .iter()
         .map(|v| LitStr::new(&v.ident.to_string(), v.ident.span()));
+    let vname_str2 = vname_str.clone();
+    let vdesc = variants.iter().map(|v| {
+        if v.attrs.len() > 0 {
+            for x in v.attrs[0].tokens.clone().into_iter().skip(1) {
+                let s = x.to_string();
+                return s[2..s.len() - 1].to_string();
+            }
+        }
+        "".to_string()
+    });
+    let vdefault_init = variants.iter().map(|v| {
+        let vname = &v.ident;
+        let finit = v.fields.iter().map(|f| {
+            let fname = f.ident.as_ref().unwrap();
+            quote! {
+                #fname: Default::default()
+            }
+        });
+        quote! {
+            #name::#vname { #( #finit,)* }
+        }
+    });
 
     TokenStream::from(quote! {
-        #ast
-        // Implementation
         impl #name {
+            /// Decode an instruction
             pub fn decode(r: &mut impl std::io::Read) -> anyhow::Result<#name> {
 
                 use byteorder::ReadBytesExt;
@@ -43,6 +65,7 @@ pub fn derive_opcode(_: TokenStream, input: TokenStream) -> TokenStream {
                 }
             }
 
+            /// Encode an instruction
             pub fn encode(&self, w: &mut impl std::io::Write) -> anyhow::Result<()> {
 
                 use byteorder::WriteBytesExt;
@@ -56,9 +79,25 @@ pub fn derive_opcode(_: TokenStream, input: TokenStream) -> TokenStream {
                 Ok(())
             }
 
+            /// Get the opcode name
             pub fn name(&self) -> &'static str {
                 match self {
                     #( #name::#vname { .. } => #vname_str, )*
+                }
+            }
+
+            /// Get the opcode description
+            pub fn description(&self) -> &'static str {
+                match self {
+                    #( #name::#vname2 { .. } => #vdesc, )*
+                }
+            }
+
+            /// Get an opcode from its name. Returns a default value for the variant.
+            pub fn from_name(name: &str) -> Option<Self> {
+                match name {
+                    #( #vname_str2 => Some(#vdefault_init), )*
+                    _ => None
                 }
             }
         }
@@ -82,7 +121,7 @@ fn ident(ty: &Type) -> String {
                 _ => unreachable!(),
             }
         }
-        other => unreachable!("unkown type {:?}", other),
+        other => unreachable!("unknown type {:?}", other),
     }
 }
 

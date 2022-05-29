@@ -1,5 +1,5 @@
-//! Hashlink bytecode disassembler and analyzer.
-//! See [Bytecode].
+//! [Hashlink](https://hashlink.haxe.org/) bytecode disassembler and analyzer.
+//! See [Bytecode] for an entrypoint to the library.
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
@@ -20,10 +20,13 @@ pub mod analysis;
 mod deser;
 /// Functions to display bytecode elements
 pub mod fmt;
-/// Opcodes definitions
+/// Opcodes definitions.
 pub mod opcodes;
 mod ser;
-/// Bytecode elements definitions
+/// Bytecode elements definitions.
+/// All the Ref* types in this modules are references to bytecode elements like constants or function.
+/// They are required since we cannot use rust references as that would make our structure self-referential.
+/// They makes the code look a bit more complicated than it actually is. Every Ref* struct is cheaply copyable.
 pub mod types;
 
 /// Bytecode structure containing all the information.
