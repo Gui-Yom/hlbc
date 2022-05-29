@@ -7,7 +7,7 @@ on:
 
 jobs:
   release-linux:
-    name: Build binaries (linux) and publish on crates.io
+    name: Build release (linux)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -18,7 +18,6 @@ jobs:
           toolchain: stable
           default: true
           profile: minimal
-          components: rust-docs
       - name: Build release
         working-directory: hlbc-cli
         run: cargo build --release
@@ -26,10 +25,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: target/release/hlbc-cli
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   release-windows:
-    name: Build binaries (windows)
+    name: Build release (windows)
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -40,7 +37,6 @@ jobs:
           toolchain: stable
           default: true
           profile: minimal
-          components: rust-docs
       - name: Build release
         working-directory: hlbc-cli
         run: cargo build --release
@@ -48,5 +44,3 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: target/release/hlbc-cli.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
