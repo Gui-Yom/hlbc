@@ -2,10 +2,10 @@ use proc_macro::TokenStream;
 
 use quote::quote;
 use syn::__private::TokenStream2;
-use syn::{Data, DeriveInput, GenericArgument, Ident, PathArguments, Type, Variant};
+use syn::{Data, DeriveInput, GenericArgument, Ident, LitStr, PathArguments, Type, Variant};
 
 #[proc_macro_attribute]
-pub fn gen_decode(_: TokenStream, input: TokenStream) -> TokenStream {
+pub fn derive_opcode(_: TokenStream, input: TokenStream) -> TokenStream {
     let ast = syn::parse_macro_input!(input as DeriveInput);
     let variants = match &ast.data {
         Data::Enum(v) => Some(&v.variants),
@@ -21,6 +21,10 @@ pub fn gen_decode(_: TokenStream, input: TokenStream) -> TokenStream {
         .iter()
         .enumerate()
         .map(|(i, v)| gen_initw(name, v, i as u8));
+    let vname = variants.iter().map(|v| &v.ident);
+    let vname_str = variants
+        .iter()
+        .map(|v| LitStr::new(&v.ident.to_string(), v.ident.span()));
 
     TokenStream::from(quote! {
         #ast
@@ -50,6 +54,12 @@ pub fn gen_decode(_: TokenStream, input: TokenStream) -> TokenStream {
                 }
 
                 Ok(())
+            }
+
+            pub fn name(&self) -> &'static str {
+                match self {
+                    #( #name::#vname { .. } => #vname_str, )*
+                }
             }
         }
     })

@@ -144,8 +144,7 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
         Command::Entrypoint => {
             println!(
                 "{}",
-                code.functions[code.findexes.get(&code.entrypoint).unwrap().0]
-                    .display_header(&code)
+                code.functions[code.findexes.get(&code.entrypoint).unwrap().0].display_header(code)
             );
         }
         Command::Int(range) => {
@@ -194,31 +193,31 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
             for i in range {
                 print_i!(i);
                 let t = &code.types[i];
-                println!("{}", t.display(&code));
+                println!("{}", t.display(code));
                 match t {
                     Type::Obj(obj) => {
                         if let Some(sup) = obj.super_ {
-                            println!("extends {}", sup.display(&code));
+                            println!("extends {}", sup.display(code));
                         }
                         println!("global: {}", obj.global.0);
                         println!("fields:");
                         for f in &obj.own_fields {
-                            println!("  {}: {}", f.name.display(&code), f.t.display(&code));
+                            println!("  {}: {}", f.name.display(code), f.t.display(code));
                         }
                         println!("protos:");
                         for p in &obj.protos {
                             println!(
                                 "  {}: {}",
-                                p.name.display(&code),
-                                p.findex.display_header(&code)
+                                p.name.display(code),
+                                p.findex.display_header(code)
                             );
                         }
                         println!("bindings:");
                         for (fi, fun) in &obj.bindings {
                             println!(
                                 "  {}: {}",
-                                fi.display_obj(t, &code),
-                                fun.display_header(&code)
+                                fi.display_obj(t, code),
+                                fun.display_header(code)
                             );
                         }
                     }
@@ -233,11 +232,11 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                                 if c.name.0 == 0 {
                                     "_".to_string()
                                 } else {
-                                    c.name.display(&code)
+                                    c.name.display(code)
                                 }
                             );
                             for (i, p) in c.params.iter().enumerate() {
-                                println!("    {i}: {}", p.display(&code));
+                                println!("    {i}: {}", p.display(code));
                             }
                         }
                     }
@@ -248,13 +247,13 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
         Command::Global(range) => {
             for i in range {
                 print_i!(i);
-                println!("{}", code.globals[i].display(&code));
+                println!("{}", code.globals[i].display(code));
             }
         }
         Command::Native(range) => {
             for i in range {
                 print_i!(i);
-                println!("{}", code.natives[i].display_header(&code));
+                println!("{}", code.natives[i].display_header(code));
             }
         }
         Command::Constant(range) => {
@@ -268,9 +267,9 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                 print_i!(findex);
                 if let Some(&(i, fun)) = code.findexes.get(&RefFun(findex)) {
                     if fun {
-                        println!("{}", code.functions[i].display_header(&code));
+                        println!("{}", code.functions[i].display_header(code));
                     } else {
-                        println!("{}", code.natives[i].display_header(&code));
+                        println!("{}", code.natives[i].display_header(code));
                     }
                 } else {
                     println!("unknown");
@@ -282,9 +281,9 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                 print_i!(findex);
                 if let Some(&(i, fun)) = code.findexes.get(&RefFun(findex)) {
                     if fun {
-                        println!("{}", code.functions[i].display(&code));
+                        println!("{}", code.functions[i].display(code));
                     } else {
-                        println!("{}", code.natives[i].display_header(&code));
+                        println!("{}", code.natives[i].display_header(code));
                     }
                 } else {
                     println!("unknown");
@@ -294,7 +293,7 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
         Command::SearchFunction(str) => {
             // TODO search for function
             if let Some(&i) = code.fnames.get(&str) {
-                println!("{}", code.functions[i].display_header(&code));
+                println!("{}", code.functions[i].display_header(code));
             } else {
                 println!("unknown");
             }
@@ -305,7 +304,7 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                 FileOrIndex::File(str) => {
                     if let Some(idx) =
                         debug_files
-                            .into_iter()
+                            .iter()
                             .enumerate()
                             .find_map(
                                 |(i, d): (usize, &String)| {
@@ -321,7 +320,7 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                         for (i, f) in code.functions.iter().enumerate() {
                             if f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0 == idx {
                                 print_i!(i);
-                                println!("{}", f.display_header(&code));
+                                println!("{}", f.display_header(code));
                             }
                         }
                     } else {
@@ -333,7 +332,7 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                     for (i, f) in code.functions.iter().enumerate() {
                         if f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0 == idx {
                             print_i!(i);
-                            println!("{}", f.display_header(&code));
+                            println!("{}", f.display_header(code));
                         }
                     }
                 }
@@ -341,18 +340,18 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
         }
         Command::FileOf(idx) => {
             let debug_files = require_debug_info!();
-            if let Some(p) = RefFun(idx).resolve(&code) {
+            if let Some(p) = RefFun(idx).resolve(code) {
                 match p {
                     RefFunPointee::Fun(f) => {
                         let idx = f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0;
                         println!(
                             "{} is in file@{idx} : {}",
-                            f.display_header(&code),
+                            f.display_header(code),
                             &debug_files[idx]
                         );
                     }
                     RefFunPointee::Native(n) => {
-                        println!("{} can't be in any file", n.display_header(&code))
+                        println!("{} can't be in any file", n.display_header(code))
                     }
                 }
             }
@@ -366,8 +365,8 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
             {
                 use hlbc::analysis::graph::{call_graph, display_graph};
 
-                let graph = call_graph(&code, RefFun(idx), depth);
-                println!("{}", display_graph(&graph, &code));
+                let graph = call_graph(code, RefFun(idx), depth);
+                println!("{}", display_graph(&graph, code));
             }
 
             #[cfg(not(feature = "graph"))]
@@ -388,13 +387,10 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                                 "constant@{i} expanding to global@{} (now also searching for global)",
                                 c.global.0
                             );
-                            iter_ops(&code).for_each(|(f, (i, o))| match o {
+                            iter_ops(code).for_each(|(f, (i, o))| match o {
                                 Opcode::GetGlobal { global, .. } => {
                                     if *global == c.global {
-                                        println!(
-                                            "in {} at {i}: GetGlobal",
-                                            f.display_header(&code)
-                                        );
+                                        println!("in {} at {i}: GetGlobal", f.display_header(code));
                                     }
                                 }
                                 _ => {}
@@ -403,10 +399,10 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                         }
                     }
                 }
-                iter_ops(&code).for_each(|(f, (i, o))| match o {
+                iter_ops(code).for_each(|(f, (i, o))| match o {
                     Opcode::String { ptr, .. } => {
                         if ptr.0 == idx {
-                            println!("{} at {i}: String", f.display_header(&code));
+                            println!("{} at {i}: String", f.display_header(code));
                         }
                     }
                     _ => {}
@@ -415,7 +411,7 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
             ElementRef::Global(idx) => {
                 println!(
                     "Finding references to global@{idx} : {}\n",
-                    code.globals[idx].display(&code)
+                    code.globals[idx].display(code)
                 );
                 if let Some(constants) = &code.constants {
                     for (i, c) in constants.iter().enumerate() {
@@ -426,10 +422,10 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                 }
                 println!();
 
-                iter_ops(&code).for_each(|(f, (i, o))| match o {
+                iter_ops(code).for_each(|(f, (i, o))| match o {
                     Opcode::GetGlobal { global, .. } | Opcode::SetGlobal { global, .. } => {
                         if global.0 == idx {
-                            println!("{} at {i}: {}", f.display_header(&code), o.name());
+                            println!("{} at {i}: {}", f.display_header(code), o.name());
                         }
                     }
                     _ => {}
@@ -438,14 +434,14 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
             ElementRef::Fn(idx) => {
                 println!(
                     "Finding references to fn@{idx} : {}\n",
-                    RefFun(idx).display_header(&code)
+                    RefFun(idx).display_header(code)
                 );
                 code.functions
                     .iter()
                     .flat_map(|f| repeat(f).zip(find_fun_refs(f)))
                     .for_each(|(f, (i, o, fun))| {
                         if fun.0 == idx {
-                            println!("{} at {i}: {}", f.display_header(&code), o.name());
+                            println!("{} at {i}: {}", f.display_header(code), o.name());
                         }
                     });
             }
@@ -454,8 +450,8 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
             let ty = &code.types[idx];
             match ty {
                 Type::Obj(obj) => {
-                    println!("Dumping type@{idx} : {}", ty.display(&code));
-                    println!("{}", decompiler::decompile_class(&code, obj));
+                    println!("Dumping type@{idx} : {}", ty.display(code));
+                    println!("{}", decompiler::decompile_class(code, obj));
                 }
                 _ => println!("Type {idx} is not an obj"),
             }

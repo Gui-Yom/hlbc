@@ -62,7 +62,7 @@ impl<T: Write> WriteHlExt for T {
             .unwrap_or(0);
         self.write_i32::<LittleEndian>(size as i32)?;
         for s in cstr.iter() {
-            self.write(s.as_bytes_with_nul())?;
+            self.write_all(s.as_bytes_with_nul())?;
         }
         for s in cstr.iter() {
             self.write_vi32(s.as_bytes().len() as i32)?;

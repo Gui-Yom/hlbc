@@ -135,12 +135,12 @@ fn index_range(max: usize) -> impl Parser<char, IndexIter, Error = Simple<char>>
                 let a = a.unwrap_or(0).max(0);
                 let b = b.unwrap_or(max);
                 if range == ".." {
-                    Box::new((a..b.min(max)).into_iter()) as IndexIter
+                    Box::new(a..b.min(max)) as IndexIter
                 } else {
-                    Box::new((a..=b.min(max - 1)).into_iter()) as IndexIter
+                    Box::new(a..=b.min(max - 1)) as IndexIter
                 }
             }),
-        num().map(|i| Box::new((i..(i + 1)).into_iter()) as IndexIter),
+        num().map(|i| Box::new(i..(i + 1)) as IndexIter),
     ))
     .labelled("index range")
 }

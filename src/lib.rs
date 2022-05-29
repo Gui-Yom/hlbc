@@ -252,7 +252,7 @@ impl Bytecode {
     /// Serialize the bytecode to any sink.
     /// Bytecode is serialized to the same format.
     pub fn serialize(&self, w: &mut impl Write) -> Result<()> {
-        w.write(&[b'H', b'L', b'B'])?;
+        w.write_all(&[b'H', b'L', b'B'])?;
         w.write_u8(self.version)?;
         w.write_vi32(if self.debug_files.is_some() { 1 } else { 0 })?;
         w.write_vi32(self.ints.len() as i32)?;
@@ -278,7 +278,7 @@ impl Bytecode {
         w.write_strings(&self.strings)?;
         if let Some(bytes) = &self.bytes {
             w.write_i32::<LittleEndian>(bytes.len() as i32)?;
-            w.write(bytes)?;
+            w.write_all(bytes)?;
             // TODO write bytes pos
         }
         if let Some(debug_files) = &self.debug_files {

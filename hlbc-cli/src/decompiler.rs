@@ -11,10 +11,10 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> String {
     writeln!(
         &mut buf,
         "class {} {}{{",
-        obj.name.display(&code),
+        obj.name.display(code),
         if let Some(e) = obj.super_ {
             is_static = e.0 == 12;
-            format!("extends {} ", e.display(&code))
+            format!("extends {} ", e.display(code))
         } else {
             "".to_string()
         }
@@ -34,8 +34,8 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> String {
             &mut buf,
             "{indent}{}var {}: {}",
             if is_static { "static " } else { "" },
-            f.name.display(&code),
-            f.t.display(&code)
+            f.name.display(code),
+            f.t.display(code)
         )
         .unwrap();
     }
@@ -152,7 +152,7 @@ pub fn decompile_function_body(code: &Bytecode, indent: &str, f: &Function) -> S
                 write!(
                     &mut buf,
                     "{dst} = {}",
-                    decompile_closure(code, &indent, fun.resolve_as_fn(code).unwrap())
+                    decompile_closure(code, indent, fun.resolve_as_fn(code).unwrap())
                 )
                 .unwrap();
             }

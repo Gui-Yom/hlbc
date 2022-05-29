@@ -90,16 +90,16 @@ impl Type {
         }
         parents.push(self as *const Type);
 
-        fn display_type_fun(ty: &TypeFun, ctx: &Bytecode, parents: &Vec<*const Type>) -> String {
+        fn display_type_fun(ty: &TypeFun, ctx: &Bytecode, parents: &[*const Type]) -> String {
             let args: Vec<String> = ty
                 .args
                 .iter()
-                .map(|a| a.display_rec(ctx, parents.clone()))
+                .map(|a| a.display_rec(ctx, parents.to_owned()))
                 .collect();
             format!(
                 "({}) -> ({})",
                 args.join(", "),
-                ty.ret.display_rec(ctx, parents.clone())
+                ty.ret.display_rec(ctx, parents.to_owned())
             )
         }
 

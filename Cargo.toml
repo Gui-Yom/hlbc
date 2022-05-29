@@ -16,11 +16,9 @@ members = ["hlbc-cli", "hlbc-derive"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hlbc-derive = { version = "0.1", path = "hlbc-derive" }
+hlbc-derive = { version = "0.2", path = "hlbc-derive" }
 byteorder = "1"
 anyhow = "1"
-strum = "0.24"
-strum_macros = "0.24"
 petgraph = { version = "0.6", default-features = false, features = ["graphmap"], optional = true }
 
 [features]

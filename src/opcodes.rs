@@ -16,8 +16,8 @@ pub type JumpOffset = i32;
 
 /// Opcodes definitions.
 /// The fields are the opcode arguments.
-#[hlbc_derive::gen_decode]
-#[derive(Debug, Clone, strum_macros::IntoStaticStr)]
+#[hlbc_derive::derive_opcode]
+#[derive(Debug, Clone)]
 pub enum Opcode {
     Mov {
         dst: Reg,
@@ -460,9 +460,10 @@ pub enum Opcode {
     Nop,
 }
 
+/*
 impl Opcode {
     /// Get the opcode name
     pub fn name(&self) -> &'static str {
         Into::into(self)
     }
-}
+}*/
