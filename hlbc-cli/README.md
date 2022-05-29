@@ -6,7 +6,13 @@ A CLI to navigate through [Hashlink](https://hashlink.haxe.org/) bytecode files.
 
 ## Usage
 
-`hlbc-cli <file>`. You then get access to a prompt where you can enter commands.
+`hlbc-cli <file> [-c <command>]`
+
+You then get access to a prompt where you can enter commands.
+
+You can execute commands on startup with the `-c` switch.
+e.g. Dump all strings from the bytecode then exit : `hlbc-cli main.hl -c "s ..; exit"`.
+If you omit the `exit` command, the app will simply launch the normal prompt after executing the startup commands.
 
 ## Commands
 
@@ -35,8 +41,5 @@ A CLI to navigate through [Hashlink](https://hashlink.haxe.org/) bytecode files.
 
 ### Indexes
 
-In most of the commands that accept an index, you can pass a range too : `a..b`, `..b`, `a..`, `a..=b` ...
-
-## Planned features
-
-- Support passing a command via the program arguments
+In most of the commands that accept an index, you can pass a Rust style range too : `a..b`, `..b`, `a..`, `a..=b`, `..`.
+Where `..10` means '*select the first 10 items*' and `..` means '*display everything*'.

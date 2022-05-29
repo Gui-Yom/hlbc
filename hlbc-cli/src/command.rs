@@ -41,6 +41,7 @@ pub enum Command {
     DumpType(usize),
 }
 
+// Used a default max values for index ranges
 #[derive(Debug, Default)]
 pub struct ParseContext {
     pub int_max: usize,

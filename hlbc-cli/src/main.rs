@@ -20,9 +20,20 @@ fn main() -> anyhow::Result<()> {
 
     let start = Instant::now();
 
+    let mut args = env::args().skip(1);
+
+    let filename = args.next().expect("Expected a filename");
+    let initial_cmd = if let Some(opt) = args.next() {
+        if opt == "-c" {
+            args.next()
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     let code = {
-        let mut args = env::args();
-        let filename = args.nth(1).unwrap();
         let mut r = BufReader::new(fs::File::open(&filename)?);
         Bytecode::load(&mut r)?
     };
@@ -37,6 +48,38 @@ fn main() -> anyhow::Result<()> {
         ColorChoice::Never
     });
 
+    let parse_ctx = ParseContext {
+        int_max: code.ints.len(),
+        float_max: code.floats.len(),
+        string_max: code.strings.len(),
+        debug_file_max: code.debug_files.as_ref().map(|v| v.len()).unwrap_or(0),
+        type_max: code.types.len(),
+        global_max: code.globals.len(),
+        native_max: code.natives.len(),
+        constant_max: code.constants.as_ref().map(|v| v.len()).unwrap_or(0),
+        findex_max: code.findexes.len(),
+    };
+
+    if let Some(initial_cmd) = initial_cmd {
+        for cmd in initial_cmd.split(";").map(|s| s.trim()) {
+            match parse_command(&parse_ctx, cmd) {
+                Ok(Command::Exit) => {
+                    return Ok(());
+                }
+                Ok(cmd) => {
+                    process_command(&mut stdout, &code, cmd)?;
+                }
+                Err(errors) => {
+                    for e in errors {
+                        eprintln!("Error while parsing command. {e:?}");
+                    }
+                    continue;
+                }
+            }
+            println!();
+        }
+    }
+
     'main: loop {
         let mut line = String::new();
         print!("> ");
@@ -44,17 +87,6 @@ fn main() -> anyhow::Result<()> {
         stdin().read_line(&mut line)?;
         let commands = line.split(";").map(|s| s.trim());
 
-        let parse_ctx = ParseContext {
-            int_max: code.ints.len(),
-            float_max: code.floats.len(),
-            string_max: code.strings.len(),
-            debug_file_max: code.debug_files.as_ref().map(|v| v.len()).unwrap_or(0),
-            type_max: code.types.len(),
-            global_max: code.globals.len(),
-            native_max: code.natives.len(),
-            constant_max: code.constants.as_ref().map(|v| v.len()).unwrap_or(0),
-            findex_max: code.findexes.len(),
-        };
         for cmd in commands {
             match parse_command(&parse_ctx, cmd) {
                 Ok(Command::Exit) => {
