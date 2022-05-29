@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  release-linux:
+    name: Build binaries (linux) and publish on crates.io
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install rust stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          default: true
+          profile: minimal
+          components: rust-docs
+      - name: Build release
+        working-directory: hlbc-cli
+        run: cargo build --release
+      - name: Upload release artifact
+        uses: softprops/action-gh-release@v1
+        with:
+          files: target/release/hlbc-cli
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  release-windows:
+    name: Build binaries (windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install rust stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          default: true
+          profile: minimal
+          components: rust-docs
+      - name: Build release
+        working-directory: hlbc-cli
+        run: cargo build --release
+      - name: Upload release artifact
+        uses: softprops/action-gh-release@v1
+        with:
+          files: target/release/hlbc-cli.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
