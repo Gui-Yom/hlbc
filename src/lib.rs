@@ -1,3 +1,6 @@
+//! Hashlink bytecode disassembler and analyzer.
+//! See [Bytecode].
+
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
 use std::io::{Read, Write};
@@ -12,33 +15,56 @@ use crate::types::{
     ConstantDef, Function, Native, ObjField, RefFun, RefGlobal, RefType, Type, TypeObj,
 };
 
+/// Analysis functions and callgraph generation
 pub mod analysis;
 mod deser;
+/// Functions to display bytecode elements
 pub mod fmt;
+/// Opcodes definitions
 pub mod opcodes;
 mod ser;
+/// Bytecode elements definitions
 pub mod types;
 
+/// Bytecode structure containing all the information.
+/// Every field is public for flexibility, but you aren't encouraged to modify them.
 #[derive(Debug)]
 pub struct Bytecode {
+    /// Bytecode format version
     pub version: u8,
+    /// Program entrypoint
     pub entrypoint: RefFun,
+    /// i32 constant pool
     pub ints: Vec<i32>,
+    /// f64 constant pool
     pub floats: Vec<f64>,
+    /// String constant pool
     pub strings: Vec<String>,
+    /// Bytes constant pool
     pub bytes: Option<Vec<u8>>,
+    /// *Debug* file names constant pool
     pub debug_files: Option<Vec<String>>,
+    /// Types, contains every possible types expressed in the program
     pub types: Vec<Type>,
+    /// Globals, holding static variables and such
     pub globals: Vec<RefType>,
+    /// Native functions references
     pub natives: Vec<Native>,
+    /// Code functions pool
     pub functions: Vec<Function>,
+    /// Constants, initializers for globals
     pub constants: Option<Vec<ConstantDef>>,
+    /// Acceleration structure mapping function references (findex) to functions indexes in the native or function pool.
     pub findexes: HashMap<RefFun, (usize, bool)>,
+    /// Acceleration structure mapping function names to function indexes in the function pool
     pub fnames: HashMap<String, usize>,
+    /// Greatest function reference stored, basically the number of natives + the number of functions.
     pub max_findex: usize,
 }
 
 impl Bytecode {
+    /// Load the bytecode from any source.
+    /// Must be a valid hashlink bytecode binary.
     pub fn load(r: &mut impl Read) -> Result<Bytecode> {
         let mut header = [0u8; 3];
         r.read_exact(&mut header)?;
@@ -223,6 +249,8 @@ impl Bytecode {
         })
     }
 
+    /// Serialize the bytecode to any sink.
+    /// Bytecode is serialized to the same format.
     pub fn serialize(&self, w: &mut impl Write) -> Result<()> {
         w.write(&[b'H', b'L', b'B'])?;
         w.write_u8(self.version)?;

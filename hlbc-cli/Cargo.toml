@@ -1,6 +1,6 @@
 [package]
 name = "hlbc-cli"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 license = "MIT"
 description = "Hashlink bytecode disassembler and analyzer"
@@ -12,7 +12,7 @@ categories = ["command-line-utilities", "parsing", "visualization"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hlbc = { version = "0.1", path = ".." }
+hlbc = { version = "0.2", path = ".." }
 termcolor = "1"
 anyhow = "1"
 atty = "0.2"

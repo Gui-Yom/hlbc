@@ -1,8 +1,8 @@
 [package]
 name = "hlbc"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
-include = ["src/**/*", "LICENSE", "README.md", "build.rs"]
+include = ["src/**/*", "LICENSE", "README.md"]
 license = "MIT"
 description = "Hashlink bytecode disassembler and analyzer"
 authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]

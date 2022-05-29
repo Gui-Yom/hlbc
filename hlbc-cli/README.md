@@ -26,6 +26,11 @@ A CLI to navigate through Hashlink bytecode files.
 - `saveto <filename>` Serialize the bytecode to a file
 - `callgraph <findex> <depth>` Create a dot call graph from a function and a max depth
 
-## Indexes
+### Indexes
 
 In most of the commands that accept an index, you can pass a range too : `a..b`, `..b`, `a..`, `a..=b` ...
+
+## Planned features
+
+- Support passing a command via the program arguments
+- Support many commands separated with `;`

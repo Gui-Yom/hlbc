@@ -6,12 +6,14 @@ use crate::{Bytecode, Function, Opcode, RefFun};
 #[cfg(feature = "graph")]
 pub mod graph;
 
+/// Iterate on every instruction of every function
 pub fn iter_ops(code: &Bytecode) -> impl Iterator<Item = (&Function, (usize, &Opcode))> {
     code.functions
         .iter()
         .flat_map(|f| repeat(f).zip(f.ops.iter().enumerate()))
 }
 
+/// Find any outbound references to other functions in a function
 pub fn find_fun_refs(f: &Function) -> impl Iterator<Item = (usize, &Opcode, RefFun)> + '_ {
     f.ops.iter().enumerate().filter_map(|(i, o)| match o {
         Opcode::Call0 { fun, .. } => Some((i, o, *fun)),
@@ -26,7 +28,7 @@ pub fn find_fun_refs(f: &Function) -> impl Iterator<Item = (usize, &Opcode, RefF
     })
 }
 
-// Starting from a position in a function, finds the last time a register has been assigned a function
+/// Starting from a position in a function, finds the last time a register has been assigned a function
 pub fn find_last_closure_assign(
     code: &Bytecode,
     f: &Function,
@@ -43,12 +45,13 @@ pub fn find_last_closure_assign(
             Opcode::Field { dst, obj, field } if *dst == reg => f.regs[obj.0 as usize]
                 .resolve(&code.types)
                 .get_type_obj()
-                .map(|o| o.bindings.get(field).copied())
-                .flatten(),
+                .and_then(|o| o.bindings.get(field).copied()),
             _ => None,
         })
 }
 
+/// Returns true if a functions comes from the standard library.
+/// Requires debug info to be present as it's looking at file names.
 pub fn is_std_fn(code: &Bytecode, f: RefFun) -> bool {
     match f.resolve(code).unwrap() {
         RefFunPointee::Fun(fun) => {

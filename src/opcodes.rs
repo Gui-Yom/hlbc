@@ -14,6 +14,8 @@ static OPCODE_ARGS: &[i8; 99] = &[
 /// Offset for jump instruction
 pub type JumpOffset = i32;
 
+/// Opcodes definitions.
+/// The fields are the opcode arguments.
 #[hlbc_derive::gen_decode]
 #[derive(Debug, Clone, strum_macros::IntoStaticStr)]
 pub enum Opcode {
@@ -459,6 +461,7 @@ pub enum Opcode {
 }
 
 impl Opcode {
+    /// Get the opcode name
     pub fn name(&self) -> &'static str {
         Into::into(self)
     }

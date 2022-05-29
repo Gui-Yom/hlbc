@@ -1,3 +1,5 @@
+//! Utilities to generate a callgraph and generate dot graphs
+
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::{Display, Formatter};

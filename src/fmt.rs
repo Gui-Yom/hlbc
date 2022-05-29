@@ -332,10 +332,10 @@ impl Opcode {
                 )
             }
             Opcode::DynGet { dst, obj, field } => {
-                op!("{dst} = {obj}[{}]", field.resolve(&ctx.strings))
+                op!("{dst} = {obj}[\"{}\"]", field.resolve(&ctx.strings))
             }
             Opcode::DynSet { obj, field, src } => {
-                op!("{obj}[{}] = {src}", field.resolve(&ctx.strings))
+                op!("{obj}[\"{}\"] = {src}", field.resolve(&ctx.strings))
             }
             Opcode::JTrue { cond, offset } => {
                 op!("if {cond} == true jump to {}", pos + offset + 1)
