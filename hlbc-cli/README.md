@@ -16,6 +16,9 @@ If you omit the `exit` command, the app will simply launch the normal prompt aft
 
 With `-w`, the given command will execute each time the file changes. The cli won't show a command prompt.
 
+You can also pass a `.hx` file containing Haxe source code directly to be compiled on the fly if the haxe compiler is
+present in the `PATH`.
+
 ## Commands
 
 - `info` General information about the bytecode

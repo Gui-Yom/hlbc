@@ -95,26 +95,28 @@ pub fn command_parser(ctx: &ParseContext) -> impl Parser<char, Command, Error = 
         };
     }
 
+    let string = string();
+
     choice((
         cmd!("exit").map(|_| Exit),
         cmd!("help").map(|_| Help),
         cmd!("info").map(|_| Info),
         cmd!("entrypoint").map(|_| Entrypoint),
-        cmd!("explain"; any().repeated()).map(|v| Explain(v.into_iter().collect())),
+        cmd!("explain"; string.clone()).map(Explain),
         cmd!("int", "i"; index_range(ctx.int_max)).map(Int),
         cmd!("float", "f"; index_range(ctx.float_max)).map(Float),
         cmd!("string", "s"; index_range(ctx.string_max)).map(String),
-        cmd!("sstr"; any().repeated()).map(|v| SearchStr(v.into_iter().collect())),
+        cmd!("sstr"; string.clone()).map(SearchStr),
         cmd!("debugfile", "file"; index_range(ctx.debug_file_max)).map(Debugfile),
-        cmd!("sfile"; any().repeated()).map(|v| SearchDebugfile(v.into_iter().collect())),
+        cmd!("sfile"; string.clone()).map(SearchDebugfile),
         cmd!("type", "t"; index_range(ctx.type_max)).map(Type),
         cmd!("global", "g"; index_range(ctx.global_max)).map(Global),
         cmd!("native", "n"; index_range(ctx.native_max)).map(Native),
         cmd!("constant", "c"; index_range(ctx.constant_max)).map(Constant),
         cmd!("fnh"; index_range(ctx.findex_max)).map(FunctionHeader),
         cmd!("fn"; index_range(ctx.findex_max)).map(Function),
-        cmd!("fnamed", "fnn"; any().repeated()).map(|v| FunctionNamed(v.into_iter().collect())),
-        cmd!("sfn"; any().repeated()).map(|v| SearchFunction(v.into_iter().collect())),
+        cmd!("fnamed", "fnn"; string.clone()).map(FunctionNamed),
+        cmd!("sfn"; string.clone()).map(SearchFunction),
         cmd!("infile").ignore_then(choice((
             num().map(|n| InFile(FileOrIndex::Index(n))),
             filter(|c: &char| !c.is_whitespace())
@@ -122,7 +124,7 @@ pub fn command_parser(ctx: &ParseContext) -> impl Parser<char, Command, Error = 
                 .map(|v| InFile(FileOrIndex::File(v.into_iter().collect()))),
         ))),
         cmd!("fileof"; num()).map(FileOf),
-        cmd!("saveto"; any().repeated()).map(|v| SaveTo(v.into_iter().collect())),
+        cmd!("saveto"; string.clone()).map(SaveTo),
         cmd!("callgraph")
             .ignore_then(num())
             .then(num())
@@ -137,6 +139,12 @@ pub fn command_parser(ctx: &ParseContext) -> impl Parser<char, Command, Error = 
         cmd!("dumptype"; num()).map(DumpType),
     ))
     .labelled("command")
+}
+
+fn string() -> impl Parser<char, String, Error = Simple<char>> + Clone {
+    filter(|c: &char| c != &';')
+        .repeated()
+        .map(|v| v.into_iter().collect())
 }
 
 fn num() -> impl Parser<char, usize, Error = Simple<char>> {
@@ -175,6 +183,7 @@ mod tests {
     use chumsky::Parser;
 
     use crate::command::{index_range, parse_command, Command, FileOrIndex, ParseContext};
+    use crate::parse_commands;
 
     #[test]
     fn test_index_range() {
@@ -262,6 +271,31 @@ mod tests {
         assert!(match parsed {
             Ok(Command::InFile(FileOrIndex::File(s))) => {
                 s == "Array.hx"
+            }
+            _ => false,
+        });
+    }
+
+    #[test]
+    fn test_command_list() {
+        let parsed = parse_commands(
+            &ParseContext::default(),
+            "sstr hello world; exit    ; fnamed main",
+        )
+        .unwrap();
+        assert!(match &parsed[0] {
+            Command::SearchStr(s) => {
+                s == "hello world"
+            }
+            _ => false,
+        });
+        assert!(match &parsed[1] {
+            Command::Exit => true,
+            _ => false,
+        });
+        assert!(match &parsed[2] {
+            Command::FunctionNamed(s) => {
+                s == "main"
             }
             _ => false,
         });

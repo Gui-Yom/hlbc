@@ -1,10 +1,11 @@
 use std::fs;
 use std::io::{stdin, BufReader, BufWriter, Write};
 use std::iter::repeat;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use clap::Parser;
+use temp_dir::TempDir;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use hlbc::analysis::{find_fun_refs, iter_ops};
@@ -40,10 +41,27 @@ fn main() -> anyhow::Result<()> {
 
     let tty = atty::is(atty::Stream::Stdout);
 
+    let is_source = args
+        .file
+        .extension()
+        .map(|ext| ext == "hx")
+        .unwrap_or(false);
+
+    let dir = TempDir::new()?;
+    let file = if is_source {
+        print!("Compiling haxe source ...");
+        let path = dir.child("bytecode.hl");
+        compile(&args.file, &path)?;
+        println!(" OK");
+        path
+    } else {
+        args.file.clone()
+    };
+
     let start = Instant::now();
 
     let code = {
-        let mut r = BufReader::new(fs::File::open(&args.file)?);
+        let mut r = BufReader::new(fs::File::open(&file)?);
         Bytecode::load(&mut r)?
     };
 
@@ -77,7 +95,7 @@ fn main() -> anyhow::Result<()> {
                         $onexit;
                     }
                     cmd => {
-                        process_command(&mut stdout, &code, cmd)?;
+                        process_command(&mut stdout, $code, cmd)?;
                     }
                 }
                 println!();
@@ -111,8 +129,12 @@ fn main() -> anyhow::Result<()> {
         'watch: loop {
             match rx.recv() {
                 Ok(DebouncedEvent::Write(_)) => {
+                    if is_source {
+                        compile(&args.file, &file)?;
+                    }
+
                     let code = {
-                        let mut r = BufReader::new(fs::File::open(&args.file)?);
+                        let mut r = BufReader::new(fs::File::open(&file)?);
                         Bytecode::load(&mut r)?
                     };
 
@@ -373,7 +395,7 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
             if let Some(&i) = code.fnames.get(&str) {
                 println!("{}", code.functions[i].display(code));
             } else {
-                println!("unknown");
+                println!("unknown '{str}'");
             }
         }
         Command::SearchFunction(str) => {
@@ -544,4 +566,24 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
         }
     }
     Ok(())
+}
+
+fn compile(source: &Path, bytecode: &Path) -> anyhow::Result<()> {
+    let result = std::process::Command::new("haxe")
+        .arg("-hl")
+        .arg(bytecode)
+        .arg("-main")
+        .arg(source.file_name().unwrap())
+        .stdin(std::process::Stdio::null())
+        .current_dir(source.canonicalize().unwrap().parent().unwrap())
+        .status()?;
+
+    if result.success() {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!(
+            "Compilation failed with error : {}",
+            result
+        ))
+    }
 }

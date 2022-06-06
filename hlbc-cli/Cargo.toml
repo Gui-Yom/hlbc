@@ -26,6 +26,8 @@ hlbc = { version = "0.3", path = "..", default-features = false }
 notify = { version = "4", optional = true }
 # cli colors
 termcolor = "1"
+# Temporary directory for compilation
+temp-dir = "0.1"
 
 [features]
 default = ["graph", "watch"]
