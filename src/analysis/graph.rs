@@ -68,11 +68,9 @@ pub fn find_calls<'a>(
         Opcode::CallClosure { fun, args, .. } => find_last_closure_assign(code, f, *fun, i)
             .map(|f| (Call::Closure, f, build_ctx!(i; args)))
             .or_else(|| {
-                if let Some(param) = reg_ctx.get(&(fun.0 as usize)) {
-                    Some((Call::Closure, *param, build_ctx!(i; args)))
-                } else {
-                    None
-                }
+                reg_ctx
+                    .get(&(fun.0 as usize))
+                    .map(|param| (Call::Closure, *param, build_ctx!(i; args)))
             }),
         Opcode::CallMethod { field, args, .. } => f.regs[args[0].0 as usize]
             .resolve(&code.types)

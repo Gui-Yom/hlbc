@@ -12,7 +12,7 @@ use hlbc::opcodes::Opcode;
 use hlbc::types::{RefFun, RefFunPointee, Type};
 use hlbc::*;
 
-use crate::command::{parse_command, Command, ElementRef, FileOrIndex, ParseContext};
+use crate::command::{parse_commands, Command, ElementRef, FileOrIndex, ParseContext};
 
 mod command;
 mod decompiler;
@@ -69,24 +69,25 @@ fn main() -> anyhow::Result<()> {
         findex_max: code.findexes.len(),
     };
 
-    if let Some(initial_cmd) = args.command {
-        for cmd in initial_cmd.split(";").map(|s| s.trim()) {
-            match parse_command(&parse_ctx, cmd) {
-                Ok(Command::Exit) => {
-                    return Ok(());
-                }
-                Ok(cmd) => {
-                    process_command(&mut stdout, &code, cmd)?;
-                }
-                Err(errors) => {
-                    for e in errors {
-                        eprintln!("Error while parsing command. {e:?}");
+    macro_rules! execute_commands {
+        ($code:expr, $commands:expr; $onexit:stmt) => {
+            for cmd in $commands {
+                match cmd {
+                    Command::Exit => {
+                        $onexit;
                     }
-                    continue;
+                    cmd => {
+                        process_command(&mut stdout, &code, cmd)?;
+                    }
                 }
+                println!();
             }
-            println!();
-        }
+        };
+    }
+
+    // Execute the -c
+    if let Some(initial_cmd) = args.command {
+        execute_commands!(&code, parse_commands(&parse_ctx, &initial_cmd).expect("Error while parsing command."); return Ok(()));
     }
 
     #[cfg(feature = "watch")]
@@ -103,25 +104,9 @@ fn main() -> anyhow::Result<()> {
 
         println!("Watching file '{}', command : {watch}", args.file.display());
 
-        let commands = watch
-            .split(";")
-            .map(|s| parse_command(&parse_ctx, s.trim()))
-            .collect::<Vec<_>>()
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()
-            .expect("Error while parsing command");
+        let commands = parse_commands(&parse_ctx, &watch).expect("Can't parse command");
 
-        for cmd in &commands {
-            match cmd {
-                Command::Exit => {
-                    return Ok(());
-                }
-                cmd => {
-                    process_command(&mut stdout, &code, cmd.clone())?;
-                }
-            }
-            println!();
-        }
+        execute_commands!(&code, commands.clone(); return Ok(()));
 
         'watch: loop {
             match rx.recv() {
@@ -131,17 +116,7 @@ fn main() -> anyhow::Result<()> {
                         Bytecode::load(&mut r)?
                     };
 
-                    for cmd in &commands {
-                        match cmd {
-                            Command::Exit => {
-                                break 'watch;
-                            }
-                            cmd => {
-                                process_command(&mut stdout, &code, cmd.clone())?;
-                            }
-                        }
-                        println!();
-                    }
+                    execute_commands!(&code, commands.clone(); break 'watch);
                 }
                 Ok(_) => {}
                 Err(e) => {
@@ -156,31 +131,15 @@ fn main() -> anyhow::Result<()> {
 
     'main: loop {
         let mut line = String::new();
-        stdout.set_color(&ColorSpec::new().set_fg(Some(Color::Yellow)))?;
+        stdout.set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))?;
         print!("> ");
-        stdout.set_color(&ColorSpec::new().set_fg(Some(Color::Cyan)))?;
+        stdout.set_color(ColorSpec::new().set_fg(Some(Color::Cyan)))?;
         stdout.flush()?;
         stdin().read_line(&mut line)?;
         stdout.reset()?;
-        let commands = line.split(";").map(|s| s.trim());
 
-        for cmd in commands {
-            match parse_command(&parse_ctx, cmd) {
-                Ok(Command::Exit) => {
-                    break 'main;
-                }
-                Ok(cmd) => {
-                    process_command(&mut stdout, &code, cmd)?;
-                }
-                Err(errors) => {
-                    for e in errors {
-                        eprintln!("Error while parsing command. {e:?}");
-                    }
-                    continue;
-                }
-            }
-            println!();
-        }
+        let commands = parse_commands(&parse_ctx, &line).expect("Error while parsing command.");
+        execute_commands!(&code, commands; break 'main);
     }
     Ok(())
 }

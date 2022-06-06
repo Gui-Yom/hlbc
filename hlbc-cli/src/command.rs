@@ -61,8 +61,20 @@ pub struct ParseContext {
     pub findex_max: usize,
 }
 
+/// Parse a command
 pub fn parse_command(ctx: &ParseContext, line: &str) -> Result<Command, Vec<Simple<char>>> {
-    command_parser(ctx).parse(line)
+    command_parser(ctx).padded().parse(line)
+}
+
+/// Parse a list of command separated by ';'
+pub fn parse_commands(ctx: &ParseContext, line: &str) -> Result<Vec<Command>, Vec<Simple<char>>> {
+    commands_parser(ctx).parse(line)
+}
+
+pub fn commands_parser(
+    ctx: &ParseContext,
+) -> impl Parser<char, Vec<Command>, Error = Simple<char>> {
+    command_parser(ctx).padded().separated_by(just(';'))
 }
 
 pub fn command_parser(ctx: &ParseContext) -> impl Parser<char, Command, Error = Simple<char>> {
