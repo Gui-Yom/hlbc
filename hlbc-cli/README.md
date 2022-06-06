@@ -6,13 +6,15 @@ A CLI to navigate through [Hashlink](https://hashlink.haxe.org/) bytecode files.
 
 ## Usage
 
-`hlbc-cli <file> [-c <command>]`
+`hlbc-cli <file> [-c <command>] [-w <command>]`
 
-You then get access to a prompt where you can enter commands.
+You get access to a prompt where you can enter commands.
 
 You can execute commands on startup with the `-c` switch.
 e.g. Dump all strings from the bytecode then exit : `hlbc-cli main.hl -c "s ..; exit"`.
 If you omit the `exit` command, the app will simply launch the normal prompt after executing the startup commands.
+
+With `-w`, the given command will execute each time the file changes. The cli won't show a command prompt.
 
 ## Commands
 

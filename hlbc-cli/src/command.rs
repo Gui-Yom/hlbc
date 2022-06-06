@@ -1,37 +1,43 @@
+use std::ops::Range;
+
 use chumsky::prelude::*;
 use chumsky::text::*;
 
-pub type IndexIter = Box<dyn Iterator<Item = usize>>;
+pub type IndexRange = Range<usize>;
 
+#[derive(Debug, Clone)]
 pub enum FileOrIndex {
     File(String),
     Index(usize),
 }
 
+#[derive(Debug, Clone)]
 pub enum ElementRef {
     String(usize),
     Global(usize),
     Fn(usize),
 }
 
+#[derive(Debug, Clone)]
 pub enum Command {
     Exit,
     Help,
     Info,
     Entrypoint,
     Explain(String),
-    Int(IndexIter),
-    Float(IndexIter),
-    String(IndexIter),
+    Int(IndexRange),
+    Float(IndexRange),
+    String(IndexRange),
     SearchStr(String),
-    Debugfile(IndexIter),
+    Debugfile(IndexRange),
     SearchDebugfile(String),
-    Type(IndexIter),
-    Global(IndexIter),
-    Native(IndexIter),
-    Constant(IndexIter),
-    FunctionHeader(IndexIter),
-    Function(IndexIter),
+    Type(IndexRange),
+    Global(IndexRange),
+    Native(IndexRange),
+    Constant(IndexRange),
+    FunctionHeader(IndexRange),
+    Function(IndexRange),
+    FunctionNamed(String),
     SearchFunction(String),
     InFile(FileOrIndex),
     FileOf(usize),
@@ -95,6 +101,7 @@ pub fn command_parser(ctx: &ParseContext) -> impl Parser<char, Command, Error = 
         cmd!("constant", "c"; index_range(ctx.constant_max)).map(Constant),
         cmd!("fnh"; index_range(ctx.findex_max)).map(FunctionHeader),
         cmd!("fn"; index_range(ctx.findex_max)).map(Function),
+        cmd!("fnamed", "fnn"; any().repeated()).map(|v| FunctionNamed(v.into_iter().collect())),
         cmd!("sfn"; any().repeated()).map(|v| SearchFunction(v.into_iter().collect())),
         cmd!("infile").ignore_then(choice((
             num().map(|n| InFile(FileOrIndex::Index(n))),
@@ -128,22 +135,25 @@ fn num() -> impl Parser<char, usize, Error = Simple<char>> {
 
 /// Parse any range, constrained between min and max. Can also parse a single index.
 /// e.g. .., ..3, 4..5, 2,..=9, 14
-fn index_range(max: usize) -> impl Parser<char, IndexIter, Error = Simple<char>> {
+fn index_range(max: usize) -> impl Parser<char, IndexRange, Error = Simple<char>> {
     choice((
+        // Range
         num()
             .or_not()
             .then(just("..=").or(just("..")))
             .then(num().or_not())
             .map(move |((a, range), b)| {
                 let a = a.unwrap_or(0).max(0);
-                let b = b.unwrap_or(max);
                 if range == ".." {
-                    Box::new(a..b.min(max)) as IndexIter
+                    let b = b.unwrap_or(max).min(max);
+                    a..b
                 } else {
-                    Box::new(a..=b.min(max - 1)) as IndexIter
+                    let b = (b.unwrap_or(max - 1) + 1).min(max);
+                    a..b
                 }
             }),
-        num().map(|i| Box::new(i..(i + 1)) as IndexIter),
+        // Single index
+        num().map(|i| i..(i + 1)),
     ))
     .labelled("index range")
 }
@@ -157,28 +167,28 @@ mod tests {
     #[test]
     fn test_index_range() {
         assert_eq!(
-            (0..10).sum::<usize>(),
-            index_range(10).parse("..").unwrap().sum()
+            Ok((0..10).sum::<usize>()),
+            index_range(10).parse("..").map(Iterator::sum)
         );
         assert_eq!(
-            (0..=9).sum::<usize>(),
-            index_range(10).parse("..=").unwrap().sum()
+            Ok((0..=9).sum::<usize>()),
+            index_range(10).parse("..=").map(Iterator::sum)
         );
         assert_eq!(
-            (0..4).sum::<usize>(),
-            index_range(10).parse("..4").unwrap().sum()
+            Ok((0..4).sum::<usize>()),
+            index_range(10).parse("..4").map(Iterator::sum)
         );
         assert_eq!(
-            (2..10).sum::<usize>(),
-            index_range(10).parse("2..").unwrap().sum()
+            Ok((2..10).sum::<usize>()),
+            index_range(10).parse("2..").map(Iterator::sum)
         );
         assert_eq!(
-            (1..5).sum::<usize>(),
-            index_range(10).parse("1..5").unwrap().sum()
+            Ok((1..5).sum::<usize>()),
+            index_range(10).parse("1..5").map(Iterator::sum)
         );
         assert_eq!(
-            (0..=8).sum::<usize>(),
-            index_range(10).parse("..=8").unwrap().sum()
+            Ok((0..=8).sum::<usize>()),
+            index_range(10).parse("..=8").map(Iterator::sum)
         );
     }
 

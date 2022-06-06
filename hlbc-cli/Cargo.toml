@@ -12,12 +12,22 @@ categories = ["command-line-utilities", "parsing", "visualization"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hlbc = { version = "0.3", path = "..", default-features = false }
-termcolor = "1"
+# Result type
 anyhow = "1"
+# Disable colors when not a tty (piped output)
 atty = "0.2"
+# Command parser
 chumsky = "0.8"
+# CLI args
+clap = { version = "3", features = ["derive"] }
+# Core functionnality
+hlbc = { version = "0.3", path = "..", default-features = false }
+# File system watching
+notify = { version = "4", optional = true }
+# cli colors
+termcolor = "1"
 
 [features]
-default = ["graph"]
+default = ["graph", "watch"]
 graph = ["hlbc/graph"]
+watch = ["notify"]

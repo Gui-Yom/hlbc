@@ -1,8 +1,10 @@
+use std::fs;
 use std::io::{stdin, BufReader, BufWriter, Write};
 use std::iter::repeat;
-use std::time::Instant;
-use std::{env, fs};
+use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
+use clap::Parser;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use hlbc::analysis::{find_fun_refs, iter_ops};
@@ -15,26 +17,33 @@ use crate::command::{parse_command, Command, ElementRef, FileOrIndex, ParseConte
 mod command;
 mod decompiler;
 
+#[derive(Parser, Debug)]
+#[clap(author, version, about)]
+struct Args {
+    file: PathBuf,
+    /// Execute the command each time the file changes
+    #[clap(short, long)]
+    watch: Option<String>,
+    /// Execute the command at startup
+    #[clap(short, long)]
+    command: Option<String>,
+}
+
 fn main() -> anyhow::Result<()> {
+    let args: Args = Args::parse();
+
+    #[cfg(not(feature = "watch"))]
+    if args.watch.is_some() {
+        println!("The program was not compiled with the 'watch' feature enabled.");
+        return Ok(());
+    }
+
     let tty = atty::is(atty::Stream::Stdout);
 
     let start = Instant::now();
 
-    let mut args = env::args().skip(1);
-
-    let filename = args.next().expect("Expected a filename");
-    let initial_cmd = if let Some(opt) = args.next() {
-        if opt == "-c" {
-            args.next()
-        } else {
-            None
-        }
-    } else {
-        None
-    };
-
     let code = {
-        let mut r = BufReader::new(fs::File::open(&filename)?);
+        let mut r = BufReader::new(fs::File::open(&args.file)?);
         Bytecode::load(&mut r)?
     };
 
@@ -60,7 +69,7 @@ fn main() -> anyhow::Result<()> {
         findex_max: code.findexes.len(),
     };
 
-    if let Some(initial_cmd) = initial_cmd {
+    if let Some(initial_cmd) = args.command {
         for cmd in initial_cmd.split(";").map(|s| s.trim()) {
             match parse_command(&parse_ctx, cmd) {
                 Ok(Command::Exit) => {
@@ -80,11 +89,79 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
+    #[cfg(feature = "watch")]
+    if let Some(watch) = args.watch {
+        use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+        use std::sync::mpsc;
+
+        let (tx, rx) = mpsc::channel();
+        let mut watcher = watcher(tx, Duration::from_millis(200)).expect("Can't init watcher");
+
+        watcher
+            .watch(&args.file, RecursiveMode::NonRecursive)
+            .expect("Can't watch file");
+
+        println!("Watching file '{}', command : {watch}", args.file.display());
+
+        let commands = watch
+            .split(";")
+            .map(|s| parse_command(&parse_ctx, s.trim()))
+            .collect::<Vec<_>>()
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .expect("Error while parsing command");
+
+        for cmd in &commands {
+            match cmd {
+                Command::Exit => {
+                    return Ok(());
+                }
+                cmd => {
+                    process_command(&mut stdout, &code, cmd.clone())?;
+                }
+            }
+            println!();
+        }
+
+        'watch: loop {
+            match rx.recv() {
+                Ok(DebouncedEvent::Write(_)) => {
+                    let code = {
+                        let mut r = BufReader::new(fs::File::open(&args.file)?);
+                        Bytecode::load(&mut r)?
+                    };
+
+                    for cmd in &commands {
+                        match cmd {
+                            Command::Exit => {
+                                break 'watch;
+                            }
+                            cmd => {
+                                process_command(&mut stdout, &code, cmd.clone())?;
+                            }
+                        }
+                        println!();
+                    }
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    println!("Error while watching : {e}");
+                    break;
+                }
+            }
+        }
+
+        return Ok(());
+    }
+
     'main: loop {
         let mut line = String::new();
+        stdout.set_color(&ColorSpec::new().set_fg(Some(Color::Yellow)))?;
         print!("> ");
+        stdout.set_color(&ColorSpec::new().set_fg(Some(Color::Cyan)))?;
         stdout.flush()?;
         stdin().read_line(&mut line)?;
+        stdout.reset()?;
         let commands = line.split(";").map(|s| s.trim());
 
         for cmd in commands {
@@ -331,6 +408,13 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                 } else {
                     println!("unknown");
                 }
+            }
+        }
+        Command::FunctionNamed(str) => {
+            if let Some(&i) = code.fnames.get(&str) {
+                println!("{}", code.functions[i].display(code));
+            } else {
+                println!("unknown");
             }
         }
         Command::SearchFunction(str) => {
