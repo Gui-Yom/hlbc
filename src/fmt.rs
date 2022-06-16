@@ -526,7 +526,7 @@ impl Function {
             .as_ref()
             .unwrap()
             .iter()
-            .map(|(s, i)| format!("{} at opcode {i}", s.resolve(&ctx.strings)))
+            .map(|(s, i)| format!("{} at opcode {}", s.resolve(&ctx.strings), i - 1))
             .collect();
         format!(
             "{} ({} regs, {} ops)\n    {}\n\n{}\n{}",

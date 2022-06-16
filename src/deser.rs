@@ -11,19 +11,29 @@ use crate::types::{
 };
 use crate::{ConstantDef, Opcode, RefFun, RefGlobal};
 
-pub(crate) trait ReadHlExt: ReadBytesExt {
-    /// Read a variable size signed integer
+/// Extension trait to read bytecode elements from anything that implements [Read]
+pub trait ReadHlExt: ReadBytesExt {
+    /// Read a variable size signed integer. Used internally by the other functions.
     fn read_vari(&mut self) -> Result<i32>;
-    /// Read a variable size unsigned integer
+    /// Read a variable size unsigned integer. Used internally by the other functions.
     fn read_varu(&mut self) -> Result<u32>;
+    /// Read a strings block
     fn read_strings(&mut self, nstrings: usize) -> Result<Vec<String>>;
+    /// Read a field definition
     fn read_field(&mut self) -> Result<ObjField>;
+    /// Read a type reference
     fn read_type_ref(&mut self) -> Result<RefType>;
+    /// Read a Fun or Method type
     fn read_type_fun(&mut self) -> Result<TypeFun>;
+    /// Read a Obj or Struct type
     fn read_type_obj(&mut self) -> Result<TypeObj>;
+    /// Read a type definition
     fn read_type(&mut self) -> Result<Type>;
+    /// Read a native function definition
     fn read_native(&mut self) -> Result<Native>;
+    /// Read a function definition
     fn read_function(&mut self, has_debug: bool, version: u8) -> Result<Function>;
+    /// Read a constant definition
     fn read_constant_def(&mut self) -> Result<ConstantDef>;
 }
 

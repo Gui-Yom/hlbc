@@ -7,15 +7,25 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use crate::types::TypeFun;
 use crate::{ConstantDef, Function, Native, ObjField, Type, TypeObj};
 
-pub(crate) trait WriteHlExt: WriteBytesExt {
+/// Extension trait to write bytecode elements to anything that implements [Write]
+pub trait WriteHlExt: WriteBytesExt {
+    /// Write a variable size integer. Used internally by the other functions.
     fn write_vi32(&mut self, value: i32) -> Result<()>;
+    /// Write a strings block
     fn write_strings(&mut self, strings: &[String]) -> Result<()>;
+    /// Write a Fun or Method type
     fn write_type_fun(&mut self, fun: &TypeFun) -> Result<()>;
+    /// Write a field definition
     fn write_field(&mut self, field: &ObjField) -> Result<()>;
+    /// Write a Obj or Struct type
     fn write_type_obj(&mut self, obj: &TypeObj) -> Result<()>;
+    /// Write a type definition
     fn write_type(&mut self, ty: &Type) -> Result<()>;
+    /// Write a native function definition
     fn write_native(&mut self, n: &Native) -> Result<()>;
+    /// Write a function definition
     fn write_function(&mut self, f: &Function) -> Result<()>;
+    /// Write a constant definition
     fn write_constant_def(&mut self, c: &ConstantDef) -> Result<()>;
 }
 
