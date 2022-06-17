@@ -4,6 +4,25 @@
 
 A CLI to navigate through [Hashlink](https://hashlink.haxe.org/) bytecode files.
 
+## Installation
+
+Download a prebuilt binary from the [releases page](https://github.com/Gui-Yom/hlbc/releases).
+
+Or build from the latest version :
+
+```shell
+cargo install hlbc-cli
+```
+
+Or build the crate from the latest sources :
+
+```shell
+git clone https://github.com/Gui-Yom/hlbc
+cd hlbc/hlbc-cli
+cargo build --release
+# The resulting binary can be found in hlbc/target/release
+```
+
 ## Usage
 
 `hlbc-cli <file> [-c <command>] [-w <command>]`
@@ -48,3 +67,15 @@ present in the `PATH`.
 
 In most of the commands that accept an index, you can pass a Rust style range too : `a..b`, `..b`, `a..`, `a..=b`, `..`.
 Where `..10` means '*select the first 10 items*' and `..` means '*display everything*'.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
+## Wiki
+
+A wiki detailing the specifics of Hashlink bytecode is available [here](https://github.com/Gui-Yom/hlbc/wiki).
+
+## Planned features
+
+- Use commands as expressions in arguments to other commands to compose analysis like `fn (entrypoint)` to display the entry function or `refto (sstr Hello)`
