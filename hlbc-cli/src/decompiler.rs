@@ -1,7 +1,8 @@
-use std::fmt::Write;
+use std::fmt;
+use std::fmt::{Display, Write};
 
 use hlbc::opcodes::Opcode;
-use hlbc::types::{Function, RefField, Type, TypeObj};
+use hlbc::types::{Function, RefField, RefFun, RefType, Reg, Type, TypeObj};
 use hlbc::Bytecode;
 
 pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> String {
@@ -133,6 +134,7 @@ pub fn decompile_closure(code: &Bytecode, indent: &str, f: &Function) -> String 
 pub fn decompile_function_body(code: &Bytecode, indent: &str, f: &Function) -> String {
     let mut buf = String::with_capacity(256);
 
+    /*
     for (i, r) in f
         .regs
         .iter()
@@ -143,30 +145,197 @@ pub fn decompile_function_body(code: &Bytecode, indent: &str, f: &Function) -> S
         if !r.is_void() {
             writeln!(&mut buf, "{indent}var reg{i}: {}", r.display(code)).unwrap();
         }
-    }
+    }*/
 
-    for (i, o) in f.ops.iter().enumerate() {
-        write!(&mut buf, "{indent}").unwrap();
+    writeln!(&mut buf).unwrap();
+
+    let mut statements = Vec::with_capacity(f.ops.len());
+
+    let mut iter = f.ops.iter().enumerate();
+    while let Some((i, o)) = iter.next() {
         match o {
-            Opcode::InstanceClosure { dst, obj, fun } => {
-                write!(
-                    &mut buf,
-                    "{dst} = {}",
-                    decompile_closure(code, indent, fun.resolve_as_fn(code).unwrap())
-                )
-                .unwrap();
+            &Opcode::Int { dst, ptr } => {
+                statements.push(Statement::NewVariable {
+                    reg: dst,
+                    name: var_name(code, f, i),
+                    assign: Expression::Constant(Constant::Int(ptr.resolve(&code.ints))),
+                });
+            }
+            Opcode::New { dst } => {
+                let call = process_constructor(code, f, *dst, &mut iter);
+                statements.push(Statement::NewVariable {
+                    reg: *dst,
+                    name: var_name(code, f, i),
+                    assign: Expression::Constructor(call),
+                })
+            }
+            Opcode::Call1 { dst, fun, arg0 } => {
+                /*
+                if let Some(func) = fun.resolve_as_fn(code) {
+                    if let Some(name) = func.name.map(|n| n.resolve(&code.strings)) {
+                        if name == "__constructor__" && f.regtype(*dst).is_void() {
+                            if let Some((r, cons_ctx)) = constructor_ctx.pop() {
+                                if r != *arg0 {
+                                    println!("[analysis error: wrong constructor]")
+                                } else {
+                                    statements.push(Statement::Constructor {
+                                        reg: r,
+                                        args: cons_ctx,
+                                    })
+                                }
+                            } else {
+                                println!("[analysis error: no new before constructor]");
+                            }
+                        }
+                    }
+                }*/
             }
             Opcode::Ret { ret } => {
-                // Skip void type
-                if i != f.ops.len() - 1 || !f.regtype(*ret).is_void() {
-                    writeln!(&mut buf, "return {ret}").unwrap();
+                if !f.regtype(*ret).is_void() {
+                    statements.push(Statement::Return {
+                        expr: Expression::Reg(*ret),
+                    })
                 }
             }
-            _ => {
-                writeln!(&mut buf, "{}", o.display(code, f, 0, 16)).unwrap();
-            }
+            _ => {}
         }
     }
 
+    for stmt in statements {
+        stmt.display(&mut buf, code, f);
+    }
+
     buf
+}
+
+fn var_name(code: &Bytecode, f: &Function, pos: usize) -> Option<String> {
+    if let Some(assigns) = &f.assigns {
+        for &(s, i) in assigns {
+            if pos == i - 1 {
+                return Some(s.resolve(&code.strings).to_string());
+            }
+        }
+    }
+    None
+}
+
+#[derive(Debug, Clone)]
+struct ConstructorCall {
+    ty: RefType,
+    args: Vec<Expression>,
+}
+
+#[derive(Debug, Clone)]
+enum Constant {
+    Int(i32),
+    Float(f64),
+    String(String),
+}
+
+#[derive(Debug, Clone)]
+enum Expression {
+    Reg(Reg),
+    Constant(Constant),
+    Constructor(ConstructorCall),
+}
+
+impl Expression {
+    fn display(&self, code: &Bytecode) -> String {
+        match self {
+            Expression::Reg(x) => format!("{x}"),
+            Expression::Constant(x) => match x {
+                Constant::Int(c) => format!("{c}"),
+                Constant::Float(c) => format!("{c}"),
+                Constant::String(c) => format!("{c}"),
+            },
+            Expression::Constructor(x) => {
+                format!(
+                    "new {}({})",
+                    x.ty.display(code),
+                    x.args
+                        .iter()
+                        .map(|a| a.display(code))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum Statement {
+    NewVariable {
+        reg: Reg,
+        name: Option<String>,
+        assign: Expression,
+    },
+    CallVoid {
+        fun: RefFun,
+        args: Vec<Expression>,
+    },
+    Return {
+        expr: Expression,
+    },
+}
+
+impl Statement {
+    fn display(&self, w: &mut impl Write, code: &Bytecode, f: &Function) {
+        match self {
+            Statement::NewVariable { reg, name, assign } => {
+                writeln!(
+                    w,
+                    "var {}: {} = {};",
+                    name.as_ref().unwrap_or(&reg.to_string()),
+                    f.regtype(*reg).display(code),
+                    assign.display(code)
+                )
+                .unwrap();
+            }
+            Statement::Return { expr } => {
+                writeln!(w, "return {};", expr.display(code)).unwrap();
+            }
+            _ => {}
+        }
+    }
+}
+
+fn process_constructor<'a>(
+    code: &Bytecode,
+    f: &Function,
+    reg: Reg,
+    ops: &mut impl Iterator<Item = (usize, &'a Opcode)>,
+) -> ConstructorCall {
+    let mut args = Vec::new();
+
+    while let Some((i, o)) = ops.next() {
+        match o {
+            Opcode::Int { dst, ptr } => {
+                args.push(Expression::Constant(Constant::Int(ptr.resolve(&code.ints))))
+            }
+            Opcode::Call1 { dst, fun, arg0 } => {
+                if *arg0 == reg {
+                    return ConstructorCall {
+                        ty: f.regtype(reg),
+                        args,
+                    };
+                }
+            }
+            Opcode::Call2 {
+                dst,
+                fun,
+                arg0,
+                arg1,
+            } => {
+                if *arg0 == reg {
+                    return ConstructorCall {
+                        ty: f.regtype(reg),
+                        args,
+                    };
+                }
+            }
+            _ => {}
+        }
+    }
+    unreachable!("No constructor call ?")
 }

@@ -4,7 +4,7 @@ use std::iter::repeat;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use clap::Parser;
+use clap::Parser as ClapParser;
 use temp_dir::TempDir;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
@@ -13,12 +13,12 @@ use hlbc::opcodes::Opcode;
 use hlbc::types::{RefFun, RefFunPointee, Type};
 use hlbc::*;
 
-use crate::command::{parse_commands, Command, ElementRef, FileOrIndex, ParseContext};
+use crate::command::{commands_parser, Command, ElementRef, FileOrIndex, ParseContext, Parser};
 
 mod command;
 mod decompiler;
 
-#[derive(Parser, Debug)]
+#[derive(ClapParser, Debug)]
 #[clap(author, version, about)]
 struct Args {
     file: PathBuf,
@@ -87,6 +87,8 @@ fn main() -> anyhow::Result<()> {
         findex_max: code.findexes.len(),
     };
 
+    let parser = commands_parser(&parse_ctx);
+
     macro_rules! execute_commands {
         ($code:expr, $commands:expr; $onexit:stmt) => {
             for cmd in $commands {
@@ -105,7 +107,7 @@ fn main() -> anyhow::Result<()> {
 
     // Execute the -c
     if let Some(initial_cmd) = args.command {
-        execute_commands!(&code, parse_commands(&parse_ctx, &initial_cmd).expect("Error while parsing command."); return Ok(()));
+        execute_commands!(&code, parser.parse(initial_cmd.as_str()).expect("Error while parsing command."); return Ok(()));
     }
 
     #[cfg(feature = "watch")]
@@ -122,7 +124,7 @@ fn main() -> anyhow::Result<()> {
 
         println!("Watching file '{}', command : {watch}", args.file.display());
 
-        let commands = parse_commands(&parse_ctx, &watch).expect("Can't parse command");
+        let commands = parser.parse(watch.as_str()).expect("Can't parse command");
 
         execute_commands!(&code, commands.clone(); return Ok(()));
 
@@ -160,7 +162,9 @@ fn main() -> anyhow::Result<()> {
         stdin().read_line(&mut line)?;
         stdout.reset()?;
 
-        let commands = parse_commands(&parse_ctx, &line).expect("Error while parsing command.");
+        let commands = parser
+            .parse(line.as_str())
+            .expect("Error while parsing command.");
         execute_commands!(&code, commands; break 'main);
     }
     Ok(())
@@ -554,7 +558,7 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                     });
             }
         },
-        Command::DumpType(idx) => {
+        Command::DecompType(idx) => {
             let ty = &code.types[idx];
             match ty {
                 Type::Obj(obj) => {
@@ -562,6 +566,11 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                     println!("{}", decompiler::decompile_class(code, obj));
                 }
                 _ => println!("Type {idx} is not an obj"),
+            }
+        }
+        Command::Decomp(idx) => {
+            if let Some(fun) = RefFun(idx).resolve_as_fn(code) {
+                println!("{}", decompiler::decompile_function_body(code, "", fun));
             }
         }
     }

@@ -2,6 +2,7 @@ use std::ops::Range;
 
 use chumsky::prelude::*;
 use chumsky::text::*;
+pub use chumsky::Parser;
 
 pub type IndexRange = Range<usize>;
 
@@ -44,7 +45,8 @@ pub enum Command {
     SaveTo(String),
     Callgraph(usize, usize),
     RefTo(ElementRef),
-    DumpType(usize),
+    DecompType(usize),
+    Decomp(usize),
 }
 
 // Used a default max values for index ranges
@@ -97,48 +99,74 @@ pub fn command_parser(ctx: &ParseContext) -> impl Parser<char, Command, Error = 
 
     let string = string();
 
-    choice((
-        cmd!("exit").map(|_| Exit),
-        cmd!("help").map(|_| Help),
-        cmd!("info").map(|_| Info),
-        cmd!("entrypoint").map(|_| Entrypoint),
-        cmd!("explain"; string.clone()).map(Explain),
-        cmd!("int", "i"; index_range(ctx.int_max)).map(Int),
-        cmd!("float", "f"; index_range(ctx.float_max)).map(Float),
-        cmd!("string", "s"; index_range(ctx.string_max)).map(String),
-        cmd!("sstr"; string.clone()).map(SearchStr),
-        cmd!("debugfile", "file"; index_range(ctx.debug_file_max)).map(Debugfile),
-        cmd!("sfile"; string.clone()).map(SearchDebugfile),
-        cmd!("type", "t"; index_range(ctx.type_max)).map(Type),
-        cmd!("global", "g"; index_range(ctx.global_max)).map(Global),
-        cmd!("native", "n"; index_range(ctx.native_max)).map(Native),
-        cmd!("constant", "c"; index_range(ctx.constant_max)).map(Constant),
-        cmd!("fnh"; index_range(ctx.findex_max)).map(FunctionHeader),
-        cmd!("fn"; index_range(ctx.findex_max)).map(Function),
-        cmd!("fnamed", "fnn"; string.clone()).map(FunctionNamed),
-        cmd!("sfn"; string.clone()).map(SearchFunction),
-        cmd!("infile").ignore_then(choice((
-            num().map(|n| InFile(FileOrIndex::Index(n))),
-            filter(|c: &char| !c.is_whitespace())
-                .repeated()
-                .map(|v| InFile(FileOrIndex::File(v.into_iter().collect()))),
-        ))),
-        cmd!("fileof"; num()).map(FileOf),
-        cmd!("saveto"; string.clone()).map(SaveTo),
+    // The boxing is necessary because the items in an array must be of the same type.
+    // We can't use a tuple because the impl are for tuples of length 25 at most.
+    choice([
+        cmd!("exit").map(|_| Exit).boxed(),
+        cmd!("help").map(|_| Help).boxed(),
+        cmd!("info").map(|_| Info).boxed(),
+        cmd!("entrypoint").map(|_| Entrypoint).boxed(),
+        cmd!("explain"; string.clone()).map(Explain).boxed(),
+        cmd!("int", "i"; index_range(ctx.int_max)).map(Int).boxed(),
+        cmd!("float", "f"; index_range(ctx.float_max))
+            .map(Float)
+            .boxed(),
+        cmd!("string", "s"; index_range(ctx.string_max))
+            .map(String)
+            .boxed(),
+        cmd!("sstr"; string.clone()).map(SearchStr).boxed(),
+        cmd!("debugfile", "file"; index_range(ctx.debug_file_max))
+            .map(Debugfile)
+            .boxed(),
+        cmd!("sfile"; string.clone()).map(SearchDebugfile).boxed(),
+        cmd!("type", "t"; index_range(ctx.type_max))
+            .map(Type)
+            .boxed(),
+        cmd!("global", "g"; index_range(ctx.global_max))
+            .map(Global)
+            .boxed(),
+        cmd!("native", "n"; index_range(ctx.native_max))
+            .map(Native)
+            .boxed(),
+        cmd!("constant", "c"; index_range(ctx.constant_max))
+            .map(Constant)
+            .boxed(),
+        cmd!("fnh"; index_range(ctx.findex_max))
+            .map(FunctionHeader)
+            .boxed(),
+        cmd!("fn"; index_range(ctx.findex_max))
+            .map(Function)
+            .boxed(),
+        cmd!("fnamed", "fnn"; string.clone())
+            .map(FunctionNamed)
+            .boxed(),
+        cmd!("sfn"; string.clone()).map(SearchFunction).boxed(),
+        cmd!("infile")
+            .ignore_then(choice((
+                num().map(|n| InFile(FileOrIndex::Index(n))),
+                filter(|c: &char| !c.is_whitespace())
+                    .repeated()
+                    .map(|v| InFile(FileOrIndex::File(v.into_iter().collect()))),
+            )))
+            .boxed(),
+        cmd!("fileof"; num()).map(FileOf).boxed(),
+        cmd!("saveto"; string.clone()).map(SaveTo).boxed(),
         cmd!("callgraph")
             .ignore_then(num())
             .then(num())
-            .map(|(f, d)| Callgraph(f, d)),
+            .map(|(f, d)| Callgraph(f, d))
+            .boxed(),
         cmd!("refto")
             .ignore_then(choice((
                 just("string@").ignore_then(num()).map(ElementRef::String),
                 just("global@").ignore_then(num()).map(ElementRef::Global),
                 just("fn@").ignore_then(num()).map(ElementRef::Fn),
             )))
-            .map(RefTo),
-        cmd!("dumptype"; num()).map(DumpType),
-    ))
-    .labelled("command")
+            .map(RefTo)
+            .boxed(),
+        cmd!("decomptype"; num()).map(DecompType).boxed(),
+        cmd!("decomp"; num()).map(Decomp).boxed(),
+    ])
 }
 
 fn string() -> impl Parser<char, String, Error = Simple<char>> + Clone {
@@ -182,7 +210,9 @@ fn index_range(max: usize) -> impl Parser<char, IndexRange, Error = Simple<char>
 mod tests {
     use chumsky::Parser;
 
-    use crate::command::{index_range, parse_command, Command, FileOrIndex, ParseContext};
+    use crate::command::{
+        index_range, parse_command, parse_commands, Command, FileOrIndex, ParseContext,
+    };
     use crate::parse_commands;
 
     #[test]
