@@ -28,7 +28,7 @@ pub enum Opcode {
         dst: Reg,
         ptr: RefInt,
     },
-    // Get a f64 from the constant pool
+    /// Get a f64 from the constant pool
     Float {
         dst: Reg,
         ptr: RefFloat,
@@ -47,21 +47,31 @@ pub enum Opcode {
         dst: Reg,
         ptr: RefString,
     },
-    /// Set dst as null
+    /// Nullify a register
+    ///
+    /// *dst* = null
     Null {
         dst: Reg,
     },
-    /// Add *a* and *b* into *dst*
+    /// Add two numbers
+    ///
+    /// *dst* = *a* + *b*
     Add {
         dst: Reg,
         a: Reg,
         b: Reg,
     },
+    /// Subtracts two numbers
+    ///
+    /// *dst* = *a* - *b*
     Sub {
         dst: Reg,
         a: Reg,
         b: Reg,
     },
+    /// Multiply two numbers
+    ///
+    /// *dst* = *a* * *b*
     Mul {
         dst: Reg,
         a: Reg,
@@ -117,35 +127,59 @@ pub enum Opcode {
         a: Reg,
         b: Reg,
     },
+    /// Negate a number
+    ///
+    /// *dst* = -*src*
     Neg {
         dst: Reg,
         src: Reg,
     },
+    /// Invert a boolean value
+    ///
+    /// *dst* = !*src*
     Not {
         dst: Reg,
         src: Reg,
     },
+    /// Increment a number
+    ///
+    /// *dst*++
     Incr {
         dst: Reg,
     },
+    /// Decrement a number
+    ///
+    /// *dst*--
     Decr {
         dst: Reg,
     },
+    /// Call a function with no argument
+    ///
+    /// *dst* = *fun*()
     Call0 {
         dst: Reg,
         fun: RefFun,
     },
+    /// Call a function with one argument
+    ///
+    /// *dst* = *fun*(*arg0*)
     Call1 {
         dst: Reg,
         fun: RefFun,
         arg0: Reg,
     },
+    /// Call a function with two arguments
+    ///
+    /// *dst* = *fun*(*arg0*, *arg1*)
     Call2 {
         dst: Reg,
         fun: RefFun,
         arg0: Reg,
         arg1: Reg,
     },
+    /// Call a function with three arguments
+    ///
+    /// *dst* = *fun*(*arg0*, *arg1*, *arg2*)
     Call3 {
         dst: Reg,
         fun: RefFun,
@@ -153,6 +187,9 @@ pub enum Opcode {
         arg1: Reg,
         arg2: Reg,
     },
+    /// Call a function with four arguments
+    ///
+    /// *dst* = *fun*(*arg0*, *arg1*, *arg2*, *arg3*)
     Call4 {
         dst: Reg,
         fun: RefFun,
@@ -161,46 +198,72 @@ pub enum Opcode {
         arg2: Reg,
         arg3: Reg,
     },
+    /// Call a function with N arguments
+    ///
+    /// *dst* = *fun*(*arg0*, *arg1*, ...)
     CallN {
         dst: Reg,
         fun: RefFun,
         args: Vec<Reg>,
     },
+    /// Call a function with N arguments, using the first argument as the receiver
+    ///
+    /// *dst* = *arg0*.*field*(*arg1*, *arg2*, ...)
     CallMethod {
         dst: Reg,
         field: RefField,
         // obj is the first arg
         args: Vec<Reg>,
     },
-    // Equivalent to CallMethod with obj = reg0
+    /// Call a function with N arguments, the receiver is the first register of the parent function
+    ///
+    /// *dst* = *reg0*.*field*(*arg0*, *arg1*, ...)
     CallThis {
         dst: Reg,
         field: RefField,
         args: Vec<Reg>,
     },
+    /// Call a closure with N arguments. Here *fun* is a register.
+    ///
+    /// *dst* = *fun*(*arg0*, *arg1*, ...)
     CallClosure {
         dst: Reg,
         fun: Reg,
         args: Vec<Reg>,
     },
+    /// Create a closure from a function reference.
+    ///
+    /// *dst* = *fun*
     StaticClosure {
         dst: Reg,
         fun: RefFun,
     },
+    /// Create a closure from an object method.
+    ///
+    /// *dst* = *obj*.*fun*
     InstanceClosure {
         dst: Reg,
         fun: RefFun,
         obj: Reg,
     },
+    /// Create a closure from an object field.
+    ///
+    /// *dst* = *obj*.*field*
     VirtualClosure {
         dst: Reg,
         obj: Reg,
         field: Reg,
     },
+    /// Get a global value.
+    ///
+    /// *dst* = *global*
     GetGlobal {
         dst: Reg,
         global: RefGlobal,
     },
+    /// Set a global value.
+    ///
+    /// `global = src`
     SetGlobal {
         global: RefGlobal,
         src: Reg,

@@ -28,13 +28,17 @@ pub fn derive_opcode_helper(input: TokenStream) -> TokenStream {
         .map(|v| LitStr::new(&v.ident.to_string(), v.ident.span()));
     let vname_str2 = vname_str.clone();
     let vdesc = variants.iter().map(|v| {
-        if !v.attrs.is_empty() {
-            if let Some(x) = v.attrs[0].tokens.clone().into_iter().nth(2) {
+        let mut acc = String::new();
+        for attr in &v.attrs {
+            if let Some(x) = attr.tokens.clone().into_iter().nth(1) {
                 let s = x.to_string();
-                return s[2..s.len() - 1].to_string();
+                if s != "\"\"" {
+                    acc.push_str(&s[2..s.len() - 1]);
+                    acc.push('\n');
+                }
             }
         }
-        "".to_string()
+        acc
     });
     let vdefault_init = variants.iter().map(|v| {
         let vname = &v.ident;

@@ -163,7 +163,7 @@ fn main() -> anyhow::Result<()> {
         stdout.reset()?;
 
         let commands = parser
-            .parse(line.as_str())
+            .parse(line.trim())
             .expect("Error while parsing command.");
         execute_commands!(&code, commands; break 'main);
     }
@@ -246,7 +246,7 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
         }
         Command::Explain(s) => {
             if let Some(o) = Opcode::from_name(&s) {
-                println!("{} : {}", o.name(), o.description());
+                print!("{} :\n{}", o.name(), o.description());
                 println!("Example : {}", o.display(code, &code.functions[0], 0, 0));
             } else {
                 println!("No opcode named '{s}' exists.");
