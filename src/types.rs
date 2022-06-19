@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{Bytecode, Opcode};
 
 /// A register argument
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Hash)]
 pub struct Reg(pub u32);
 
 /// A reference to the i32 constant pool
@@ -216,37 +216,49 @@ impl Function {
     }
 }
 
-/// Reference to a function or a native in the constant pool (findex)
+/// Reference to a function or a native in the pool (findex)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Default)]
 pub struct RefFun(pub usize);
 
-/// The possible values behind a function reference
-#[derive(Debug, Copy, Clone)]
-pub enum RefFunPointee<'a> {
-    Fun(&'a Function),
-    Native(&'a Native),
-}
-
 impl RefFun {
-    pub fn resolve<'a>(&self, bc: &'a Bytecode) -> Option<RefFunPointee<'a>> {
-        if let Some(&(i, f)) = bc.findexes.get(self) {
-            Some(if f {
-                RefFunPointee::Fun(&bc.functions[i])
-            } else {
-                RefFunPointee::Native(&bc.natives[i])
-            })
-        } else {
-            None
-        }
+    pub fn resolve<'a>(&self, code: &'a Bytecode) -> FunPtr<'a> {
+        code.findexes[self.0].resolve(code)
     }
 
     /// Useful when you already know you should be getting a Function
-    pub fn resolve_as_fn<'a>(&self, bc: &'a Bytecode) -> Option<&'a Function> {
-        self.resolve(bc).and_then(|f| match f {
-            RefFunPointee::Fun(f) => Some(f),
-            RefFunPointee::Native(_) => None,
-        })
+    pub fn resolve_as_fn<'a>(&self, code: &'a Bytecode) -> Option<&'a Function> {
+        code.findexes[self.0].resolve_as_fn(code)
     }
+}
+
+// Reference to a function or a native in the pool, but we know what is is.
+#[derive(Debug, Copy, Clone)]
+pub enum RefFunKnown {
+    Fun(usize),
+    Native(usize),
+}
+
+impl RefFunKnown {
+    pub fn resolve<'a>(&self, code: &'a Bytecode) -> FunPtr<'a> {
+        match self {
+            &RefFunKnown::Fun(x) => FunPtr::Fun(&code.functions[x]),
+            &RefFunKnown::Native(x) => FunPtr::Native(&code.natives[x]),
+        }
+    }
+
+    pub fn resolve_as_fn<'a>(&self, code: &'a Bytecode) -> Option<&'a Function> {
+        match self {
+            &RefFunKnown::Fun(x) => Some(&code.functions[x]),
+            _ => None,
+        }
+    }
+}
+
+/// The possible values behind a function reference
+#[derive(Debug, Copy, Clone)]
+pub enum FunPtr<'a> {
+    Fun(&'a Function),
+    Native(&'a Native),
 }
 
 /// A constant definition

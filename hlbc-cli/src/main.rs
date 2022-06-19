@@ -10,7 +10,7 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use hlbc::analysis::{find_fun_refs, iter_ops};
 use hlbc::opcodes::Opcode;
-use hlbc::types::{RefFun, RefFunPointee, Type};
+use hlbc::types::{FunPtr, RefFun, Type};
 use hlbc::*;
 
 use crate::command::{commands_parser, Command, ElementRef, FileOrIndex, ParseContext, Parser};
@@ -239,10 +239,7 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
             );
         }
         Command::Entrypoint => {
-            println!(
-                "{}",
-                code.functions[code.findexes.get(&code.entrypoint).unwrap().0].display_header(code)
-            );
+            println!("{}", code.entrypoint.display_header(code));
         }
         Command::Explain(s) => {
             if let Some(o) = Opcode::from_name(&s) {
@@ -295,57 +292,61 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
             }
         }
         Command::Type(range) => {
+            let range_len = range.len();
             for i in range {
                 print_i!(i);
                 let t = &code.types[i];
                 println!("{}", t.display(code));
-                match t {
-                    Type::Obj(obj) => {
-                        if let Some(sup) = obj.super_ {
-                            println!("extends {}", sup.display(code));
-                        }
-                        println!("global: {}", obj.global.0);
-                        println!("fields:");
-                        for f in &obj.own_fields {
-                            println!("  {}: {}", f.name.display(code), f.t.display(code));
-                        }
-                        println!("protos:");
-                        for p in &obj.protos {
-                            println!(
-                                "  {}: {}",
-                                p.name.display(code),
-                                p.findex.display_header(code)
-                            );
-                        }
-                        println!("bindings:");
-                        for (fi, fun) in &obj.bindings {
-                            println!(
-                                "  {}: {}",
-                                fi.display_obj(t, code),
-                                fun.display_header(code)
-                            );
-                        }
-                    }
-                    Type::Enum {
-                        global, constructs, ..
-                    } => {
-                        println!("global: {}", global.0);
-                        println!("constructs:");
-                        for c in constructs {
-                            println!(
-                                "  {}:",
-                                if c.name.0 == 0 {
-                                    "_".to_string()
-                                } else {
-                                    c.name.display(code)
-                                }
-                            );
-                            for (i, p) in c.params.iter().enumerate() {
-                                println!("    {i}: {}", p.display(code));
+                // Only display full info if selecting a single item
+                if range_len == 1 {
+                    match t {
+                        Type::Obj(obj) => {
+                            if let Some(sup) = obj.super_ {
+                                println!("extends {}", sup.display(code));
+                            }
+                            println!("global: {}", obj.global.0);
+                            println!("fields:");
+                            for f in &obj.own_fields {
+                                println!("  {}: {}", f.name.display(code), f.t.display(code));
+                            }
+                            println!("protos:");
+                            for p in &obj.protos {
+                                println!(
+                                    "  {}: {}",
+                                    p.name.display(code),
+                                    p.findex.display_header(code)
+                                );
+                            }
+                            println!("bindings:");
+                            for (fi, fun) in &obj.bindings {
+                                println!(
+                                    "  {}: {}",
+                                    fi.display_obj(t, code),
+                                    fun.display_header(code)
+                                );
                             }
                         }
+                        Type::Enum {
+                            global, constructs, ..
+                        } => {
+                            println!("global: {}", global.0);
+                            println!("constructs:");
+                            for c in constructs {
+                                println!(
+                                    "  {}:",
+                                    if c.name.0 == 0 {
+                                        "_".to_string()
+                                    } else {
+                                        c.name.display(code)
+                                    }
+                                );
+                                for (i, p) in c.params.iter().enumerate() {
+                                    println!("    {i}: {}", p.display(code));
+                                }
+                            }
+                        }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
         }
@@ -370,28 +371,18 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
         Command::FunctionHeader(range) => {
             for findex in range {
                 print_i!(findex);
-                if let Some(&(i, fun)) = code.findexes.get(&RefFun(findex)) {
-                    if fun {
-                        println!("{}", code.functions[i].display_header(code));
-                    } else {
-                        println!("{}", code.natives[i].display_header(code));
-                    }
-                } else {
-                    println!("unknown");
+                match RefFun(findex).resolve(code) {
+                    FunPtr::Fun(f) => println!("{}", f.display_header(code)),
+                    FunPtr::Native(n) => println!("{}", n.display_header(code)),
                 }
             }
         }
         Command::Function(range) => {
             for findex in range {
                 print_i!(findex);
-                if let Some(&(i, fun)) = code.findexes.get(&RefFun(findex)) {
-                    if fun {
-                        println!("{}", code.functions[i].display(code));
-                    } else {
-                        println!("{}", code.natives[i].display_header(code));
-                    }
-                } else {
-                    println!("unknown");
+                match RefFun(findex).resolve(code) {
+                    FunPtr::Fun(f) => println!("{}", f.display(code)),
+                    FunPtr::Native(n) => println!("{}", n.display_header(code)),
                 }
             }
         }
@@ -452,19 +443,21 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
         }
         Command::FileOf(idx) => {
             let debug_files = require_debug_info!();
-            if let Some(p) = RefFun(idx).resolve(code) {
-                match p {
-                    RefFunPointee::Fun(f) => {
-                        let idx = f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0;
-                        println!(
-                            "{} is in file@{idx} : {}",
-                            f.display_header(code),
-                            &debug_files[idx]
-                        );
-                    }
-                    RefFunPointee::Native(n) => {
-                        println!("{} can't be in any file", n.display_header(code))
-                    }
+            match RefFun(idx).resolve(code) {
+                FunPtr::Fun(f) => {
+                    let idx = f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0;
+                    println!(
+                        "{} is in file@{idx} : {}",
+                        f.display_header(code),
+                        &debug_files[idx]
+                    );
+                }
+                FunPtr::Native(n) => {
+                    println!(
+                        "native {} is in the module {}",
+                        n.display_header(code),
+                        n.lib.resolve(&code.strings)
+                    )
                 }
             }
         }

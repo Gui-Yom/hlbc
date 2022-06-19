@@ -2,8 +2,8 @@ use std::fmt::{Display, Formatter, Result};
 
 use crate::opcodes::Opcode;
 use crate::types::{
-    Function, Native, RefEnumConstruct, RefField, RefFloat, RefFunPointee, RefInt, RefString,
-    RefType, Reg, Type, TypeFun, TypeObj,
+    FunPtr, Function, Native, RefEnumConstruct, RefField, RefFloat, RefInt, RefString, RefType,
+    Reg, Type, TypeFun, TypeObj,
 };
 use crate::{Bytecode, RefFun};
 
@@ -167,26 +167,26 @@ impl Type {
 
 impl RefFun {
     pub fn display_header(&self, ctx: &Bytecode) -> String {
-        self.resolve(ctx).unwrap().display_header(ctx)
+        self.resolve(ctx).display_header(ctx)
     }
 
     pub fn display_call(&self, ctx: &Bytecode) -> impl Display {
-        self.resolve(ctx).unwrap().display_call(ctx)
+        self.resolve(ctx).display_call(ctx)
     }
 }
 
-impl<'a> RefFunPointee<'a> {
+impl<'a> FunPtr<'a> {
     pub fn display_header(&'a self, ctx: &Bytecode) -> String {
         match self {
-            RefFunPointee::Fun(fun) => fun.display_header(ctx),
-            RefFunPointee::Native(n) => n.display_header(ctx),
+            FunPtr::Fun(fun) => fun.display_header(ctx),
+            FunPtr::Native(n) => n.display_header(ctx),
         }
     }
 
     pub fn display_call(&'a self, ctx: &Bytecode) -> impl Display {
         match self {
-            RefFunPointee::Fun(fun) => fun.display_call(ctx),
-            RefFunPointee::Native(n) => n.display_call(ctx),
+            FunPtr::Fun(fun) => fun.display_call(ctx),
+            FunPtr::Native(n) => n.display_call(ctx),
         }
     }
 }
@@ -211,6 +211,7 @@ impl Native {
 }
 
 impl Opcode {
+    /// This display is an enhanced assembly view, with nice printing and added information from the context
     pub fn display(
         &self,
         ctx: &Bytecode,
@@ -220,7 +221,7 @@ impl Opcode {
     ) -> impl Display {
         macro_rules! op {
             ($($arg:tt)*) => {
-                format!("{:<align$} {}", self.name(), format_args!($($arg)*))
+                format!("{:<align$}{}", self.name(), format_args!($($arg)*))
             };
         }
 

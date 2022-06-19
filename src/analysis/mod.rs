@@ -1,6 +1,6 @@
 use std::iter::repeat;
 
-use crate::types::{RefFunPointee, Reg};
+use crate::types::{FunPtr, Reg};
 use crate::{Bytecode, Function, Opcode, RefFun};
 
 #[cfg(feature = "graph")]
@@ -53,8 +53,8 @@ pub fn find_last_closure_assign(
 /// Returns true if a functions comes from the standard library.
 /// Requires debug info to be present as it's looking at file names.
 pub fn is_std_fn(code: &Bytecode, f: RefFun) -> bool {
-    match f.resolve(code).unwrap() {
-        RefFunPointee::Fun(fun) => {
+    match f.resolve(code) {
+        FunPtr::Fun(fun) => {
             if let Some(debug_info) = &fun.debug_info {
                 // We look at the Ret opcode which is probably not from inlined code.
                 let (file, _) = debug_info[fun.ops.len() - 1];
@@ -64,6 +64,6 @@ pub fn is_std_fn(code: &Bytecode, f: RefFun) -> bool {
                 false
             }
         }
-        RefFunPointee::Native(n) => n.lib.resolve(&code.strings) == "std",
+        FunPtr::Native(n) => n.lib.resolve(&code.strings) == "std",
     }
 }

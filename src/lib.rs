@@ -1,5 +1,9 @@
 //! [Hashlink](https://hashlink.haxe.org/) bytecode disassembler and analyzer.
 //! See [Bytecode] for an entrypoint to the library.
+//!
+//! #### Note about safety
+//! We don't deal with self-references, hence we deal with indexes into structures.
+//! Be careful when calling functions on Ref* objects, as no bound checking is done and every index is assumed to be valid.
 
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
@@ -12,7 +16,7 @@ use crate::deser::ReadHlExt;
 use crate::opcodes::Opcode;
 use crate::ser::WriteHlExt;
 use crate::types::{
-    ConstantDef, Function, Native, ObjField, RefFun, RefGlobal, RefType, Type, TypeObj,
+    ConstantDef, Function, Native, ObjField, RefFun, RefFunKnown, RefGlobal, RefType, Type, TypeObj,
 };
 
 /// Analysis functions and callgraph generation
@@ -57,8 +61,11 @@ pub struct Bytecode {
     pub functions: Vec<Function>,
     /// Constants, initializers for globals
     pub constants: Option<Vec<ConstantDef>>,
+
+    // Fields below are not part of the data.
+    // Those are acceleration structures used to speed up lookup.
     /// Acceleration structure mapping function references (findex) to functions indexes in the native or function pool.
-    pub findexes: HashMap<RefFun, (usize, bool)>,
+    pub findexes: Vec<RefFunKnown>,
     /// Acceleration structure mapping function names to function indexes in the function pool
     pub fnames: HashMap<String, usize>,
     /// Greatest function reference stored, basically the number of natives + the number of functions.
@@ -165,20 +172,20 @@ impl Bytecode {
 
         // Function indexes
         let mut max_findex = 0;
-        let mut findexes = HashMap::with_capacity(functions.len() + natives.len());
+        let mut findexes = vec![RefFunKnown::Fun(0); nfunctions + nnatives];
         for (i, f) in functions.iter().enumerate() {
-            findexes.insert(f.findex, (i, true));
+            findexes[f.findex.0] = RefFunKnown::Fun(i);
             max_findex = max_findex.max(f.findex.0);
         }
         for (i, n) in natives.iter().enumerate() {
-            findexes.insert(n.findex, (i, false));
+            findexes[n.findex.0] = RefFunKnown::Native(i);
             max_findex = max_findex.max(n.findex.0);
         }
 
-        let mut new_fields: Vec<Option<Vec<ObjField>>> = Vec::with_capacity(types.len());
         // Flatten types fields
         // Start by collecting every fields in the hierarchy
         // The order is important because we refer to fields by index
+        let mut new_fields: Vec<Option<Vec<ObjField>>> = Vec::with_capacity(types.len());
         for t in &types {
             if let Some(obj) = t.get_type_obj() {
                 let mut parent = obj.super_.as_ref().map(|s| s.resolve(&types));
@@ -209,14 +216,20 @@ impl Bytecode {
             }) = t.get_type_obj()
             {
                 for p in protos {
-                    if let Some(f) = findexes.get(&p.findex).map(|(i, _)| &mut functions[*i]) {
-                        f.name = Some(p.name);
+                    match findexes[p.findex.0] {
+                        RefFunKnown::Fun(x) => {
+                            functions[x].name = Some(p.name);
+                        }
+                        _ => {}
                     }
                 }
                 for (fid, findex) in bindings {
                     if let Some(field) = t.get_type_obj().map(|o| &o.fields[fid.0]) {
-                        if let Some(f) = findexes.get(findex).map(|(i, _)| &mut functions[*i]) {
-                            f.name = Some(field.name);
+                        match findexes[findex.0] {
+                            RefFunKnown::Fun(x) => {
+                                functions[x].name = Some(field.name);
+                            }
+                            _ => {}
                         }
                     }
                 }
@@ -231,7 +244,13 @@ impl Bytecode {
                 fnames.insert(s.resolve(&strings).to_string(), i);
             }
         }
-        fnames.insert("init".to_string(), findexes.get(&entrypoint).unwrap().0);
+        fnames.insert(
+            "init".to_string(),
+            match findexes[entrypoint.0] {
+                RefFunKnown::Fun(x) => x,
+                _ => 0,
+            },
+        );
 
         Ok(Bytecode {
             version,

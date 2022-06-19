@@ -8,7 +8,7 @@ use petgraph::graphmap::DiGraphMap;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences, IntoNodeReferences, NodeIndexable, NodeRef};
 
 use crate::analysis::{find_last_closure_assign, is_std_fn};
-use crate::types::{Function, RefFun, RefFunPointee};
+use crate::types::{FunPtr, Function, RefFun};
 use crate::{Bytecode, Opcode, Type};
 
 pub enum Call {
@@ -86,12 +86,12 @@ pub fn find_calls<'a>(
 
 pub fn call_graph(code: &Bytecode, f: RefFun, max_depth: usize) -> Callgraph {
     let mut g = Callgraph::new();
-    match f.resolve(code).unwrap() {
-        RefFunPointee::Fun(f) => {
+    match f.resolve(code) {
+        FunPtr::Fun(f) => {
             g.add_node(f.findex);
             build_graph_rec(code, &mut g, f, &RegCtx::new(), max_depth);
         }
-        RefFunPointee::Native(n) => {
+        FunPtr::Native(n) => {
             g.add_node(n.findex);
         }
     }
@@ -104,8 +104,8 @@ fn build_graph_rec(code: &Bytecode, g: &mut Callgraph, f: &Function, ctx: &RegCt
     }
     for (call, fun, ctx) in find_calls(code, f, ctx) {
         if !is_std_fn(code, fun) {
-            match fun.resolve(code).unwrap() {
-                RefFunPointee::Fun(fun) => {
+            match fun.resolve(code) {
+                FunPtr::Fun(fun) => {
                     if !g.contains_node(fun.findex) {
                         g.add_node(fun.findex);
                         //println!("call to {} with args: {:?}", fun.display_header(code), ctx);
@@ -113,7 +113,7 @@ fn build_graph_rec(code: &Bytecode, g: &mut Callgraph, f: &Function, ctx: &RegCt
                     }
                     g.add_edge(f.findex, fun.findex, call);
                 }
-                RefFunPointee::Native(n) => {
+                FunPtr::Native(n) => {
                     if !g.contains_node(n.findex) {
                         g.add_node(n.findex);
                     }
