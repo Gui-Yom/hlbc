@@ -1,7 +1,8 @@
 use std::collections::HashMap;
-use std::fmt::Write;
+use std::fmt;
+use std::fmt::{format, Display, Formatter, Write};
 
-use hlbc::opcodes::Opcode;
+use hlbc::opcodes::{JumpOffset, Opcode};
 use hlbc::types::{Function, RefField, RefFun, RefGlobal, RefType, Reg, Type, TypeObj};
 use hlbc::Bytecode;
 
@@ -144,7 +145,12 @@ pub fn decompile_function_body(code: &Bytecode, indent: &str, f: &Function) -> S
 }
 
 fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
+    // Finished statements
     let mut statements = Vec::with_capacity(f.ops.len());
+    // Current iteration statement, to be pushed onto the finished statements or the nesting
+    let mut statement = None;
+    // Nesting handling
+    let mut nesting = Vec::new();
     let mut reg_state = HashMap::new();
     let mut constructor_ctx = None;
 
@@ -156,6 +162,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
         );
     }
 
+    // Create a statement and update the register state (depending on inline rules)
     macro_rules! process_simple_expr {
         ($i:expr, $dst:expr, $e:expr) => {
             let name = f.var_name(code, $i);
@@ -165,7 +172,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 reg_state.insert($dst, expr);
             } else {
                 reg_state.insert($dst, Expression::Variable($dst, name.clone()));
-                statements.push(Statement::NewVariable {
+                statement = Some(Statement::NewVariable {
                     reg: $dst,
                     name,
                     assign: expr,
@@ -182,6 +189,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
     let mut iter = f.ops.iter().enumerate();
     while let Some((i, o)) = iter.next() {
+        //println!("ITER");
         match o {
             &Opcode::Int { dst, ptr } => {
                 process_simple_expr!(
@@ -196,6 +204,9 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     dst,
                     Expression::Constant(Constant::Float(ptr.resolve(&code.floats)))
                 );
+            }
+            &Opcode::Bool { dst, value } => {
+                process_simple_expr!(i, dst, Expression::Constant(Constant::Bool(value.0)));
             }
             &Opcode::String { dst, ptr } => {
                 process_simple_expr!(
@@ -283,18 +294,99 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     );
                 }
             }
-            Opcode::Ret { ret } => {
+            &Opcode::Ret { ret } => {
                 // Do not display return void;
-                if !f.regtype(*ret).is_void() {
-                    statements.push(Statement::Return {
+                if nesting.len() > 0 {
+                    statement = Some(if f.regtype(ret).is_void() {
+                        Statement::ReturnVoid
+                    } else {
+                        Statement::Return {
+                            expr: reg_state
+                                .get(&ret)
+                                .expect("Returning an unused register ?")
+                                .clone(),
+                        }
+                    });
+                } else if !f.regtype(ret).is_void() {
+                    statement = Some(Statement::Return {
                         expr: reg_state
-                            .get(ret)
+                            .get(&ret)
                             .expect("Returning an unused register ?")
                             .clone(),
-                    })
+                    });
                 }
             }
+            &Opcode::JFalse { cond, offset } => {
+                nesting.push((
+                    offset + 1,
+                    Statement::If {
+                        cond: reg_state.get(&cond).expect("No cond ?").clone(),
+                        stmts: Vec::new(),
+                    },
+                    Vec::new(),
+                ));
+                //println!("Increase nesting !");
+            }
+            &Opcode::JTrue { cond, offset } => {
+                nesting.push((
+                    offset + 1,
+                    Statement::If {
+                        cond: Expression::UnaryOp(UnaryOp::Not(Box::new(
+                            reg_state.get(&cond).expect("No cond ?").clone(),
+                        ))),
+                        stmts: Vec::new(),
+                    },
+                    Vec::new(),
+                ));
+                //println!("Increase nesting !");
+            }
             _ => {}
+        }
+
+        // Push in the scope if there's one
+        if let Some(stmt) = statement.take() {
+            if let Some((offset, parent, scope)) = nesting.last_mut() {
+                //println!("Push in scope {stmt:?}");
+                scope.push(stmt);
+            } else {
+                //println!("Push in global {stmt:?}");
+                statements.push(stmt);
+            }
+        }
+        for idx in (0..nesting.len()).rev() {
+            //println!("Update nesting {idx}");
+            let (mut len, mut parent, mut scope) = nesting.remove(idx);
+
+            if let Some(stmt) = statement.take() {
+                //println!("Push in scope {stmt:?}");
+                scope.push(stmt);
+            }
+
+            // Decrease scope len
+            len -= 1;
+            if len <= 0 {
+                // End of scope, create a statement
+                match &mut parent {
+                    Statement::If { stmts, .. } => {
+                        *stmts = scope;
+                    }
+                    _ => {}
+                }
+                //println!("Decrease nesting {parent:?}");
+                statement = Some(parent);
+            } else {
+                // Scope continues
+                nesting.insert(idx, (len, parent, scope));
+            }
+        }
+        if let Some(stmt) = statement.take() {
+            if let Some((offset, parent, scope)) = nesting.last_mut() {
+                //println!("Push in scope {stmt:?}");
+                scope.push(stmt);
+            } else {
+                //println!("Push in global {stmt:?}");
+                statements.push(stmt);
+            }
         }
     }
 
@@ -312,6 +404,22 @@ enum Constant {
     Int(i32),
     Float(f64),
     String(String),
+    Bool(bool),
+}
+
+#[derive(Debug, Clone)]
+enum UnaryOp {
+    Not(Box<Expression>),
+}
+
+impl UnaryOp {
+    fn display(&self, code: &Bytecode) -> String {
+        match self {
+            UnaryOp::Not(expr) => {
+                format!("!{}", expr.display(code))
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -320,6 +428,7 @@ enum Expression {
     Constant(Constant),
     Constructor(ConstructorCall),
     Call(RefFun, Vec<Expression>),
+    UnaryOp(UnaryOp),
 }
 
 impl Expression {
@@ -337,10 +446,12 @@ impl Expression {
                 }
             }
             Expression::Constant(x) => match x {
-                Constant::Int(c) => format!("{c}"),
-                Constant::Float(c) => format!("{c}"),
+                Constant::Int(c) => c.to_string(),
+                Constant::Float(c) => c.to_string(),
                 Constant::String(c) => format!("\"{c}\""),
+                Constant::Bool(c) => c.to_string(),
             },
+            Expression::UnaryOp(op) => op.display(code),
             Expression::Constructor(ConstructorCall { ty, args }) => {
                 format!(
                     "new {}({})",
@@ -379,10 +490,15 @@ enum Statement {
     Return {
         expr: Expression,
     },
+    ReturnVoid,
+    If {
+        cond: Expression,
+        stmts: Vec<Statement>,
+    },
 }
 
 impl Statement {
-    fn display(&self, w: &mut impl Write, code: &Bytecode, f: &Function) {
+    fn display(&self, w: &mut impl Write, code: &Bytecode, f: &Function) -> fmt::Result {
         match self {
             Statement::NewVariable { reg, name, assign } => {
                 writeln!(
@@ -391,14 +507,24 @@ impl Statement {
                     name.as_ref().unwrap_or(&reg.to_string()),
                     f.regtype(*reg).display(code),
                     assign.display(code)
-                )
-                .unwrap();
+                )?;
             }
             Statement::Return { expr } => {
-                writeln!(w, "return {};", expr.display(code)).unwrap();
+                writeln!(w, "return {};", expr.display(code))?;
+            }
+            Statement::ReturnVoid => {
+                writeln!(w, "return;")?;
+            }
+            Statement::If { cond, stmts } => {
+                writeln!(w, "if ({}) {{", cond.display(code))?;
+                for stmt in stmts {
+                    stmt.display(w, code, f)?;
+                }
+                writeln!(w, "}}")?;
             }
             _ => {}
         }
+        Ok(())
     }
 }
 
