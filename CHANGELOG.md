@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Get an Opcode description (generated from its doc comment) and create an Opcode from its name.
 - Derive Default on a lot of types
 - Global initializer map (global -> constant)
+- Correctly handle bytes pool
 
 ### Changed
 

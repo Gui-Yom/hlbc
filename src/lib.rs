@@ -50,7 +50,7 @@ pub struct Bytecode {
     /// String constant pool
     pub strings: Vec<String>,
     /// Bytes constant pool
-    pub bytes: Option<Vec<u8>>,
+    pub bytes: Option<(Vec<u8>, Vec<usize>)>,
     /// *Debug* file names constant pool
     pub debug_files: Option<Vec<String>>,
     /// Types, contains every possible types expressed in the program
@@ -119,15 +119,15 @@ impl Bytecode {
 
         let strings = r.read_strings(nstrings)?;
 
-        let bytes = if version >= 5 {
+        let bytes = if let Some(nbytes) = nbytes {
             let size = r.read_i32::<LittleEndian>()? as usize;
             let mut bytes = vec![0; size];
             r.read_exact(&mut bytes)?;
-            for _ in 0..nbytes.unwrap() {
-                // TODO bytes pos
-                r.read_varu()?;
+            let mut pos = Vec::with_capacity(nbytes);
+            for _ in 0..nbytes {
+                pos.push(r.read_varu()? as usize);
             }
-            Some(bytes)
+            Some((bytes, pos))
         } else {
             None
         };
@@ -288,8 +288,8 @@ impl Bytecode {
         w.write_vi32(self.ints.len() as i32)?;
         w.write_vi32(self.floats.len() as i32)?;
         w.write_vi32(self.strings.len() as i32)?;
-        if let Some(bytes) = &self.bytes {
-            w.write_vi32(bytes.len() as i32)?;
+        if let Some((bytes, pos)) = &self.bytes {
+            w.write_vi32(pos.len() as i32)?;
         }
         w.write_vi32(self.types.len() as i32)?;
         w.write_vi32(self.globals.len() as i32)?;
@@ -306,10 +306,12 @@ impl Bytecode {
             w.write_f64::<LittleEndian>(f)?;
         }
         w.write_strings(&self.strings)?;
-        if let Some(bytes) = &self.bytes {
+        if let Some((bytes, pos)) = &self.bytes {
             w.write_i32::<LittleEndian>(bytes.len() as i32)?;
             w.write_all(bytes)?;
-            // TODO write bytes pos
+            for &p in pos {
+                w.write_vi32(p as i32)?;
+            }
         }
         if let Some(debug_files) = &self.debug_files {
             w.write_vi32(debug_files.len() as i32)?;
