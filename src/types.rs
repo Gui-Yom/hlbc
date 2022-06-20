@@ -45,7 +45,7 @@ impl RefString {
 pub struct ValBool(pub bool);
 
 /// A reference to a global
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Hash)]
 pub struct RefGlobal(pub usize);
 
 /// An object field definition
@@ -180,6 +180,14 @@ impl RefType {
     pub fn is_void(&self) -> bool {
         self.0 == 0
     }
+
+    pub fn resolve_as_fun<'a>(&self, types: &'a [Type]) -> Option<&'a TypeFun> {
+        match self.resolve(types) {
+            Type::Fun(fun) => Some(fun),
+            Type::Method(fun) => Some(fun),
+            _ => None,
+        }
+    }
 }
 
 /// A native function reference. Contains no code but indicates the library from where to load it.
@@ -213,6 +221,35 @@ impl Function {
     /// Get the type of a register
     pub fn regtype(&self, reg: Reg) -> RefType {
         self.regs[reg.0 as usize]
+    }
+
+    /// Skip a lot of the pain
+    pub fn ty<'a>(&self, code: &'a Bytecode) -> &'a TypeFun {
+        self.t.resolve_as_fun(&code.types).expect("Unknown type ?")
+    }
+
+    /// Uses the assigns
+    pub fn arg_name(&self, code: &Bytecode, pos: usize) -> Option<String> {
+        if let Some(assigns) = &self.assigns {
+            for (j, &(s, i)) in assigns.iter().enumerate() {
+                if i == 0 && j == pos {
+                    return Some(s.resolve(&code.strings).to_string());
+                }
+            }
+        }
+        None
+    }
+
+    /// Uses the assigns
+    pub fn var_name(&self, code: &Bytecode, pos: usize) -> Option<String> {
+        if let Some(assigns) = &self.assigns {
+            for &(s, i) in assigns {
+                if pos == i - 1 {
+                    return Some(s.resolve(&code.strings).to_string());
+                }
+            }
+        }
+        None
     }
 }
 

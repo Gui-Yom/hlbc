@@ -522,21 +522,22 @@ impl Function {
                 .map(|(i, o)| format!("{i:>3}: {}", o.display(ctx, self, i as i32, 16)))
                 .collect()
         };
+        /*
         let assigns: Vec<String> = self
             .assigns
             .as_ref()
             .unwrap()
             .iter()
-            .map(|(s, i)| format!("{} at opcode {}", s.resolve(&ctx.strings), i - 1))
-            .collect();
+            .map(|(s, i)| format!("{} at opcode {}", s.resolve(&ctx.strings), i))
+            .collect();*/
         format!(
-            "{} ({} regs, {} ops)\n    {}\n\n{}\n{}",
+            "{} ({} regs, {} ops)\n    {}\n\n{}",
             self.display_header(ctx),
             self.regs.len(),
             self.ops.len(),
             regs.join("\n    "),
             ops.join("\n"),
-            assigns.join("\n")
+            //assigns.join("\n")
         )
     }
 }
