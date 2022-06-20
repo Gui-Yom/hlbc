@@ -1,8 +1,8 @@
 class Constructor {
 
-    function new() {}
+    function new(a: Int, b: String) {}
 
     static function main() {
-        var instance = new Constructor();
+        var a = new Constructor(3, "3.141592");
     }
 }
