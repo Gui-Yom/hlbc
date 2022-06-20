@@ -35,6 +35,8 @@ pub mod types;
 
 /// Bytecode structure containing all the information.
 /// Every field is public for flexibility, but you aren't encouraged to modify them.
+///
+/// We try to keep optimizations, and acceleration structures separated from the main data.
 #[derive(Debug)]
 pub struct Bytecode {
     /// Bytecode format version
@@ -68,8 +70,7 @@ pub struct Bytecode {
     pub findexes: Vec<RefFunKnown>,
     /// Acceleration structure mapping function names to function indexes in the function pool
     pub fnames: HashMap<String, usize>,
-    /// Greatest function reference stored, basically the number of natives + the number of functions.
-    pub max_findex: usize,
+    pub globals_initializers: HashMap<RefGlobal, usize>,
 }
 
 impl Bytecode {
@@ -170,16 +171,13 @@ impl Bytecode {
 
         // Parsing is finished, we now build links between everything
 
-        // Function indexes
-        let mut max_findex = 0;
+        // Global function indexes
         let mut findexes = vec![RefFunKnown::Fun(0); nfunctions + nnatives];
         for (i, f) in functions.iter().enumerate() {
             findexes[f.findex.0] = RefFunKnown::Fun(i);
-            max_findex = max_findex.max(f.findex.0);
         }
         for (i, n) in natives.iter().enumerate() {
             findexes[n.findex.0] = RefFunKnown::Native(i);
-            max_findex = max_findex.max(n.findex.0);
         }
 
         // Flatten types fields
@@ -252,6 +250,16 @@ impl Bytecode {
             },
         );
 
+        let globals_initializers = if let Some(constants) = &constants {
+            let mut tmp = HashMap::with_capacity(constants.len());
+            for (i, c) in constants.iter().enumerate() {
+                tmp.insert(c.global, i);
+            }
+            tmp
+        } else {
+            HashMap::new()
+        };
+
         Ok(Bytecode {
             version,
             entrypoint,
@@ -267,7 +275,7 @@ impl Bytecode {
             constants,
             findexes,
             fnames,
-            max_findex,
+            globals_initializers,
         })
     }
 
