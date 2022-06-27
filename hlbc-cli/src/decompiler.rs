@@ -6,6 +6,26 @@ use hlbc::opcodes::{JumpOffset, Opcode};
 use hlbc::types::{Function, RefField, RefFun, RefGlobal, RefType, Reg, Type, TypeObj};
 use hlbc::Bytecode;
 
+struct FormatOptions {
+    indent: String,
+    inc_indent: String,
+}
+
+impl FormatOptions {
+    fn inc_nesting(&self) -> Self {
+        FormatOptions {
+            indent: format!("{}{}", self.indent, self.inc_indent),
+            inc_indent: self.inc_indent.clone(),
+        }
+    }
+}
+
+impl Display for FormatOptions {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.indent)
+    }
+}
+
 pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> String {
     let mut buf = String::with_capacity(1024);
 
@@ -135,7 +155,10 @@ pub fn decompile_closure(code: &Bytecode, indent: &str, f: &Function) -> String 
 pub fn decompile_function_body(code: &Bytecode, indent: &str, f: &Function) -> String {
     let mut buf = String::with_capacity(256);
 
-    writeln!(&mut buf).unwrap();
+    let indent = FormatOptions {
+        indent: String::new(),
+        inc_indent: "  ".to_string(),
+    };
 
     for a in f
         .assigns
@@ -144,11 +167,12 @@ pub fn decompile_function_body(code: &Bytecode, indent: &str, f: &Function) -> S
         .iter()
         .map(|(s, i)| format!("{} at opcode {}", s.resolve(&code.strings), i - 1))
     {
-        writeln!(&mut buf, "  {a}").unwrap();
+        writeln!(&mut buf, "{indent}{a}").unwrap();
     }
+    writeln!(&mut buf).unwrap();
 
     for stmt in make_statements(code, f) {
-        stmt.display(&mut buf, code, f).unwrap();
+        stmt.display(&mut buf, &indent, code, f).unwrap();
     }
 
     buf
@@ -241,13 +265,15 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 );
             }
             &Opcode::GetGlobal { dst, global } => {
-                process_simple_expr!(
-                    i,
-                    dst,
-                    Expression::Constant(Constant::String(
-                        global_value_from_constant(code, global).unwrap()
-                    ))
-                );
+                if f.regtype(dst).0 == 13 {
+                    process_simple_expr!(
+                        i,
+                        dst,
+                        Expression::Constant(Constant::String(
+                            global_value_from_constant(code, global).unwrap()
+                        ))
+                    );
+                }
             }
             &Opcode::Add { dst, a, b } => {
                 process_simple_expr!(i, dst, add(expr!(a), expr!(b)));
@@ -573,14 +599,21 @@ enum Statement {
         cond: Expression,
         stmts: Vec<Statement>,
     },
-    Loop {
+    While {
         cond: Expression,
         stmts: Vec<Statement>,
     },
 }
 
 impl Statement {
-    fn display(&self, w: &mut impl Write, code: &Bytecode, f: &Function) -> fmt::Result {
+    fn display(
+        &self,
+        w: &mut impl Write,
+        indent: &FormatOptions,
+        code: &Bytecode,
+        f: &Function,
+    ) -> fmt::Result {
+        write!(w, "{indent}")?;
         match self {
             Statement::NewVariable { reg, name, assign } => {
                 writeln!(
@@ -618,17 +651,19 @@ impl Statement {
             }
             Statement::If { cond, stmts } => {
                 writeln!(w, "if ({}) {{", cond.display(code))?;
+                let indent2 = indent.inc_nesting();
                 for stmt in stmts {
-                    stmt.display(w, code, f)?;
+                    stmt.display(w, &indent2, code, f)?;
                 }
-                writeln!(w, "}}")?;
+                writeln!(w, "{indent}}}")?;
             }
-            Statement::Loop { cond, stmts } => {
+            Statement::While { cond, stmts } => {
                 writeln!(w, "while ({}) {{", cond.display(code))?;
+                let indent2 = indent.inc_nesting();
                 for stmt in stmts {
-                    stmt.display(w, code, f)?;
+                    stmt.display(w, &indent2, code, f)?;
                 }
-                writeln!(w, "}}")?;
+                writeln!(w, "{indent}}}")?;
             }
         }
         Ok(())
