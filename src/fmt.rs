@@ -387,7 +387,7 @@ impl Opcode {
                 op!("if {a} != {b} jump to {}", pos + offset + 1)
             }
             Opcode::JAlways { offset } => {
-                op!("jump {}", pos + offset + 1)
+                op!("jump to {}", pos + offset + 1)
             }
             Opcode::ToDyn { dst, src } => {
                 op!("{dst} = cast {src}")

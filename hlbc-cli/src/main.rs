@@ -41,6 +41,12 @@ fn main() -> anyhow::Result<()> {
 
     let tty = atty::is(atty::Stream::Stdout);
 
+    let mut stdout = StandardStream::stdout(if tty {
+        ColorChoice::Auto
+    } else {
+        ColorChoice::Never
+    });
+
     let is_source = args
         .file
         .extension()
@@ -49,10 +55,15 @@ fn main() -> anyhow::Result<()> {
 
     let dir = TempDir::new()?;
     let file = if is_source {
-        print!("Compiling haxe source ...");
+        if tty {
+            print!("Compiling haxe source ... ");
+            stdout.flush()?;
+        }
         let path = dir.child("bytecode.hl");
         compile(&args.file, &path)?;
-        println!(" OK");
+        if tty {
+            println!(" OK");
+        }
         path
     } else {
         args.file.clone()
@@ -68,12 +79,6 @@ fn main() -> anyhow::Result<()> {
     if tty {
         println!("Loaded ! ({} ms)", start.elapsed().as_millis());
     }
-
-    let mut stdout = StandardStream::stdout(if tty {
-        ColorChoice::Auto
-    } else {
-        ColorChoice::Never
-    });
 
     let parse_ctx = ParseContext {
         int_max: code.ints.len(),

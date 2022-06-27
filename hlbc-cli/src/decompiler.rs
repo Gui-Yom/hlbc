@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fmt::{format, Display, Formatter, Write};
 
@@ -137,8 +137,18 @@ pub fn decompile_function_body(code: &Bytecode, indent: &str, f: &Function) -> S
 
     writeln!(&mut buf).unwrap();
 
+    for a in f
+        .assigns
+        .as_ref()
+        .unwrap()
+        .iter()
+        .map(|(s, i)| format!("{} at opcode {}", s.resolve(&code.strings), i - 1))
+    {
+        writeln!(&mut buf, "  {a}").unwrap();
+    }
+
     for stmt in make_statements(code, f) {
-        stmt.display(&mut buf, code, f);
+        stmt.display(&mut buf, code, f).unwrap();
     }
 
     buf
@@ -153,6 +163,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
     let mut nesting = Vec::new();
     let mut reg_state = HashMap::new();
     let mut constructor_ctx = None;
+    let mut seen = HashSet::new();
 
     // Initialize register state with the function arguments
     for i in 0..f.ty(code).args.len() {
@@ -172,18 +183,32 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 reg_state.insert($dst, expr);
             } else {
                 reg_state.insert($dst, Expression::Variable($dst, name.clone()));
-                statement = Some(Statement::NewVariable {
-                    reg: $dst,
-                    name,
-                    assign: expr,
-                });
+                if seen.insert(name.clone().unwrap()) {
+                    statement = Some(Statement::NewVariable {
+                        reg: $dst,
+                        name,
+                        assign: expr,
+                    });
+                } else {
+                    statement = Some(Statement::Assign {
+                        reg: $dst,
+                        name,
+                        assign: expr,
+                    });
+                }
             }
+        };
+    }
+
+    macro_rules! expr {
+        ($reg:expr) => {
+            reg_state.get(&$reg).expect("No expr for reg ?").clone()
         };
     }
 
     macro_rules! make_args {
         ($($arg:expr),*) => {
-            vec![$( reg_state.get($arg).expect("Not assigned ?").clone() ),*]
+            vec![$(expr!($arg)),*]
         }
     }
 
@@ -224,6 +249,21 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     ))
                 );
             }
+            &Opcode::Add { dst, a, b } => {
+                process_simple_expr!(i, dst, add(expr!(a), expr!(b)));
+            }
+            &Opcode::Sub { dst, a, b } => {
+                process_simple_expr!(i, dst, sub(expr!(a), expr!(b)));
+            }
+            &Opcode::Decr { dst } => {
+                process_simple_expr!(i, dst, decr(expr!(dst)));
+            }
+            &Opcode::Incr { dst } => {
+                process_simple_expr!(i, dst, incr(expr!(dst)));
+            }
+            &Opcode::Mov { dst, src } => {
+                process_simple_expr!(i, dst, expr!(src));
+            }
             &Opcode::New { dst } => {
                 // Constructor analysis
                 constructor_ctx = Some((dst, i));
@@ -244,7 +284,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         );
                     }
                 } else {
-                    process_simple_expr!(i, dst, Expression::Call(fun, make_args!(&arg0)));
+                    process_simple_expr!(i, dst, Expression::Call(fun, make_args!(arg0)));
                 }
             }
             &Opcode::Call2 {
@@ -260,12 +300,12 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                             new,
                             Expression::Constructor(ConstructorCall {
                                 ty: f.regtype(new),
-                                args: make_args!(&arg1)
+                                args: make_args!(arg1)
                             })
                         );
                     }
                 } else {
-                    process_simple_expr!(i, dst, Expression::Call(fun, make_args!(&arg0, &arg1)));
+                    process_simple_expr!(i, dst, Expression::Call(fun, make_args!(arg0, &arg1)));
                 }
             }
             &Opcode::Call3 {
@@ -282,7 +322,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                             new,
                             Expression::Constructor(ConstructorCall {
                                 ty: f.regtype(new),
-                                args: make_args!(&arg1, &arg2)
+                                args: make_args!(arg1, arg2)
                             })
                         );
                     }
@@ -290,7 +330,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     process_simple_expr!(
                         i,
                         dst,
-                        Expression::Call(fun, make_args!(&arg0, &arg1, &arg2))
+                        Expression::Call(fun, make_args!(arg0, arg1, arg2))
                     );
                 }
             }
@@ -300,45 +340,42 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     statement = Some(if f.regtype(ret).is_void() {
                         Statement::ReturnVoid
                     } else {
-                        Statement::Return {
-                            expr: reg_state
-                                .get(&ret)
-                                .expect("Returning an unused register ?")
-                                .clone(),
-                        }
+                        Statement::Return { expr: expr!(ret) }
                     });
                 } else if !f.regtype(ret).is_void() {
-                    statement = Some(Statement::Return {
-                        expr: reg_state
-                            .get(&ret)
-                            .expect("Returning an unused register ?")
-                            .clone(),
-                    });
+                    statement = Some(Statement::Return { expr: expr!(ret) });
                 }
             }
-            &Opcode::JFalse { cond, offset } => {
-                nesting.push((
-                    offset + 1,
-                    Statement::If {
-                        cond: reg_state.get(&cond).expect("No cond ?").clone(),
-                        stmts: Vec::new(),
-                    },
-                    Vec::new(),
-                ));
+            &Opcode::Label => {
+                // We have a loop
+
                 //println!("Increase nesting !");
             }
+            &Opcode::JFalse { cond, offset } => {
+                if offset > 0 {
+                    nesting.push((
+                        offset + 1,
+                        Statement::If {
+                            cond: expr!(cond),
+                            stmts: Vec::new(),
+                        },
+                        Vec::new(),
+                    ));
+                    //println!("Increase nesting !");
+                }
+            }
             &Opcode::JTrue { cond, offset } => {
-                nesting.push((
-                    offset + 1,
-                    Statement::If {
-                        cond: Expression::UnaryOp(UnaryOp::Not(Box::new(
-                            reg_state.get(&cond).expect("No cond ?").clone(),
-                        ))),
-                        stmts: Vec::new(),
-                    },
-                    Vec::new(),
-                ));
-                //println!("Increase nesting !");
+                if offset > 0 {
+                    nesting.push((
+                        offset + 1,
+                        Statement::If {
+                            cond: not(expr!(cond)),
+                            stmts: Vec::new(),
+                        },
+                        Vec::new(),
+                    ));
+                    //println!("Increase nesting !");
+                }
             }
             _ => {}
         }
@@ -408,18 +445,54 @@ enum Constant {
 }
 
 #[derive(Debug, Clone)]
-enum UnaryOp {
+enum Operation {
     Not(Box<Expression>),
+    Decr(Box<Expression>),
+    Incr(Box<Expression>),
+    Add(Box<Expression>, Box<Expression>),
+    Sub(Box<Expression>, Box<Expression>),
 }
 
-impl UnaryOp {
+impl Operation {
     fn display(&self, code: &Bytecode) -> String {
         match self {
-            UnaryOp::Not(expr) => {
+            Operation::Not(expr) => {
                 format!("!{}", expr.display(code))
+            }
+            Operation::Decr(expr) => {
+                format!("{}--", expr.display(code))
+            }
+            Operation::Incr(expr) => {
+                format!("{}++", expr.display(code))
+            }
+            Operation::Add(e1, e2) => {
+                format!("{} + {}", e1.display(code), e2.display(code))
+            }
+            Operation::Sub(e1, e2) => {
+                format!("{} - {}", e1.display(code), e2.display(code))
             }
         }
     }
+}
+
+fn not(e: Expression) -> Expression {
+    Expression::Op(Operation::Not(Box::new(e)))
+}
+
+fn decr(e: Expression) -> Expression {
+    Expression::Op(Operation::Decr(Box::new(e)))
+}
+
+fn incr(e: Expression) -> Expression {
+    Expression::Op(Operation::Incr(Box::new(e)))
+}
+
+fn add(e1: Expression, e2: Expression) -> Expression {
+    Expression::Op(Operation::Add(Box::new(e1), Box::new(e2)))
+}
+
+fn sub(e1: Expression, e2: Expression) -> Expression {
+    Expression::Op(Operation::Sub(Box::new(e1), Box::new(e2)))
 }
 
 #[derive(Debug, Clone)]
@@ -428,7 +501,7 @@ enum Expression {
     Constant(Constant),
     Constructor(ConstructorCall),
     Call(RefFun, Vec<Expression>),
-    UnaryOp(UnaryOp),
+    Op(Operation),
 }
 
 impl Expression {
@@ -451,7 +524,7 @@ impl Expression {
                 Constant::String(c) => format!("\"{c}\""),
                 Constant::Bool(c) => c.to_string(),
             },
-            Expression::UnaryOp(op) => op.display(code),
+            Expression::Op(op) => op.display(code),
             Expression::Constructor(ConstructorCall { ty, args }) => {
                 format!(
                     "new {}({})",
@@ -483,6 +556,11 @@ enum Statement {
         name: Option<String>,
         assign: Expression,
     },
+    Assign {
+        reg: Reg,
+        name: Option<String>,
+        assign: Expression,
+    },
     CallVoid {
         fun: RefFun,
         args: Vec<Expression>,
@@ -492,6 +570,10 @@ enum Statement {
     },
     ReturnVoid,
     If {
+        cond: Expression,
+        stmts: Vec<Statement>,
+    },
+    Loop {
         cond: Expression,
         stmts: Vec<Statement>,
     },
@@ -509,6 +591,25 @@ impl Statement {
                     assign.display(code)
                 )?;
             }
+            Statement::Assign { reg, name, assign } => {
+                writeln!(
+                    w,
+                    "{} = {};",
+                    name.as_ref().unwrap_or(&reg.to_string()),
+                    assign.display(code)
+                )?;
+            }
+            Statement::CallVoid { fun, args } => {
+                writeln!(
+                    w,
+                    "{}({})",
+                    fun.display_call(code),
+                    args.iter()
+                        .map(|a| a.display(code))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )?;
+            }
             Statement::Return { expr } => {
                 writeln!(w, "return {};", expr.display(code))?;
             }
@@ -522,7 +623,13 @@ impl Statement {
                 }
                 writeln!(w, "}}")?;
             }
-            _ => {}
+            Statement::Loop { cond, stmts } => {
+                writeln!(w, "while ({}) {{", cond.display(code))?;
+                for stmt in stmts {
+                    stmt.display(w, code, f)?;
+                }
+                writeln!(w, "}}")?;
+            }
         }
         Ok(())
     }
