@@ -1,18 +1,32 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::fmt::{format, Display, Formatter, Write};
+use std::fmt::{Display, Formatter, Write};
 
-use hlbc::opcodes::{JumpOffset, Opcode};
+use hlbc::opcodes::Opcode;
 use hlbc::types::{Function, RefField, RefFun, RefGlobal, RefType, Reg, Type, TypeObj};
 use hlbc::Bytecode;
 
-struct FormatOptions {
+pub struct FormatOptions {
     indent: String,
     inc_indent: String,
 }
 
 impl FormatOptions {
-    fn inc_nesting(&self) -> Self {
+    pub fn new(inc_indent: &str) -> Self {
+        Self {
+            indent: String::new(),
+            inc_indent: inc_indent.to_string(),
+        }
+    }
+
+    pub fn with_base_indent(indent: &str, inc_indent: &str) -> Self {
+        Self {
+            indent: indent.to_string(),
+            inc_indent: inc_indent.to_string(),
+        }
+    }
+
+    pub fn inc_nesting(&self) -> Self {
         FormatOptions {
             indent: format!("{}{}", self.indent, self.inc_indent),
             inc_indent: self.inc_indent.clone(),
@@ -42,7 +56,10 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> String {
         }
     )
     .unwrap();
-    let indent = "  ";
+    let indent = FormatOptions {
+        indent: String::new(),
+        inc_indent: "  ".to_string(),
+    };
     for (i, f) in obj
         .fields
         .iter()
@@ -63,7 +80,7 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> String {
     }
     writeln!(&mut buf, "// BINDINGS").unwrap();
 
-    for (fi, fun) in &obj.bindings {
+    for fun in obj.bindings.values() {
         //let fi = &obj.fields[fi.0];
         let fun = fun.resolve_as_fn(code).unwrap();
         writeln!(
@@ -71,7 +88,7 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> String {
             "{indent}{}{}{}{indent}}}\n",
             if is_static { "static " } else { "" },
             decompile_function_header(code, fun),
-            decompile_function_body(code, &format!("{indent}  "), fun)
+            decompile_function_body(code, &indent.inc_nesting(), fun)
         )
         .unwrap();
     }
@@ -84,7 +101,7 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> String {
             &mut buf,
             "{indent}{}{}{indent}}}\n",
             decompile_function_header(code, f),
-            decompile_function_body(code, &format!("{indent}  "), f)
+            decompile_function_body(code, &indent.inc_nesting(), f)
         )
         .unwrap();
     }
@@ -121,7 +138,7 @@ pub fn decompile_function_header(code: &Bytecode, f: &Function) -> String {
     buf
 }
 
-pub fn decompile_closure(code: &Bytecode, indent: &str, f: &Function) -> String {
+pub fn decompile_closure(code: &Bytecode, indent: &FormatOptions, f: &Function) -> String {
     let mut buf = String::with_capacity(256);
 
     write!(&mut buf, "(").unwrap();
@@ -144,7 +161,7 @@ pub fn decompile_closure(code: &Bytecode, indent: &str, f: &Function) -> String 
     write!(
         &mut buf,
         "{}",
-        decompile_function_body(code, &format!("{indent}  "), f)
+        decompile_function_body(code, &indent.inc_nesting(), f)
     )
     .unwrap();
 
@@ -152,13 +169,8 @@ pub fn decompile_closure(code: &Bytecode, indent: &str, f: &Function) -> String 
     buf
 }
 
-pub fn decompile_function_body(code: &Bytecode, indent: &str, f: &Function) -> String {
+pub fn decompile_function_body(code: &Bytecode, indent: &FormatOptions, f: &Function) -> String {
     let mut buf = String::with_capacity(256);
-
-    let indent = FormatOptions {
-        indent: String::new(),
-        inc_indent: "  ".to_string(),
-    };
 
     for a in f
         .assigns
@@ -172,7 +184,7 @@ pub fn decompile_function_body(code: &Bytecode, indent: &str, f: &Function) -> S
     writeln!(&mut buf).unwrap();
 
     for stmt in make_statements(code, f) {
-        stmt.display(&mut buf, &indent, code, f).unwrap();
+        stmt.display(&mut buf, indent, code, f).unwrap();
     }
 
     buf
@@ -185,8 +197,11 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
     let mut statement = None;
     // Nesting handling
     let mut nesting = Vec::new();
+    // Expression values for each registers
     let mut reg_state = HashMap::new();
+    // Some when we're parsing a constructor call (between New and Call)
     let mut constructor_ctx = None;
+    // Variable names we already declared
     let mut seen = HashSet::new();
 
     // Initialize register state with the function arguments
@@ -198,7 +213,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
     }
 
     // Create a statement and update the register state (depending on inline rules)
-    macro_rules! process_simple_expr {
+    macro_rules! push_expr {
         ($i:expr, $dst:expr, $e:expr) => {
             let name = f.var_name(code, $i);
             let expr = $e;
@@ -224,6 +239,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
         };
     }
 
+    // Get the expr for a register
     macro_rules! expr {
         ($reg:expr) => {
             reg_state.get(&$reg).expect("No expr for reg ?").clone()
@@ -236,37 +252,37 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
         }
     }
 
-    let mut iter = f.ops.iter().enumerate();
-    while let Some((i, o)) = iter.next() {
+    let iter = f.ops.iter().enumerate();
+    for (i, o) in iter {
         //println!("ITER");
-        match o {
-            &Opcode::Int { dst, ptr } => {
-                process_simple_expr!(
+        match *o {
+            Opcode::Int { dst, ptr } => {
+                push_expr!(
                     i,
                     dst,
                     Expression::Constant(Constant::Int(ptr.resolve(&code.ints)))
                 );
             }
-            &Opcode::Float { dst, ptr } => {
-                process_simple_expr!(
+            Opcode::Float { dst, ptr } => {
+                push_expr!(
                     i,
                     dst,
                     Expression::Constant(Constant::Float(ptr.resolve(&code.floats)))
                 );
             }
-            &Opcode::Bool { dst, value } => {
-                process_simple_expr!(i, dst, Expression::Constant(Constant::Bool(value.0)));
+            Opcode::Bool { dst, value } => {
+                push_expr!(i, dst, Expression::Constant(Constant::Bool(value.0)));
             }
-            &Opcode::String { dst, ptr } => {
-                process_simple_expr!(
+            Opcode::String { dst, ptr } => {
+                push_expr!(
                     i,
                     dst,
                     Expression::Constant(Constant::String(ptr.resolve(&code.strings).to_owned()))
                 );
             }
-            &Opcode::GetGlobal { dst, global } => {
+            Opcode::GetGlobal { dst, global } => {
                 if f.regtype(dst).0 == 13 {
-                    process_simple_expr!(
+                    push_expr!(
                         i,
                         dst,
                         Expression::Constant(Constant::String(
@@ -275,32 +291,32 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     );
                 }
             }
-            &Opcode::Add { dst, a, b } => {
-                process_simple_expr!(i, dst, add(expr!(a), expr!(b)));
+            Opcode::Add { dst, a, b } => {
+                push_expr!(i, dst, add(expr!(a), expr!(b)));
             }
-            &Opcode::Sub { dst, a, b } => {
-                process_simple_expr!(i, dst, sub(expr!(a), expr!(b)));
+            Opcode::Sub { dst, a, b } => {
+                push_expr!(i, dst, sub(expr!(a), expr!(b)));
             }
-            &Opcode::Decr { dst } => {
-                process_simple_expr!(i, dst, decr(expr!(dst)));
+            Opcode::Decr { dst } => {
+                push_expr!(i, dst, decr(expr!(dst)));
             }
-            &Opcode::Incr { dst } => {
-                process_simple_expr!(i, dst, incr(expr!(dst)));
+            Opcode::Incr { dst } => {
+                push_expr!(i, dst, incr(expr!(dst)));
             }
-            &Opcode::Mov { dst, src } => {
-                process_simple_expr!(i, dst, expr!(src));
+            Opcode::Mov { dst, src } => {
+                push_expr!(i, dst, expr!(src));
             }
-            &Opcode::New { dst } => {
+            Opcode::New { dst } => {
                 // Constructor analysis
                 constructor_ctx = Some((dst, i));
             }
-            &Opcode::Call0 { dst, fun } => {
-                process_simple_expr!(i, dst, Expression::Call(fun, Vec::new()));
+            Opcode::Call0 { dst, fun } => {
+                push_expr!(i, dst, Expression::Call(fun, Vec::new()));
             }
-            &Opcode::Call1 { dst, fun, arg0 } => {
+            Opcode::Call1 { dst, fun, arg0 } => {
                 if let Some((new, j)) = constructor_ctx {
                     if new == arg0 {
-                        process_simple_expr!(
+                        push_expr!(
                             j,
                             new,
                             Expression::Constructor(ConstructorCall {
@@ -310,10 +326,10 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         );
                     }
                 } else {
-                    process_simple_expr!(i, dst, Expression::Call(fun, make_args!(arg0)));
+                    push_expr!(i, dst, Expression::Call(fun, make_args!(arg0)));
                 }
             }
-            &Opcode::Call2 {
+            Opcode::Call2 {
                 dst,
                 fun,
                 arg0,
@@ -321,7 +337,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
             } => {
                 if let Some((new, j)) = constructor_ctx {
                     if new == arg0 {
-                        process_simple_expr!(
+                        push_expr!(
                             j,
                             new,
                             Expression::Constructor(ConstructorCall {
@@ -331,10 +347,10 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         );
                     }
                 } else {
-                    process_simple_expr!(i, dst, Expression::Call(fun, make_args!(arg0, &arg1)));
+                    push_expr!(i, dst, Expression::Call(fun, make_args!(arg0, &arg1)));
                 }
             }
-            &Opcode::Call3 {
+            Opcode::Call3 {
                 dst,
                 fun,
                 arg0,
@@ -343,7 +359,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
             } => {
                 if let Some((new, j)) = constructor_ctx {
                     if new == arg0 {
-                        process_simple_expr!(
+                        push_expr!(
                             j,
                             new,
                             Expression::Constructor(ConstructorCall {
@@ -353,16 +369,12 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         );
                     }
                 } else {
-                    process_simple_expr!(
-                        i,
-                        dst,
-                        Expression::Call(fun, make_args!(arg0, arg1, arg2))
-                    );
+                    push_expr!(i, dst, Expression::Call(fun, make_args!(arg0, arg1, arg2)));
                 }
             }
-            &Opcode::Ret { ret } => {
+            Opcode::Ret { ret } => {
                 // Do not display return void;
-                if nesting.len() > 0 {
+                if !nesting.is_empty() {
                     statement = Some(if f.regtype(ret).is_void() {
                         Statement::ReturnVoid
                     } else {
@@ -372,12 +384,12 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     statement = Some(Statement::Return { expr: expr!(ret) });
                 }
             }
-            &Opcode::Label => {
+            Opcode::Label => {
                 // We have a loop
 
                 //println!("Increase nesting !");
             }
-            &Opcode::JFalse { cond, offset } => {
+            Opcode::JFalse { cond, offset } => {
                 if offset > 0 {
                     nesting.push((
                         offset + 1,
@@ -390,7 +402,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     //println!("Increase nesting !");
                 }
             }
-            &Opcode::JTrue { cond, offset } => {
+            Opcode::JTrue { cond, offset } => {
                 if offset > 0 {
                     nesting.push((
                         offset + 1,
@@ -406,16 +418,6 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
             _ => {}
         }
 
-        // Push in the scope if there's one
-        if let Some(stmt) = statement.take() {
-            if let Some((offset, parent, scope)) = nesting.last_mut() {
-                //println!("Push in scope {stmt:?}");
-                scope.push(stmt);
-            } else {
-                //println!("Push in global {stmt:?}");
-                statements.push(stmt);
-            }
-        }
         for idx in (0..nesting.len()).rev() {
             //println!("Update nesting {idx}");
             let (mut len, mut parent, mut scope) = nesting.remove(idx);
@@ -443,7 +445,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
             }
         }
         if let Some(stmt) = statement.take() {
-            if let Some((offset, parent, scope)) = nesting.last_mut() {
+            if let Some((_, _, scope)) = nesting.last_mut() {
                 //println!("Push in scope {stmt:?}");
                 scope.push(stmt);
             } else {
@@ -672,10 +674,8 @@ impl Statement {
 
 fn global_value_from_constant(code: &Bytecode, global: RefGlobal) -> Option<String> {
     code.globals_initializers.get(&global).and_then(|&x| {
-        if let Some(constants) = &code.constants {
-            Some(code.strings[constants[x].fields[0]].to_owned())
-        } else {
-            None
-        }
+        code.constants
+            .as_ref()
+            .map(|constants| code.strings[constants[x].fields[0]].to_owned())
     })
 }

@@ -21,12 +21,12 @@ use crate::types::{
 
 /// Analysis functions and callgraph generation
 pub mod analysis;
-mod deser;
+pub mod deser;
 /// Functions to display bytecode elements
 pub mod fmt;
 /// Opcodes definitions.
 pub mod opcodes;
-mod ser;
+pub mod ser;
 /// Bytecode elements definitions.
 /// All the Ref* types in this modules are references to bytecode elements like constants or function.
 /// They are required since we cannot use rust references as that would make our structure self-referential.
@@ -214,20 +214,14 @@ impl Bytecode {
             }) = t.get_type_obj()
             {
                 for p in protos {
-                    match findexes[p.findex.0] {
-                        RefFunKnown::Fun(x) => {
-                            functions[x].name = Some(p.name);
-                        }
-                        _ => {}
+                    if let RefFunKnown::Fun(x) = findexes[p.findex.0] {
+                        functions[x].name = Some(p.name);
                     }
                 }
                 for (fid, findex) in bindings {
                     if let Some(field) = t.get_type_obj().map(|o| &o.fields[fid.0]) {
-                        match findexes[findex.0] {
-                            RefFunKnown::Fun(x) => {
-                                functions[x].name = Some(field.name);
-                            }
-                            _ => {}
+                        if let RefFunKnown::Fun(x) = findexes[findex.0] {
+                            functions[x].name = Some(field.name);
                         }
                     }
                 }
@@ -288,7 +282,7 @@ impl Bytecode {
         w.write_vi32(self.ints.len() as i32)?;
         w.write_vi32(self.floats.len() as i32)?;
         w.write_vi32(self.strings.len() as i32)?;
-        if let Some((bytes, pos)) = &self.bytes {
+        if let Some((_, pos)) = &self.bytes {
             w.write_vi32(pos.len() as i32)?;
         }
         w.write_vi32(self.types.len() as i32)?;

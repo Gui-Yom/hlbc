@@ -277,9 +277,9 @@ pub enum RefFunKnown {
 
 impl RefFunKnown {
     pub fn resolve<'a>(&self, code: &'a Bytecode) -> FunPtr<'a> {
-        match self {
-            &RefFunKnown::Fun(x) => FunPtr::Fun(&code.functions[x]),
-            &RefFunKnown::Native(x) => FunPtr::Native(&code.natives[x]),
+        match *self {
+            RefFunKnown::Fun(x) => FunPtr::Fun(&code.functions[x]),
+            RefFunKnown::Native(x) => FunPtr::Native(&code.natives[x]),
         }
     }
 

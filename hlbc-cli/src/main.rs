@@ -14,6 +14,7 @@ use hlbc::types::{FunPtr, RefFun, Type};
 use hlbc::*;
 
 use crate::command::{commands_parser, Command, ElementRef, FileOrIndex, ParseContext, Parser};
+use crate::decompiler::FormatOptions;
 
 mod command;
 mod decompiler;
@@ -98,9 +99,10 @@ fn main() -> anyhow::Result<()> {
         ($code:expr, $commands:expr; $onexit:stmt) => {
             for cmd in $commands {
                 match cmd {
-                    Command::Exit => {
-                        $onexit;
-                    }
+                    #[rustfmt::skip]
+                                Command::Exit => {
+                                    $onexit
+                                },
                     cmd => {
                         process_command(&mut stdout, $code, cmd)?;
                     }
@@ -568,7 +570,10 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
         }
         Command::Decomp(idx) => {
             if let Some(fun) = RefFun(idx).resolve_as_fn(code) {
-                println!("{}", decompiler::decompile_function_body(code, "", fun));
+                println!(
+                    "{}",
+                    decompiler::decompile_function_body(code, &FormatOptions::new("  "), fun)
+                );
             }
         }
     }
