@@ -9,6 +9,12 @@ impl Scopes {
         Self { scopes: Vec::new() }
     }
 
+    pub(crate) fn last_is_loop(&self) -> bool {
+        self.scopes
+            .last()
+            .map_or(false, |s| matches!(s, Scope::Loop(_)))
+    }
+
     pub(crate) fn pop_last_loop(&mut self) -> Option<LoopScope> {
         for idx in (0..self.depth()).rev() {
             match self.scopes.remove(idx) {
@@ -21,6 +27,14 @@ impl Scopes {
             }
         }
         None
+    }
+
+    pub(crate) fn last(&self) -> Option<&Scope> {
+        self.scopes.last()
+    }
+
+    pub(crate) fn last_mut(&mut self) -> Option<&mut Scope> {
+        self.scopes.last_mut()
     }
 
     pub(crate) fn push_scope(&mut self, scope: Scope) {
@@ -77,11 +91,15 @@ impl Scopes {
 
 pub(crate) struct LoopScope {
     pub(crate) stmts: Vec<Statement>,
+    pub(crate) cond: Option<Expression>,
 }
 
 impl LoopScope {
     pub(crate) fn new() -> Self {
-        Self { stmts: Vec::new() }
+        Self {
+            stmts: Vec::new(),
+            cond: None,
+        }
     }
 }
 
@@ -100,7 +118,7 @@ impl Scope {
             Scope::Branch { stmts, .. } => {
                 stmts.push(stmt);
             }
-            Scope::Loop(LoopScope { stmts }) => {
+            Scope::Loop(LoopScope { stmts, .. }) => {
                 stmts.push(stmt);
             }
         }
@@ -127,6 +145,10 @@ pub(crate) enum Constant {
     Bool(bool),
 }
 
+pub(crate) fn constant_bool(cst: bool) -> Expression {
+    Expression::Constant(Constant::Bool(cst))
+}
+
 #[derive(Debug, Clone)]
 pub(crate) enum Operation {
     Not(Box<Expression>),
@@ -134,26 +156,45 @@ pub(crate) enum Operation {
     Incr(Box<Expression>),
     Add(Box<Expression>, Box<Expression>),
     Sub(Box<Expression>, Box<Expression>),
+    Gt(Box<Expression>, Box<Expression>),
+    Gte(Box<Expression>, Box<Expression>),
+    Lt(Box<Expression>, Box<Expression>),
+    Lte(Box<Expression>, Box<Expression>),
 }
 
+macro_rules! make_op_shorthand {
+    ($name:ident, $op:ident, $( $e:ident ),+) => {
+        pub(crate) fn $name($( $e: Expression ),+) -> Expression {
+            Expression::Op(Operation::$op($( Box::new($e) ),+))
+        }
+    }
+}
+
+make_op_shorthand!(decr, Decr, e1);
+make_op_shorthand!(incr, Incr, e1);
+make_op_shorthand!(add, Add, e1, e2);
+make_op_shorthand!(sub, Sub, e1, e2);
+make_op_shorthand!(gt, Gt, e1, e2);
+make_op_shorthand!(gte, Gte, e1, e2);
+make_op_shorthand!(lt, Lt, e1, e2);
+make_op_shorthand!(lte, Lte, e1, e2);
+
+// Invert an expression, will also optimize the expression.
 pub(crate) fn not(e: Expression) -> Expression {
-    Expression::Op(Operation::Not(Box::new(e)))
-}
-
-pub(crate) fn decr(e: Expression) -> Expression {
-    Expression::Op(Operation::Decr(Box::new(e)))
-}
-
-pub(crate) fn incr(e: Expression) -> Expression {
-    Expression::Op(Operation::Incr(Box::new(e)))
-}
-
-pub(crate) fn add(e1: Expression, e2: Expression) -> Expression {
-    Expression::Op(Operation::Add(Box::new(e1), Box::new(e2)))
-}
-
-pub(crate) fn sub(e1: Expression, e2: Expression) -> Expression {
-    Expression::Op(Operation::Sub(Box::new(e1), Box::new(e2)))
+    match &e {
+        Expression::Op(op) => match op {
+            Operation::Not(a) => *a.clone(),
+            Operation::Decr(_) => e,
+            Operation::Incr(_) => e,
+            Operation::Add(_, _) => e,
+            Operation::Sub(_, _) => e,
+            Operation::Gt(a, b) => Expression::Op(Operation::Lte(a.clone(), b.clone())),
+            Operation::Gte(a, b) => Expression::Op(Operation::Lt(a.clone(), b.clone())),
+            Operation::Lt(a, b) => Expression::Op(Operation::Gte(a.clone(), b.clone())),
+            Operation::Lte(a, b) => Expression::Op(Operation::Gt(a.clone(), b.clone())),
+        },
+        _ => Expression::Op(Operation::Not(Box::new(e))),
+    }
 }
 
 #[derive(Debug, Clone)]

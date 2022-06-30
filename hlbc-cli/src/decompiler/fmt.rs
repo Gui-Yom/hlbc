@@ -31,6 +31,18 @@ impl Operation {
             Operation::Sub(e1, e2) => {
                 format!("{} - {}", e1.display(code), e2.display(code))
             }
+            Operation::Gt(e1, e2) => {
+                format!("{} > {}", e1.display(code), e2.display(code))
+            }
+            Operation::Gte(e1, e2) => {
+                format!("{} >= {}", e1.display(code), e2.display(code))
+            }
+            Operation::Lt(e1, e2) => {
+                format!("{} < {}", e1.display(code), e2.display(code))
+            }
+            Operation::Lte(e1, e2) => {
+                format!("{} <= {}", e1.display(code), e2.display(code))
+            }
         }
     }
 }
