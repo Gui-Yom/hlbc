@@ -1,40 +1,39 @@
 use hlbc::types::{RefFun, RefType, Reg};
 
+/// Helper to process a stack of scopes (branches, loops)
 pub(crate) struct Scopes {
+    // A linked list would be appreciable i think
+    /// There is always at least one scope, the root scope
     scopes: Vec<Scope>,
 }
 
 impl Scopes {
     pub(crate) fn new() -> Self {
-        Self { scopes: Vec::new() }
+        Self {
+            scopes: vec![Scope {
+                ty: ScopeType::RootScope,
+                stmts: Vec::new(),
+            }],
+        }
     }
 
-    pub(crate) fn last_is_loop(&self) -> bool {
-        self.scopes
-            .last()
-            .map_or(false, |s| matches!(s, Scope::Loop(_)))
-    }
-
-    pub(crate) fn pop_last_loop(&mut self) -> Option<LoopScope> {
+    pub(crate) fn pop_last_loop(&mut self) -> Option<(LoopScope, Vec<Statement>)> {
         for idx in (0..self.depth()).rev() {
-            match self.scopes.remove(idx) {
-                Scope::Loop(l) => {
-                    return Some(l);
+            let scope = self.scopes.remove(idx);
+            match scope.ty {
+                ScopeType::Loop(l) => {
+                    return Some((l, scope.stmts));
                 }
-                other => {
-                    self.scopes.insert(idx, other);
+                _ => {
+                    self.scopes.insert(idx, scope);
                 }
             }
         }
         None
     }
 
-    pub(crate) fn last(&self) -> Option<&Scope> {
-        self.scopes.last()
-    }
-
-    pub(crate) fn last_mut(&mut self) -> Option<&mut Scope> {
-        self.scopes.last_mut()
+    pub(crate) fn last_mut(&mut self) -> &mut Scope {
+        self.scopes.last_mut().unwrap()
     }
 
     pub(crate) fn push_scope(&mut self, scope: Scope) {
@@ -42,35 +41,41 @@ impl Scopes {
     }
 
     pub(crate) fn has_some(&self) -> bool {
-        !self.scopes.is_empty()
+        self.depth() > 1
     }
 
     pub(crate) fn depth(&self) -> usize {
         self.scopes.len()
     }
 
-    pub(crate) fn process(&mut self, mut stmt: Option<Statement>) -> Option<Statement> {
+    pub(crate) fn push_stmt(&mut self, mut stmt: Option<Statement>) {
+        // Start to iterate from the end ('for' because we need the index)
         for idx in (0..self.depth()).rev() {
             let mut scope = self.scopes.remove(idx);
 
             if let Some(stmt) = stmt.take() {
-                scope.push_stmt(stmt);
+                scope.stmts.push(stmt);
             }
 
-            match scope {
-                Scope::Branch {
-                    mut len,
-                    cond,
-                    stmts,
-                } => {
+            match scope.ty {
+                ScopeType::Branch { mut len, cond } => {
                     // Decrease scope len
                     len -= 1;
                     if len <= 0 {
                         //println!("Decrease nesting {parent:?}");
-                        stmt = Some(Statement::If { cond, stmts });
+                        stmt = Some(Statement::If {
+                            cond,
+                            stmts: scope.stmts,
+                        });
                     } else {
                         // Scope continues
-                        self.scopes.insert(idx, Scope::Branch { len, cond, stmts });
+                        self.scopes.insert(
+                            idx,
+                            Scope {
+                                ty: ScopeType::Branch { len, cond },
+                                stmts: scope.stmts,
+                            },
+                        );
                     }
                 }
                 _ => {
@@ -79,49 +84,42 @@ impl Scopes {
             }
         }
         if let Some(stmt) = stmt.take() {
-            if let Some(scope) = self.scopes.last_mut() {
-                scope.push_stmt(stmt);
-            } else {
-                return Some(stmt);
-            }
+            self.last_mut().stmts.push(stmt);
         }
-        None
+    }
+
+    pub(crate) fn statements(mut self) -> Vec<Statement> {
+        self.scopes.pop().unwrap().stmts
     }
 }
 
-pub(crate) struct LoopScope {
+pub(crate) struct Scope {
+    pub(crate) ty: ScopeType,
     pub(crate) stmts: Vec<Statement>,
+}
+
+impl Scope {
+    pub(crate) fn new(ty: ScopeType) -> Self {
+        Self {
+            ty,
+            stmts: Vec::new(),
+        }
+    }
+}
+
+pub(crate) enum ScopeType {
+    RootScope,
+    Branch { len: i32, cond: Expression },
+    Loop(LoopScope),
+}
+
+pub(crate) struct LoopScope {
     pub(crate) cond: Option<Expression>,
 }
 
 impl LoopScope {
     pub(crate) fn new() -> Self {
-        Self {
-            stmts: Vec::new(),
-            cond: None,
-        }
-    }
-}
-
-pub(crate) enum Scope {
-    Branch {
-        len: i32,
-        cond: Expression,
-        stmts: Vec<Statement>,
-    },
-    Loop(LoopScope),
-}
-
-impl Scope {
-    pub(crate) fn push_stmt(&mut self, stmt: Statement) {
-        match self {
-            Scope::Branch { stmts, .. } => {
-                stmts.push(stmt);
-            }
-            Scope::Loop(LoopScope { stmts, .. }) => {
-                stmts.push(stmt);
-            }
-        }
+        Self { cond: None }
     }
 }
 
