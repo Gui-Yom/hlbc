@@ -31,6 +31,12 @@ impl Operation {
             Operation::Sub(e1, e2) => {
                 format!("{} - {}", e1.display(code), e2.display(code))
             }
+            Operation::Eq(e1, e2) => {
+                format!("{} == {}", e1.display(code), e2.display(code))
+            }
+            Operation::NotEq(e1, e2) => {
+                format!("{} == {}", e1.display(code), e2.display(code))
+            }
             Operation::Gt(e1, e2) => {
                 format!("{} > {}", e1.display(code), e2.display(code))
             }
@@ -62,6 +68,7 @@ impl Expression {
                 Constant::Float(c) => c.to_string(),
                 Constant::String(c) => format!("\"{c}\""),
                 Constant::Bool(c) => c.to_string(),
+                Constant::Null => "null".to_owned(),
             },
             Expression::Op(op) => op.display(code),
             Expression::Constructor(ConstructorCall { ty, args }) => {

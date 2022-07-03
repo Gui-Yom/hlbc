@@ -40,10 +40,6 @@ impl Scopes {
         self.scopes.push(scope);
     }
 
-    pub(crate) fn has_some(&self) -> bool {
-        self.depth() > 1
-    }
-
     pub(crate) fn depth(&self) -> usize {
         self.scopes.len()
     }
@@ -57,6 +53,8 @@ impl Scopes {
                 scope.stmts.push(stmt);
             }
 
+            // We only handle branches we know the length of
+            // We can't know the end of a loop scope before seeing the jump back
             match scope.ty {
                 ScopeType::Branch { mut len, cond } => {
                     // Decrease scope len
@@ -153,16 +151,35 @@ impl ConstructorCall {
     }
 }
 
+// TODO make this zero copy by accepting the Ref* types instead and only resolving on demand
+
 #[derive(Debug, Clone)]
 pub(crate) enum Constant {
     Int(i32),
     Float(f64),
     String(String),
     Bool(bool),
+    Null,
 }
 
-pub(crate) fn constant_bool(cst: bool) -> Expression {
+pub(crate) fn cst_bool(cst: bool) -> Expression {
     Expression::Constant(Constant::Bool(cst))
+}
+
+pub(crate) fn cst_int(cst: i32) -> Expression {
+    Expression::Constant(Constant::Int(cst))
+}
+
+pub(crate) fn cst_float(cst: f64) -> Expression {
+    Expression::Constant(Constant::Float(cst))
+}
+
+pub(crate) fn cst_string(cst: String) -> Expression {
+    Expression::Constant(Constant::String(cst))
+}
+
+pub(crate) fn cst_null() -> Expression {
+    Expression::Constant(Constant::Null)
 }
 
 #[derive(Debug, Clone)]
@@ -172,6 +189,8 @@ pub(crate) enum Operation {
     Incr(Box<Expression>),
     Add(Box<Expression>, Box<Expression>),
     Sub(Box<Expression>, Box<Expression>),
+    Eq(Box<Expression>, Box<Expression>),
+    NotEq(Box<Expression>, Box<Expression>),
     Gt(Box<Expression>, Box<Expression>),
     Gte(Box<Expression>, Box<Expression>),
     Lt(Box<Expression>, Box<Expression>),
@@ -190,6 +209,8 @@ make_op_shorthand!(decr, Decr, e1);
 make_op_shorthand!(incr, Incr, e1);
 make_op_shorthand!(add, Add, e1, e2);
 make_op_shorthand!(sub, Sub, e1, e2);
+make_op_shorthand!(eq, Eq, e1, e2);
+make_op_shorthand!(noteq, NotEq, e1, e2);
 make_op_shorthand!(gt, Gt, e1, e2);
 make_op_shorthand!(gte, Gte, e1, e2);
 make_op_shorthand!(lt, Lt, e1, e2);
@@ -197,19 +218,33 @@ make_op_shorthand!(lte, Lte, e1, e2);
 
 // Invert an expression, will also optimize the expression.
 pub(crate) fn not(e: Expression) -> Expression {
-    match &e {
-        Expression::Op(op) => match op {
-            Operation::Not(a) => *a.clone(),
-            Operation::Decr(_) => e,
-            Operation::Incr(_) => e,
-            Operation::Add(_, _) => e,
-            Operation::Sub(_, _) => e,
-            Operation::Gt(a, b) => Expression::Op(Operation::Lte(a.clone(), b.clone())),
-            Operation::Gte(a, b) => Expression::Op(Operation::Lt(a.clone(), b.clone())),
-            Operation::Lt(a, b) => Expression::Op(Operation::Gte(a.clone(), b.clone())),
-            Operation::Lte(a, b) => Expression::Op(Operation::Gt(a.clone(), b.clone())),
-        },
-        _ => Expression::Op(Operation::Not(Box::new(e))),
+    use Expression::*;
+    use Operation::*;
+    match e {
+        Op(Not(a)) => *a,
+        Op(Eq(a, b)) => Op(NotEq(a, b)),
+        Op(NotEq(a, b)) => Op(Eq(a, b)),
+        Op(Gt(a, b)) => Op(Lte(a, b)),
+        Op(Gte(a, b)) => Op(Lt(a, b)),
+        Op(Lt(a, b)) => Op(Gte(a, b)),
+        Op(Lte(a, b)) => Op(Gt(a, b)),
+        _ => Op(Not(Box::new(e))),
+    }
+}
+
+// Flip the operands of an expression
+pub(crate) fn flip(e: Expression) -> Expression {
+    use Expression::*;
+    use Operation::*;
+    match e {
+        Op(Add(a, b)) => Op(Add(b, a)),
+        Op(Eq(a, b)) => Op(Eq(b, a)),
+        Op(NotEq(a, b)) => Op(NotEq(b, a)),
+        Op(Gt(a, b)) => Op(Lt(b, a)),
+        Op(Gte(a, b)) => Op(Lte(b, a)),
+        Op(Lt(a, b)) => Op(Gt(b, a)),
+        Op(Lte(a, b)) => Op(Gte(b, a)),
+        _ => e,
     }
 }
 
