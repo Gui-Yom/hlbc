@@ -1,12 +1,12 @@
 class Branch {
     static function main() {
-        var cond = true;
-        if (cond) {
-            var a = 5;
-            if (!cond) {
-                a = 6;
-                return;
-            }
+        var a = 0;
+        if (a > 1) {
+            a = 1;
+        } else {
+            a = 2;
+            return;
         }
+        a = 3;
     }
 }

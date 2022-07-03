@@ -140,6 +140,14 @@ impl Statement {
                 }
                 writeln!(w, "{indent}}}")?;
             }
+            Statement::Else { stmts } => {
+                writeln!(w, "else {{")?;
+                let indent2 = indent.inc_nesting();
+                for stmt in stmts {
+                    stmt.display(w, &indent2, code, f)?;
+                }
+                writeln!(w, "{indent}}}")?;
+            }
             Statement::While { cond, stmts } => {
                 writeln!(w, "while ({}) {{", cond.display(code))?;
                 let indent2 = indent.inc_nesting();

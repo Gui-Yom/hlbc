@@ -391,6 +391,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
             Opcode::Label => scopes.push_scope(Scope::new(ScopeType::Loop(LoopScope::new()))),
             Opcode::JAlways { offset } => {
                 if offset < 0 {
+                    // It's the jump back of a loop
                     if let Some((loop_, stmts)) = scopes.pop_last_loop() {
                         if let Some(cond) = loop_.cond {
                             statement = Some(Statement::While { cond, stmts });
@@ -401,6 +402,9 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                             });
                         }
                     }
+                } else {
+                    // It's the jump over of an else clause
+                    scopes.push_scope(Scope::new(ScopeType::Else { len: offset + 1 }));
                 }
             }
             Opcode::JFalse { cond, offset } => {
@@ -429,23 +433,19 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
             }
             Opcode::JSGte { a, b, offset } => {
                 if offset > 0 {
-                    if matches!(f.ops[i + offset as usize], Opcode::JAlways { .. }) {
+                    // It's a loop
+                    if matches!(f.ops[i + offset as usize], Opcode::JAlways { offset } if offset < 0)
+                    {
                         if let ScopeType::Loop(loop_) = &mut scopes.last_mut().ty {
                             loop_.cond = Some(not(gte(expr!(a), expr!(b))));
                         }
-                    }
-                    /*
-                    if scopes.last_is_loop() {
-                        if let Some(Scope::Loop(scope)) = scopes.last_mut() {
-                            //scope.cond = not(expr!())
-                        }
                     } else {
-                        scopes.push_scope(Scope::Branch {
+                        // It's an if
+                        scopes.push_scope(Scope::new(ScopeType::Branch {
                             len: offset + 1,
-                            cond: not(expr!(cond)),
-                            stmts: Vec::new(),
-                        });
-                    }*/
+                            cond: not(gte(expr!(a), expr!(b))),
+                        }));
+                    }
                 }
             }
             _ => {}

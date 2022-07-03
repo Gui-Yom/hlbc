@@ -78,6 +78,23 @@ impl Scopes {
                         );
                     }
                 }
+                ScopeType::Else { mut len } => {
+                    // Decrease scope len
+                    len -= 1;
+                    if len <= 0 {
+                        //println!("Decrease nesting {parent:?}");
+                        stmt = Some(Statement::Else { stmts: scope.stmts });
+                    } else {
+                        // Scope continues
+                        self.scopes.insert(
+                            idx,
+                            Scope {
+                                ty: ScopeType::Else { len },
+                                stmts: scope.stmts,
+                            },
+                        );
+                    }
+                }
                 _ => {
                     self.scopes.insert(idx, scope);
                 }
@@ -110,6 +127,7 @@ impl Scope {
 pub(crate) enum ScopeType {
     RootScope,
     Branch { len: i32, cond: Expression },
+    Else { len: i32 },
     Loop(LoopScope),
 }
 
@@ -226,6 +244,9 @@ pub(crate) enum Statement {
     ReturnVoid,
     If {
         cond: Expression,
+        stmts: Vec<Statement>,
+    },
+    Else {
         stmts: Vec<Statement>,
     },
     While {
