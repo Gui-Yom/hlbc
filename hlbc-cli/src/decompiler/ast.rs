@@ -1,4 +1,4 @@
-use hlbc::types::{RefFun, RefType, Reg};
+use hlbc::types::{RefField, RefFun, RefType, Reg};
 
 /// Helper to process a stack of scopes (branches, loops)
 pub(crate) struct Scopes {
@@ -124,30 +124,18 @@ impl Scope {
 
 pub(crate) enum ScopeType {
     RootScope,
-    Branch { len: i32, cond: Expression },
+    Branch { len: i32, cond: Expr },
     Else { len: i32 },
     Loop(LoopScope),
 }
 
 pub(crate) struct LoopScope {
-    pub(crate) cond: Option<Expression>,
+    pub(crate) cond: Option<Expr>,
 }
 
 impl LoopScope {
     pub(crate) fn new() -> Self {
         Self { cond: None }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ConstructorCall {
-    pub(crate) ty: RefType,
-    pub(crate) args: Vec<Expression>,
-}
-
-impl ConstructorCall {
-    pub(crate) fn new(ty: RefType, args: Vec<Expression>) -> Self {
-        Self { ty, args }
     }
 }
 
@@ -160,47 +148,52 @@ pub(crate) enum Constant {
     String(String),
     Bool(bool),
     Null,
+    This,
 }
 
-pub(crate) fn cst_bool(cst: bool) -> Expression {
-    Expression::Constant(Constant::Bool(cst))
+pub(crate) fn cst_bool(cst: bool) -> Expr {
+    Expr::Constant(Constant::Bool(cst))
 }
 
-pub(crate) fn cst_int(cst: i32) -> Expression {
-    Expression::Constant(Constant::Int(cst))
+pub(crate) fn cst_int(cst: i32) -> Expr {
+    Expr::Constant(Constant::Int(cst))
 }
 
-pub(crate) fn cst_float(cst: f64) -> Expression {
-    Expression::Constant(Constant::Float(cst))
+pub(crate) fn cst_float(cst: f64) -> Expr {
+    Expr::Constant(Constant::Float(cst))
 }
 
-pub(crate) fn cst_string(cst: String) -> Expression {
-    Expression::Constant(Constant::String(cst))
+pub(crate) fn cst_string(cst: String) -> Expr {
+    Expr::Constant(Constant::String(cst))
 }
 
-pub(crate) fn cst_null() -> Expression {
-    Expression::Constant(Constant::Null)
+pub(crate) fn cst_null() -> Expr {
+    Expr::Constant(Constant::Null)
+}
+
+pub(crate) fn cst_this() -> Expr {
+    Expr::Constant(Constant::This)
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum Operation {
-    Not(Box<Expression>),
-    Decr(Box<Expression>),
-    Incr(Box<Expression>),
-    Add(Box<Expression>, Box<Expression>),
-    Sub(Box<Expression>, Box<Expression>),
-    Eq(Box<Expression>, Box<Expression>),
-    NotEq(Box<Expression>, Box<Expression>),
-    Gt(Box<Expression>, Box<Expression>),
-    Gte(Box<Expression>, Box<Expression>),
-    Lt(Box<Expression>, Box<Expression>),
-    Lte(Box<Expression>, Box<Expression>),
+    Not(Box<Expr>),
+    Decr(Box<Expr>),
+    Incr(Box<Expr>),
+    Add(Box<Expr>, Box<Expr>),
+    Sub(Box<Expr>, Box<Expr>),
+    Eq(Box<Expr>, Box<Expr>),
+    NotEq(Box<Expr>, Box<Expr>),
+    Gt(Box<Expr>, Box<Expr>),
+    Gte(Box<Expr>, Box<Expr>),
+    Lt(Box<Expr>, Box<Expr>),
+    Lte(Box<Expr>, Box<Expr>),
 }
 
 macro_rules! make_op_shorthand {
     ($name:ident, $op:ident, $( $e:ident ),+) => {
-        pub(crate) fn $name($( $e: Expression ),+) -> Expression {
-            Expression::Op(Operation::$op($( Box::new($e) ),+))
+        pub(crate) fn $name($( $e: Expr ),+) -> Expr {
+            Expr::Op(Operation::$op($( Box::new($e) ),+))
         }
     }
 }
@@ -217,8 +210,8 @@ make_op_shorthand!(lt, Lt, e1, e2);
 make_op_shorthand!(lte, Lte, e1, e2);
 
 // Invert an expression, will also optimize the expression.
-pub(crate) fn not(e: Expression) -> Expression {
-    use Expression::*;
+pub(crate) fn not(e: Expr) -> Expr {
+    use Expr::Op;
     use Operation::*;
     match e {
         Op(Not(a)) => *a,
@@ -233,8 +226,8 @@ pub(crate) fn not(e: Expression) -> Expression {
 }
 
 // Flip the operands of an expression
-pub(crate) fn flip(e: Expression) -> Expression {
-    use Expression::*;
+pub(crate) fn flip(e: Expr) -> Expr {
+    use Expr::Op;
     use Operation::*;
     match e {
         Op(Add(a, b)) => Op(Add(b, a)),
@@ -249,43 +242,90 @@ pub(crate) fn flip(e: Expression) -> Expression {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum Expression {
+pub(crate) struct ConstructorCall {
+    pub(crate) ty: RefType,
+    pub(crate) args: Vec<Expr>,
+}
+
+impl ConstructorCall {
+    pub(crate) fn new(ty: RefType, args: Vec<Expr>) -> Self {
+        Self { ty, args }
+    }
+}
+
+/// Function or method call
+#[derive(Debug, Clone)]
+pub(crate) struct Call {
+    pub(crate) fun: Expr,
+    pub(crate) args: Vec<Expr>,
+}
+
+impl Call {
+    pub(crate) fn new(fun: Expr, args: Vec<Expr>) -> Self {
+        Self { fun, args }
+    }
+
+    pub(crate) fn new_fun(fun: RefFun, args: Vec<Expr>) -> Self {
+        Self {
+            fun: Expr::FunRef(fun),
+            args,
+        }
+    }
+}
+
+pub(crate) fn call(fun: Expr, args: Vec<Expr>) -> Expr {
+    Expr::Call(Box::new(Call::new(fun, args)))
+}
+
+pub(crate) fn call_fun(fun: RefFun, args: Vec<Expr>) -> Expr {
+    Expr::Call(Box::new(Call::new_fun(fun, args)))
+}
+
+/// An expression with a value
+#[derive(Debug, Clone)]
+pub(crate) enum Expr {
+    /// Variable identifier
     Variable(Reg, Option<String>),
+    /// Constant value
     Constant(Constant),
+    /// Constructor call
     Constructor(ConstructorCall),
-    Call(RefFun, Vec<Expression>),
+    /// Function call
+    Call(Box<Call>),
+    /// Operator
     Op(Operation),
+    /// Function reference
+    FunRef(RefFun),
+    Field(Box<Expr>, RefType, RefField),
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum Statement {
-    NewVariable {
-        reg: Reg,
-        name: Option<String>,
-        assign: Expression,
-    },
+    // Variable assignment
     Assign {
+        declaration: bool,
         reg: Reg,
         name: Option<String>,
-        assign: Expression,
+        assign: Expr,
     },
-    CallVoid {
-        fun: RefFun,
-        args: Vec<Expression>,
-    },
-    Return {
-        expr: Expression,
-    },
+    // Call a void function (no assignment)
+    Call(Call),
+    /// Return an expression
+    Return(Expr),
+    /// Return nothing / early return
     ReturnVoid,
+    /// If statement
     If {
-        cond: Expression,
+        cond: Expr,
         stmts: Vec<Statement>,
     },
+    /// Else clause for the if statement
     Else {
         stmts: Vec<Statement>,
     },
+    /// While statement
     While {
-        cond: Expression,
+        cond: Expr,
         stmts: Vec<Statement>,
     },
 }

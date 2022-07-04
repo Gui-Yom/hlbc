@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter, Write};
 use hlbc::types::Function;
 use hlbc::Bytecode;
 
-use crate::decompiler::ast::{Constant, ConstructorCall, Expression, Operation, Statement};
+use crate::decompiler::ast::{Call, Constant, ConstructorCall, Expr, Operation, Statement};
 use crate::FormatOptions;
 
 impl Display for FormatOptions {
@@ -53,25 +53,26 @@ impl Operation {
     }
 }
 
-impl Expression {
+impl Expr {
     pub(crate) fn display(&self, code: &Bytecode) -> String {
         match self {
-            Expression::Variable(x, name) => {
+            Expr::Variable(x, name) => {
                 if let Some(name) = name {
                     name.clone()
                 } else {
                     format!("{x}")
                 }
             }
-            Expression::Constant(x) => match x {
+            Expr::Constant(x) => match x {
                 Constant::Int(c) => c.to_string(),
                 Constant::Float(c) => c.to_string(),
                 Constant::String(c) => format!("\"{c}\""),
                 Constant::Bool(c) => c.to_string(),
                 Constant::Null => "null".to_owned(),
+                Constant::This => "this".to_owned(),
             },
-            Expression::Op(op) => op.display(code),
-            Expression::Constructor(ConstructorCall { ty, args }) => {
+            Expr::Op(op) => op.display(code),
+            Expr::Constructor(ConstructorCall { ty, args }) => {
                 format!(
                     "new {}({})",
                     ty.display(code),
@@ -81,16 +82,25 @@ impl Expression {
                         .join(", ")
                 )
             }
-            Expression::Call(fun, args) => {
+            Expr::Call(call) => {
                 format!(
                     "{}({})",
-                    fun.display_call(code),
-                    args.iter()
+                    call.fun.display(code),
+                    call.args
+                        .iter()
                         .map(|a| a.display(code))
                         .collect::<Vec<_>>()
                         .join(", ")
                 )
             }
+            Expr::Field(receiver, receiver_type, field) => {
+                format!(
+                    "{}.{}",
+                    receiver.display(code),
+                    field.display_obj(receiver_type.resolve(&code.types), code)
+                )
+            }
+            Expr::FunRef(fun) => fun.display_call(code).to_string(),
         }
     }
 }
@@ -105,35 +115,37 @@ impl Statement {
     ) -> fmt::Result {
         write!(w, "{indent}")?;
         match self {
-            Statement::NewVariable { reg, name, assign } => {
+            Statement::Assign {
+                declaration,
+                reg,
+                name,
+                assign,
+            } => {
                 writeln!(
                     w,
-                    "var {}: {} = {};",
+                    "{}{}{} = {};",
+                    if *declaration { "var " } else { "" },
                     name.as_ref().unwrap_or(&reg.to_string()),
-                    f.regtype(*reg).display(code),
+                    if *declaration {
+                        format!(": {}", f.regtype(*reg).display(code))
+                    } else {
+                        "".to_owned()
+                    },
                     assign.display(code)
                 )?;
             }
-            Statement::Assign { reg, name, assign } => {
-                writeln!(
-                    w,
-                    "{} = {};",
-                    name.as_ref().unwrap_or(&reg.to_string()),
-                    assign.display(code)
-                )?;
-            }
-            Statement::CallVoid { fun, args } => {
+            Statement::Call(Call { fun, args }) => {
                 writeln!(
                     w,
                     "{}({})",
-                    fun.display_call(code),
+                    fun.display(code),
                     args.iter()
                         .map(|a| a.display(code))
                         .collect::<Vec<_>>()
                         .join(", ")
                 )?;
             }
-            Statement::Return { expr } => {
+            Statement::Return(expr) => {
                 writeln!(w, "return {};", expr.display(code))?;
             }
             Statement::ReturnVoid => {
