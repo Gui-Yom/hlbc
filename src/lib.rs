@@ -207,8 +207,8 @@ impl Bytecode {
             }
         }
 
-        // Function names based on object fields bindings and methods
-        for t in &types {
+        // Give functions name based on object fields bindings and methods
+        for (i, t) in types.iter().enumerate() {
             if let Some(TypeObj {
                 protos, bindings, ..
             }) = t.get_type_obj()
@@ -216,12 +216,14 @@ impl Bytecode {
                 for p in protos {
                     if let RefFunKnown::Fun(x) = findexes[p.findex.0] {
                         functions[x].name = Some(p.name);
+                        functions[x].parent = Some(RefType(i));
                     }
                 }
                 for (fid, findex) in bindings {
                     if let Some(field) = t.get_type_obj().map(|o| &o.fields[fid.0]) {
                         if let RefFunKnown::Fun(x) = findexes[findex.0] {
                             functions[x].name = Some(field.name);
+                            functions[x].parent = Some(RefType(i));
                         }
                     }
                 }

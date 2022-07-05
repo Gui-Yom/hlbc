@@ -215,6 +215,10 @@ pub struct Function {
     pub debug_info: Option<Vec<(usize, usize)>>,
     /// *Debug* Information about some variables names for some instructions
     pub assigns: Option<Vec<(RefString, usize)>>,
+
+    // Fields below are not part of the bytecode
+    /// Parent type (Obj/Struct)
+    pub parent: Option<RefType>,
 }
 
 impl Function {

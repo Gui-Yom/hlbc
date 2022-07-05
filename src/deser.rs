@@ -282,6 +282,7 @@ impl<T: Read> ReadHlExt for T {
             ops,
             debug_info,
             assigns,
+            parent: None,
         })
     }
 

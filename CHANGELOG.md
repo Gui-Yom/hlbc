@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Derive Default on a lot of types
 - Global initializer map (global -> constant)
 - Correctly handle bytes pool
+- Store a reference to the parent type in the function struct
 
 ### Changed
 
