@@ -260,9 +260,18 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         new,
                         Expr::Constructor(ConstructorCall::new(f.regtype(new), make_args!($($args),*)))
                     );
+                    constructor_ctx = None;
                 }
             } else {
-                push_expr!($i, $dst, call_fun($fun, make_args!($arg0 $(, $args)*)));
+                if let Some(parent) = $fun.resolve_as_fn(code).unwrap().parent {
+                    if parent == f.regtype($arg0) {
+                        push_expr!($i, $dst, call(Expr::Field(Box::new(expr!($arg0)), $fun.resolve_as_fn(code).unwrap().name.clone().unwrap().resolve(&code.strings).to_owned()), make_args!($($args),*)));
+                    } else {
+                        push_expr!($i, $dst, call_fun($fun, make_args!($arg0 $(, $args)*)));
+                    }
+                } else {
+                    push_expr!($i, $dst, call_fun($fun, make_args!($arg0 $(, $args)*)));
+                }
             }
         };
     }
@@ -396,7 +405,12 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     i,
                     *dst,
                     call(
-                        Expr::Field(Box::new(expr!(args[0])), f.regtype(args[0]), *field),
+                        Expr::Field(
+                            Box::new(expr!(args[0])),
+                            field
+                                .display_obj(f.regtype(args[0]).resolve(&code.types), code)
+                                .to_string()
+                        ),
                         args.iter().skip(1).map(|x| expr!(x)).collect::<Vec<_>>()
                     )
                 );
@@ -406,7 +420,12 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     i,
                     *dst,
                     call(
-                        Expr::Field(Box::new(cst_this()), f.regtype(args[0]), *field),
+                        Expr::Field(
+                            Box::new(cst_this()),
+                            field
+                                .display_obj(f.regtype(args[0]).resolve(&code.types), code)
+                                .to_string()
+                        ),
                         args.iter().skip(1).map(|x| expr!(x)).collect::<Vec<_>>()
                     )
                 );

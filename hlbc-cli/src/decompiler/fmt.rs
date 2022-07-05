@@ -93,12 +93,8 @@ impl Expr {
                         .join(", ")
                 )
             }
-            Expr::Field(receiver, receiver_type, field) => {
-                format!(
-                    "{}.{}",
-                    receiver.display(code),
-                    field.display_obj(receiver_type.resolve(&code.types), code)
-                )
+            Expr::Field(receiver, name) => {
+                format!("{}.{}", receiver.display(code), name)
             }
             Expr::FunRef(fun) => fun.display_call(code).to_string(),
         }

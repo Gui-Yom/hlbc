@@ -296,7 +296,7 @@ pub(crate) enum Expr {
     Op(Operation),
     /// Function reference
     FunRef(RefFun),
-    Field(Box<Expr>, RefType, RefField),
+    Field(Box<Expr>, String),
 }
 
 #[derive(Debug, Clone)]
