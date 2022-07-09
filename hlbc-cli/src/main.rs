@@ -10,7 +10,7 @@ use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use hlbc::analysis::{find_fun_refs, iter_ops};
 use hlbc::opcodes::Opcode;
-use hlbc::types::{FunPtr, RefFun, Type};
+use hlbc::types::{FunPtr, RefFun, RefGlobal, Type};
 use hlbc::*;
 
 use crate::command::{commands_parser, Command, ElementRef, FileOrIndex, ParseContext, Parser};
@@ -100,9 +100,9 @@ fn main() -> anyhow::Result<()> {
             for cmd in $commands {
                 match cmd {
                     #[rustfmt::skip]
-                                Command::Exit => {
-                                    $onexit
-                                },
+                                                                                Command::Exit => {
+                                                                                    $onexit
+                                                                                },
                     cmd => {
                         process_command(&mut stdout, $code, cmd)?;
                     }
@@ -361,6 +361,11 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
             for i in range {
                 print_i!(i);
                 println!("{}", code.globals[i].display(code));
+                if let Some(&cst) = code.globals_initializers.get(&RefGlobal(i)) {
+                    for init in &code.constants.as_ref().unwrap()[cst].fields {
+                        println!("    {}", init);
+                    }
+                }
             }
         }
         Command::Native(range) => {

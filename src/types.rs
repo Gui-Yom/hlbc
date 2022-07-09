@@ -230,7 +230,8 @@ pub struct Function {
     pub assigns: Option<Vec<(RefString, usize)>>,
 
     // Fields below are not part of the bytecode
-    /// Parent type (Obj/Struct)
+    /// Parent type (Obj/Struct) this function is a member of.
+    /// This does not mean it's a method
     pub parent: Option<RefType>,
 }
 
@@ -240,33 +241,46 @@ impl Function {
         self.regs[reg.0 as usize]
     }
 
-    /// Skip a lot of the pain
+    /// Get the function signature type
     pub fn ty<'a>(&self, code: &'a Bytecode) -> &'a TypeFun {
+        // Guaranteed to be a TypeFun
         self.t.resolve_as_fun(&code.types).expect("Unknown type ?")
     }
 
-    /// Uses the assigns
+    /// Uses the assigns to find the name of an argument
     pub fn arg_name(&self, code: &Bytecode, pos: usize) -> Option<String> {
-        if let Some(assigns) = &self.assigns {
-            for (j, &(s, i)) in assigns.iter().enumerate() {
-                if i == 0 && j == pos {
-                    return Some(s.resolve(&code.strings).to_string());
-                }
-            }
-        }
-        None
+        self.assigns.as_ref().and_then(|a| {
+            a.iter()
+                .filter(|&&(_, i)| i == 0)
+                .enumerate()
+                .find_map(|(j, (s, _))| {
+                    if j == pos {
+                        Some(s.resolve(&code.strings).to_string())
+                    } else {
+                        None
+                    }
+                })
+        })
     }
 
-    /// Uses the assigns
+    /// Uses the assigns to find the name of a variable
     pub fn var_name(&self, code: &Bytecode, pos: usize) -> Option<String> {
-        if let Some(assigns) = &self.assigns {
-            for &(s, i) in assigns {
-                if pos == i - 1 {
-                    return Some(s.resolve(&code.strings).to_string());
+        self.assigns.as_ref().and_then(|a| {
+            a.iter().find_map(|&(s, i)| {
+                if pos + 1 == i {
+                    Some(s.resolve(&code.strings).to_owned())
+                } else {
+                    None
                 }
-            }
-        }
-        None
+            })
+        })
+    }
+
+    /// A function is a method if the first argument has the same type as the parent type
+    pub fn is_method(&self) -> bool {
+        self.parent
+            .map(|parent| !self.regs.is_empty() && self.regs[0] == parent)
+            .unwrap_or(false)
     }
 }
 

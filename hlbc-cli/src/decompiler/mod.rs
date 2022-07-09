@@ -179,14 +179,14 @@ pub fn decompile_closure(code: &Bytecode, indent: &FormatOptions, f: &Function) 
 pub fn decompile_function_body(code: &Bytecode, indent: &FormatOptions, f: &Function) -> String {
     let mut buf = String::with_capacity(256);
 
-    for a in f
-        .assigns
-        .as_ref()
-        .unwrap()
-        .iter()
-        .map(|(s, i)| format!("{} at opcode {}", s.resolve(&code.strings), i - 1))
-    {
-        writeln!(&mut buf, "{indent}{a}").unwrap();
+    for &(s, i) in f.assigns.as_ref().unwrap() {
+        writeln!(
+            &mut buf,
+            "{indent}{} at opcode {}",
+            s.resolve(&code.strings),
+            i as i32 - 1
+        )
+        .unwrap();
     }
     writeln!(&mut buf).unwrap();
 
@@ -222,15 +222,22 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
     // Variable names we already declared
     let mut seen = HashSet::new();
 
+    let mut start = 0;
+    // First argument / First register is 'this'
+    if f.is_method() {
+        reg_state.insert(Reg(0), cst_this());
+        start = 1;
+    }
+
     // Initialize register state with the function arguments
-    for i in 0..f.ty(code).args.len() {
+    for i in start..f.ty(code).args.len() {
         reg_state.insert(
             Reg(i as u32),
-            Expr::Variable(Reg(i as u32), f.arg_name(code, i)),
+            Expr::Variable(Reg(i as u32), f.arg_name(code, i - start)),
         );
     }
 
-    // Create a statement and update the register state (depending on inline rules)
+    // Update the register state and create a statement depending on inline rules
     macro_rules! push_expr {
         ($i:expr, $dst:expr, $e:expr) => {
             let name = f.var_name(code, $i);
@@ -275,18 +282,17 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     expr_ctx.pop();
                 }
             } else {
-                if let Some(parent) = $fun.resolve_as_fn(code).unwrap().parent {
-                    if parent == f.regtype($arg0) {
-                        push_expr!($i, $dst, call(Expr::Field(Box::new(expr!($arg0)), $fun.resolve_as_fn(code).unwrap().name.clone().unwrap().resolve(&code.strings).to_owned()), make_args!($($args),*)));
-                    } else if $fun.resolve_as_fn(code).unwrap().ty(code).ret.is_void() {
-                        statement = Some(Statement::Call(Call::new_fun($fun, make_args!($arg0 $(, $args)*))));
-                    } else {
-                        push_expr!($i, $dst, call_fun($fun, make_args!($arg0 $(, $args)*)));
-                    }
-                } else if $fun.resolve_as_fn(code).unwrap().ty(code).ret.is_void() {
-                    statement = Some(Statement::Call(Call::new_fun($fun, make_args!($arg0 $(, $args)*))));
+                let func = $fun.resolve_as_fn(code).unwrap();
+
+                let call = if func.is_method() {
+                    Call::new(Expr::Field(Box::new(expr!($arg0)), func.name.clone().unwrap().resolve(&code.strings).to_owned()), make_args!($($args),*))
                 } else {
-                    push_expr!($i, $dst, call_fun($fun, make_args!($arg0 $(, $args)*)));
+                    Call::new_fun($fun, make_args!($arg0 $(, $args)*))
+                };
+                if func.ty(code).ret.is_void() {
+                    statement = Some(Statement::Call(call));
+                } else {
+                    push_expr!($i, $dst, Expr::Call(Box::new(call)));
                 }
             }
         };
@@ -328,6 +334,9 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
             &Opcode::String { dst, ptr } => {
                 push_expr!(i, dst, cst_string(ptr.resolve(&code.strings).to_owned()));
             }
+            &Opcode::Null { dst } => {
+                push_expr!(i, dst, cst_null());
+            }
             &Opcode::GetGlobal { dst, global } => {
                 // Is a string
                 if f.regtype(dst).0 == 13 {
@@ -336,10 +345,17 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         dst,
                         cst_string(global_value_from_constant(code, global).unwrap())
                     );
-                } else if let Some(obj) = f.regtype(dst).resolve(&code.types).get_type_obj() {
-                    push_expr!(i, dst, Expr::Variable(dst, Some(obj.name.display(code))));
+                } else {
+                    match f.regtype(dst).resolve(&code.types) {
+                        Type::Obj(obj) | Type::Struct(obj) => {
+                            push_expr!(i, dst, Expr::Variable(dst, Some(obj.name.display(code))));
+                        }
+                        Type::Enum { global: eg, .. } => {
+                            println!("{:?} -> {:?}", global, eg);
+                        }
+                        _ => {}
+                    }
                 }
-                // TODO handle other global types
             }
             &Opcode::Add { dst, a, b } => {
                 push_expr!(i, dst, add(expr!(a), expr!(b)));
