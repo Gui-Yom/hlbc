@@ -5,12 +5,12 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 
 use hlbc::opcodes::Opcode;
-use hlbc::types::{Function, RefField, RefGlobal, RefType, Reg, Type, TypeObj};
+use hlbc::types::{Function, RefField, RefGlobal, Reg, Type, TypeObj};
 use hlbc::Bytecode;
 
 use crate::decompiler::ast::{
     add, call, call_fun, cst_bool, cst_float, cst_int, cst_null, cst_string, cst_this, decr, eq,
-    field, gt, gte, incr, lt, lte, not, noteq, sub, Call, ConstructorCall, Expr, LoopScope, Scope,
+    gt, gte, incr, lt, lte, not, noteq, sub, Call, ConstructorCall, Expr, LoopScope, Scope,
     ScopeType, Scopes, Statement,
 };
 
@@ -198,10 +198,18 @@ pub fn decompile_function_body(code: &Bytecode, indent: &FormatOptions, f: &Func
 }
 
 enum ExprCtx {
-    Constructor { reg: Reg, pos: usize },
-    Anonymous { pos: usize, fields: Vec<Expr> },
+    Constructor {
+        reg: Reg,
+        pos: usize,
+    },
+    Anonymous {
+        pos: usize,
+        fields: HashMap<RefField, Expr>,
+        remaining: usize,
+    },
 }
 
+/// Generate a list of statements for a function
 fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
     // Holds the statements, handles the scopes
     let mut scopes = Scopes::new();
@@ -284,34 +292,6 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
         };
     }
 
-    macro_rules! push_callN {
-        ($i:ident, $dst:expr, $fun:expr, $args:expr) => {
-            if let Some(&ExprCtx::Constructor { reg, pos }) = expr_ctx.last() {
-                if reg == $args[0] {
-                    push_expr!(
-                        pos,
-                        reg,
-                        Expr::Constructor(ConstructorCall::new(
-                            f.regtype(reg),
-                            $args[1..].iter().map(|x| expr!(x)).collect::<Vec<_>>()
-                        ))
-                    );
-                }
-            } else if $fun.resolve_as_fn(code).unwrap().ty(code).ret.is_void() {
-                statement = Some(Statement::Call(Call::new_fun(
-                    $fun,
-                    $args.iter().map(|x| expr!(x)).collect::<Vec<_>>(),
-                )));
-            } else {
-                push_expr!(
-                    $i,
-                    $dst,
-                    call_fun($fun, $args.iter().map(|x| expr!(x)).collect::<Vec<_>>())
-                );
-            }
-        };
-    }
-
     // Process a jmp instruction, might be the exit condition of a loop or an if
     macro_rules! push_jmp {
         ($i:ident, $offset:ident, $cond:expr) => {
@@ -386,7 +366,8 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     Type::Virtual { fields } => {
                         expr_ctx.push(ExprCtx::Anonymous {
                             pos: i,
-                            fields: Vec::with_capacity(fields.len()),
+                            fields: HashMap::with_capacity(fields.len()),
+                            remaining: fields.len(),
                         });
                     }
                     _ => {
@@ -436,37 +417,87 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 push_call!(i, dst, fun, arg0, arg1, arg2, arg3)
             }
             Opcode::CallN { dst, fun, args } => {
-                push_callN!(i, *dst, *fun, args)
+                if let Some(&ExprCtx::Constructor { reg, pos }) = expr_ctx.last() {
+                    if reg == args[0] {
+                        push_expr!(
+                            pos,
+                            reg,
+                            Expr::Constructor(ConstructorCall::new(
+                                f.regtype(reg),
+                                args[1..].iter().map(|x| expr!(x)).collect::<Vec<_>>()
+                            ))
+                        );
+                    }
+                } else if fun.resolve_as_fn(code).unwrap().ty(code).ret.is_void() {
+                    statement = Some(Statement::Call(Call::new_fun(
+                        *fun,
+                        args.iter().map(|x| expr!(x)).collect::<Vec<_>>(),
+                    )));
+                } else {
+                    push_expr!(
+                        i,
+                        *dst,
+                        call_fun(*fun, args.iter().map(|x| expr!(x)).collect::<Vec<_>>())
+                    );
+                }
             }
             Opcode::CallMethod { dst, field, args } => {
-                push_expr!(
-                    i,
-                    *dst,
-                    call(
-                        Expr::Field(
-                            Box::new(expr!(args[0])),
-                            field
-                                .display_obj(f.regtype(args[0]).resolve(&code.types), code)
-                                .to_string()
-                        ),
-                        args.iter().skip(1).map(|x| expr!(x)).collect::<Vec<_>>()
-                    )
+                let call = Call::new(
+                    Expr::Field(
+                        Box::new(expr!(args[0])),
+                        field
+                            .display_obj(f.regtype(args[0]).resolve(&code.types), code)
+                            .to_string(),
+                    ),
+                    args.iter().skip(1).map(|x| expr!(x)).collect::<Vec<_>>(),
                 );
+                if f.regtype(args[0])
+                    .field(*field, code)
+                    .and_then(|fi| fi.t.resolve_as_fun(&code.types))
+                    .map(|ty| ty.ret.is_void())
+                    .unwrap()
+                {
+                    statement = Some(Statement::Call(call));
+                } else {
+                    push_expr!(i, *dst, Expr::Call(Box::new(call)));
+                }
             }
             Opcode::CallThis { dst, field, args } => {
-                push_expr!(
-                    i,
-                    *dst,
-                    call(
-                        Expr::Field(
-                            Box::new(cst_this()),
-                            field
-                                .display_obj(f.regtype(args[0]).resolve(&code.types), code)
-                                .to_string()
-                        ),
-                        args.iter().skip(1).map(|x| expr!(x)).collect::<Vec<_>>()
-                    )
+                let call = Call::new(
+                    Expr::Field(
+                        Box::new(cst_this()),
+                        field
+                            .display_obj(f.regs[0].resolve(&code.types), code)
+                            .to_string(),
+                    ),
+                    args.iter().map(|x| expr!(x)).collect::<Vec<_>>(),
                 );
+                if f.regs[0]
+                    .field(*field, code)
+                    .and_then(|fi| fi.t.resolve_as_fun(&code.types))
+                    .map(|ty| ty.ret.is_void())
+                    .unwrap()
+                {
+                    statement = Some(Statement::Call(call));
+                } else {
+                    push_expr!(i, *dst, Expr::Call(Box::new(call)));
+                }
+            }
+            Opcode::CallClosure { dst, fun, args } => {
+                let call = Call::new(
+                    expr!(*fun),
+                    args.iter().map(|x| expr!(x)).collect::<Vec<_>>(),
+                );
+                if f.regtype(*fun)
+                    .resolve_as_fun(&code.types)
+                    .unwrap()
+                    .ret
+                    .is_void()
+                {
+                    statement = Some(Statement::Call(call));
+                } else {
+                    push_expr!(i, *dst, Expr::Call(Box::new(call)));
+                }
             }
             &Opcode::Ret { ret } => {
                 // Do not display return void; only in case of an early return
@@ -535,13 +566,23 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
             &Opcode::SetField { obj, field, src } => {
                 let ctx = expr_ctx.pop();
                 // Might be a SetField for an anonymous structure
-                if let Some(ExprCtx::Anonymous { pos, mut fields }) = ctx {
-                    fields.push(expr!(src));
+                if let Some(ExprCtx::Anonymous {
+                    pos,
+                    mut fields,
+                    mut remaining,
+                }) = ctx
+                {
+                    fields.insert(field, expr!(src));
+                    remaining -= 1;
                     // If we filled all the structure fields, we emit an expr
-                    if fields.len() == fields.capacity() {
+                    if remaining == 0 {
                         push_expr!(pos, obj, Expr::Anonymous(f.regtype(obj), fields));
                     } else {
-                        expr_ctx.push(ExprCtx::Anonymous { pos, fields });
+                        expr_ctx.push(ExprCtx::Anonymous {
+                            pos,
+                            fields,
+                            remaining,
+                        });
                     }
                 } else if let Some(ctx) = ctx {
                     expr_ctx.push(ctx);

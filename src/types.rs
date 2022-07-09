@@ -192,6 +192,15 @@ impl RefType {
             _ => None,
         }
     }
+
+    pub fn resolve_as_obj<'a>(&self, types: &'a [Type]) -> Option<&'a TypeObj> {
+        self.resolve(types).get_type_obj()
+    }
+
+    pub fn field<'a>(&self, field: RefField, code: &'a Bytecode) -> Option<&'a ObjField> {
+        self.resolve_as_obj(&code.types)
+            .map(|obj| &obj.fields[field.0])
+    }
 }
 
 /// A native function reference. Contains no code but indicates the library from where to load it.

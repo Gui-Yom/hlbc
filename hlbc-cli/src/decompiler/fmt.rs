@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::{Display, Formatter, Write};
 
-use hlbc::types::{Function, Type};
+use hlbc::types::{Function, RefField, Type};
 use hlbc::Bytecode;
 
 use crate::decompiler::ast::{Call, Constant, ConstructorCall, Expr, Operation, Statement};
@@ -103,9 +103,13 @@ impl Expr {
                         "{{ {} }}",
                         fields
                             .iter()
-                            .zip(values)
-                            .map(|(f, v)| {
-                                format!("{}: {}", f.name.resolve(&code.strings), v.display(code))
+                            .enumerate()
+                            .map(|(i, f)| {
+                                format!(
+                                    "{}: {}",
+                                    f.name.resolve(&code.strings),
+                                    values.get(&RefField(i)).unwrap().display(code)
+                                )
                             })
                             .collect::<Vec<_>>()
                             .join(", ")

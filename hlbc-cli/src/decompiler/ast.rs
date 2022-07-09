@@ -1,5 +1,6 @@
 use hlbc::types::{RefField, RefFun, RefType, Reg};
 use hlbc::Bytecode;
+use std::collections::HashMap;
 
 /// Helper to process a stack of scopes (branches, loops)
 pub(crate) struct Scopes {
@@ -217,7 +218,7 @@ pub(crate) enum Expr {
     /// Field access : obj.field
     Field(Box<Expr>, String),
     /// An anonymous structure : { field: value }
-    Anonymous(RefType, Vec<Expr>),
+    Anonymous(RefType, HashMap<RefField, Expr>),
 }
 
 pub(crate) fn cst_bool(cst: bool) -> Expr {
