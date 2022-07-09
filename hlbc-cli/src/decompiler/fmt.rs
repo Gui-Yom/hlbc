@@ -1,7 +1,7 @@
 use std::fmt;
 use std::fmt::{Display, Formatter, Write};
 
-use hlbc::types::Function;
+use hlbc::types::{Function, Type};
 use hlbc::Bytecode;
 
 use crate::decompiler::ast::{Call, Constant, ConstructorCall, Expr, Operation, Statement};
@@ -97,6 +97,22 @@ impl Expr {
                 format!("{}.{}", receiver.display(code), name)
             }
             Expr::FunRef(fun) => fun.display_call(code).to_string(),
+            Expr::Anonymous(ty, values) => match ty.resolve(&code.types) {
+                Type::Virtual { fields } => {
+                    format!(
+                        "{{ {} }}",
+                        fields
+                            .iter()
+                            .zip(values)
+                            .map(|(f, v)| {
+                                format!("{}: {}", f.name.resolve(&code.strings), v.display(code))
+                            })
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                }
+                _ => "[invalid anonymous type]".to_owned(),
+            },
         }
     }
 }
@@ -113,27 +129,27 @@ impl Statement {
         match self {
             Statement::Assign {
                 declaration,
-                reg,
-                name,
+                variable,
                 assign,
             } => {
                 writeln!(
                     w,
-                    "{}{}{} = {};",
+                    "{}{} = {};",
                     if *declaration { "var " } else { "" },
-                    name.as_ref().unwrap_or(&reg.to_string()),
+                    variable.display(code),
+                    /*
                     if *declaration {
                         format!(": {}", f.regtype(*reg).display(code))
                     } else {
                         "".to_owned()
-                    },
+                    },*/
                     assign.display(code)
                 )?;
             }
             Statement::Call(Call { fun, args }) => {
                 writeln!(
                     w,
-                    "{}({})",
+                    "{}({});",
                     fun.display(code),
                     args.iter()
                         .map(|a| a.display(code))

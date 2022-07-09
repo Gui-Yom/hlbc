@@ -1,4 +1,5 @@
 use hlbc::types::{RefField, RefFun, RefType, Reg};
+use hlbc::Bytecode;
 
 /// Helper to process a stack of scopes (branches, loops)
 pub(crate) struct Scopes {
@@ -151,6 +152,74 @@ pub(crate) enum Constant {
     This,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) enum Operation {
+    Not(Box<Expr>),
+    Decr(Box<Expr>),
+    Incr(Box<Expr>),
+    Add(Box<Expr>, Box<Expr>),
+    Sub(Box<Expr>, Box<Expr>),
+    Eq(Box<Expr>, Box<Expr>),
+    NotEq(Box<Expr>, Box<Expr>),
+    Gt(Box<Expr>, Box<Expr>),
+    Gte(Box<Expr>, Box<Expr>),
+    Lt(Box<Expr>, Box<Expr>),
+    Lte(Box<Expr>, Box<Expr>),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ConstructorCall {
+    pub(crate) ty: RefType,
+    pub(crate) args: Vec<Expr>,
+}
+
+impl ConstructorCall {
+    pub(crate) fn new(ty: RefType, args: Vec<Expr>) -> Self {
+        Self { ty, args }
+    }
+}
+
+/// Function or method call
+#[derive(Debug, Clone)]
+pub(crate) struct Call {
+    pub(crate) fun: Expr,
+    pub(crate) args: Vec<Expr>,
+}
+
+impl Call {
+    pub(crate) fn new(fun: Expr, args: Vec<Expr>) -> Self {
+        Self { fun, args }
+    }
+
+    pub(crate) fn new_fun(fun: RefFun, args: Vec<Expr>) -> Self {
+        Self {
+            fun: Expr::FunRef(fun),
+            args,
+        }
+    }
+}
+
+/// An expression with a value
+#[derive(Debug, Clone)]
+pub(crate) enum Expr {
+    /// Variable identifier
+    Variable(Reg, Option<String>),
+    /// Constant value
+    Constant(Constant),
+    /// Constructor call
+    Constructor(ConstructorCall),
+    /// Function call
+    Call(Box<Call>),
+    /// Operator
+    Op(Operation),
+    /// Function reference
+    FunRef(RefFun),
+    /// Field access : obj.field
+    Field(Box<Expr>, String),
+    /// An anonymous structure : { field: value }
+    Anonymous(RefType, Vec<Expr>),
+}
+
 pub(crate) fn cst_bool(cst: bool) -> Expr {
     Expr::Constant(Constant::Bool(cst))
 }
@@ -173,21 +242,6 @@ pub(crate) fn cst_null() -> Expr {
 
 pub(crate) fn cst_this() -> Expr {
     Expr::Constant(Constant::This)
-}
-
-#[derive(Debug, Clone)]
-pub(crate) enum Operation {
-    Not(Box<Expr>),
-    Decr(Box<Expr>),
-    Incr(Box<Expr>),
-    Add(Box<Expr>, Box<Expr>),
-    Sub(Box<Expr>, Box<Expr>),
-    Eq(Box<Expr>, Box<Expr>),
-    NotEq(Box<Expr>, Box<Expr>),
-    Gt(Box<Expr>, Box<Expr>),
-    Gte(Box<Expr>, Box<Expr>),
-    Lt(Box<Expr>, Box<Expr>),
-    Lte(Box<Expr>, Box<Expr>),
 }
 
 macro_rules! make_op_shorthand {
@@ -241,38 +295,6 @@ pub(crate) fn flip(e: Expr) -> Expr {
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct ConstructorCall {
-    pub(crate) ty: RefType,
-    pub(crate) args: Vec<Expr>,
-}
-
-impl ConstructorCall {
-    pub(crate) fn new(ty: RefType, args: Vec<Expr>) -> Self {
-        Self { ty, args }
-    }
-}
-
-/// Function or method call
-#[derive(Debug, Clone)]
-pub(crate) struct Call {
-    pub(crate) fun: Expr,
-    pub(crate) args: Vec<Expr>,
-}
-
-impl Call {
-    pub(crate) fn new(fun: Expr, args: Vec<Expr>) -> Self {
-        Self { fun, args }
-    }
-
-    pub(crate) fn new_fun(fun: RefFun, args: Vec<Expr>) -> Self {
-        Self {
-            fun: Expr::FunRef(fun),
-            args,
-        }
-    }
-}
-
 pub(crate) fn call(fun: Expr, args: Vec<Expr>) -> Expr {
     Expr::Call(Box::new(Call::new(fun, args)))
 }
@@ -281,31 +303,22 @@ pub(crate) fn call_fun(fun: RefFun, args: Vec<Expr>) -> Expr {
     Expr::Call(Box::new(Call::new_fun(fun, args)))
 }
 
-/// An expression with a value
-#[derive(Debug, Clone)]
-pub(crate) enum Expr {
-    /// Variable identifier
-    Variable(Reg, Option<String>),
-    /// Constant value
-    Constant(Constant),
-    /// Constructor call
-    Constructor(ConstructorCall),
-    /// Function call
-    Call(Box<Call>),
-    /// Operator
-    Op(Operation),
-    /// Function reference
-    FunRef(RefFun),
-    Field(Box<Expr>, String),
+pub(crate) fn field(expr: Expr, obj: RefType, field: RefField, code: &Bytecode) -> Expr {
+    Expr::Field(
+        Box::new(expr),
+        field
+            .display_obj(obj.resolve(&code.types), code)
+            .to_string(),
+    )
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum Statement {
-    // Variable assignment
+    /// Variable assignment
     Assign {
+        /// Should 'var' appear
         declaration: bool,
-        reg: Reg,
-        name: Option<String>,
+        variable: Expr,
         assign: Expr,
     },
     // Call a void function (no assignment)

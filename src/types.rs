@@ -101,10 +101,14 @@ pub struct TypeObj {
     pub global: RefGlobal,
     /// Fields defined in this type
     pub own_fields: Vec<ObjField>,
-    /// Including other fields in the hierarchy
-    pub fields: Vec<ObjField>,
+    /// Methods in this class
     pub protos: Vec<ObjProto>,
+    /// Functions bounds to class fields
     pub bindings: HashMap<RefField, RefFun>,
+
+    // Data below is not stored in the bytecode
+    /// Fields including parents in the hierarchy
+    pub fields: Vec<ObjField>,
 }
 
 /// Type available in the hashlink type system. Every type is one of those.

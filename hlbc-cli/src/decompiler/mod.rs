@@ -5,12 +5,12 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Write;
 
 use hlbc::opcodes::Opcode;
-use hlbc::types::{Function, RefField, RefGlobal, Reg, Type, TypeObj};
+use hlbc::types::{Function, RefField, RefGlobal, RefType, Reg, Type, TypeObj};
 use hlbc::Bytecode;
 
 use crate::decompiler::ast::{
     add, call, call_fun, cst_bool, cst_float, cst_int, cst_null, cst_string, cst_this, decr, eq,
-    gt, gte, incr, lt, lte, not, noteq, sub, Call, ConstructorCall, Expr, LoopScope, Scope,
+    field, gt, gte, incr, lt, lte, not, noteq, sub, Call, ConstructorCall, Expr, LoopScope, Scope,
     ScopeType, Scopes, Statement,
 };
 
@@ -197,6 +197,11 @@ pub fn decompile_function_body(code: &Bytecode, indent: &FormatOptions, f: &Func
     buf
 }
 
+enum ExprCtx {
+    Constructor { reg: Reg, pos: usize },
+    Anonymous { pos: usize, fields: Vec<Expr> },
+}
+
 fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
     // Holds the statements, handles the scopes
     let mut scopes = Scopes::new();
@@ -204,8 +209,8 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
     let mut statement = None;
     // Expression values for each registers
     let mut reg_state = HashMap::with_capacity(f.regs.len());
-    // Some when we're parsing a constructor call (between New and Call)
-    let mut constructor_ctx = None;
+    // For parsing statements made of multiple instructions like constructor calls and anonymous structures
+    let mut expr_ctx = Vec::new();
     // Variable names we already declared
     let mut seen = HashSet::new();
 
@@ -229,8 +234,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 reg_state.insert($dst, Expr::Variable($dst, name.clone()));
                 statement = Some(Statement::Assign {
                     declaration: seen.insert(name.clone().unwrap()),
-                    reg: $dst,
-                    name,
+                    variable: Expr::Variable($dst, name),
                     assign: expr,
                 });
             }
@@ -253,22 +257,26 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
     macro_rules! push_call {
         ($i:ident, $dst:ident, $fun:ident, $arg0:expr $(, $args:expr)*) => {
-            if let Some((new, j)) = constructor_ctx {
-                if new == $arg0 {
+            if let Some(&ExprCtx::Constructor { reg, pos }) = expr_ctx.last() {
+                if reg == $arg0 {
                     push_expr!(
-                        j,
-                        new,
-                        Expr::Constructor(ConstructorCall::new(f.regtype(new), make_args!($($args),*)))
+                        pos,
+                        reg,
+                        Expr::Constructor(ConstructorCall::new(f.regtype(reg), make_args!($($args),*)))
                     );
-                    constructor_ctx = None;
+                    expr_ctx.pop();
                 }
             } else {
                 if let Some(parent) = $fun.resolve_as_fn(code).unwrap().parent {
                     if parent == f.regtype($arg0) {
                         push_expr!($i, $dst, call(Expr::Field(Box::new(expr!($arg0)), $fun.resolve_as_fn(code).unwrap().name.clone().unwrap().resolve(&code.strings).to_owned()), make_args!($($args),*)));
+                    } else if $fun.resolve_as_fn(code).unwrap().ty(code).ret.is_void() {
+                        statement = Some(Statement::Call(Call::new_fun($fun, make_args!($arg0 $(, $args)*))));
                     } else {
                         push_expr!($i, $dst, call_fun($fun, make_args!($arg0 $(, $args)*)));
                     }
+                } else if $fun.resolve_as_fn(code).unwrap().ty(code).ret.is_void() {
+                    statement = Some(Statement::Call(Call::new_fun($fun, make_args!($arg0 $(, $args)*))));
                 } else {
                     push_expr!($i, $dst, call_fun($fun, make_args!($arg0 $(, $args)*)));
                 }
@@ -278,17 +286,22 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
     macro_rules! push_callN {
         ($i:ident, $dst:expr, $fun:expr, $args:expr) => {
-            if let Some((new, j)) = constructor_ctx {
-                if new == $args[0] {
+            if let Some(&ExprCtx::Constructor { reg, pos }) = expr_ctx.last() {
+                if reg == $args[0] {
                     push_expr!(
-                        j,
-                        new,
+                        pos,
+                        reg,
                         Expr::Constructor(ConstructorCall::new(
-                            f.regtype(new),
+                            f.regtype(reg),
                             $args[1..].iter().map(|x| expr!(x)).collect::<Vec<_>>()
                         ))
                     );
                 }
+            } else if $fun.resolve_as_fn(code).unwrap().ty(code).ret.is_void() {
+                statement = Some(Statement::Call(Call::new_fun(
+                    $fun,
+                    $args.iter().map(|x| expr!(x)).collect::<Vec<_>>(),
+                )));
             } else {
                 push_expr!(
                     $i,
@@ -336,12 +349,15 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 push_expr!(i, dst, cst_string(ptr.resolve(&code.strings).to_owned()));
             }
             &Opcode::GetGlobal { dst, global } => {
+                // Is a string
                 if f.regtype(dst).0 == 13 {
                     push_expr!(
                         i,
                         dst,
                         cst_string(global_value_from_constant(code, global).unwrap())
                     );
+                } else if let Some(obj) = f.regtype(dst).resolve(&code.types).get_type_obj() {
+                    push_expr!(i, dst, Expr::Variable(dst, Some(obj.name.display(code))));
                 }
                 // TODO handle other global types
             }
@@ -362,10 +378,32 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
             }
             &Opcode::New { dst } => {
                 // Constructor analysis
-                constructor_ctx = Some((dst, i));
+                let ty = f.regtype(dst).resolve(&code.types);
+                match ty {
+                    Type::Obj(_) | Type::Struct(_) => {
+                        expr_ctx.push(ExprCtx::Constructor { reg: dst, pos: i });
+                    }
+                    Type::Virtual { fields } => {
+                        expr_ctx.push(ExprCtx::Anonymous {
+                            pos: i,
+                            fields: Vec::with_capacity(fields.len()),
+                        });
+                    }
+                    _ => {
+                        push_expr!(
+                            i,
+                            dst,
+                            Expr::Constructor(ConstructorCall::new(f.regtype(dst), Vec::new()))
+                        );
+                    }
+                }
             }
             &Opcode::Call0 { dst, fun } => {
-                push_expr!(i, dst, call_fun(fun, Vec::new()));
+                if fun.resolve_as_fn(code).unwrap().ty(code).ret.is_void() {
+                    statement = Some(Statement::Call(Call::new_fun(fun, Vec::new())));
+                } else {
+                    push_expr!(i, dst, call_fun(fun, Vec::new()));
+                }
             }
             &Opcode::Call1 { dst, fun, arg0 } => {
                 push_call!(i, dst, fun, arg0)
@@ -490,6 +528,34 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
             }
             &Opcode::JNotEq { a, b, offset } => {
                 push_jmp!(i, offset, eq(expr!(a), expr!(b)))
+            }
+            &Opcode::Field { dst, obj, field } => {
+                push_expr!(i, dst, ast::field(expr!(obj), f.regtype(obj), field, code));
+            }
+            &Opcode::SetField { obj, field, src } => {
+                let ctx = expr_ctx.pop();
+                // Might be a SetField for an anonymous structure
+                if let Some(ExprCtx::Anonymous { pos, mut fields }) = ctx {
+                    fields.push(expr!(src));
+                    // If we filled all the structure fields, we emit an expr
+                    if fields.len() == fields.capacity() {
+                        push_expr!(pos, obj, Expr::Anonymous(f.regtype(obj), fields));
+                    } else {
+                        expr_ctx.push(ExprCtx::Anonymous { pos, fields });
+                    }
+                } else if let Some(ctx) = ctx {
+                    expr_ctx.push(ctx);
+                } else {
+                    // Otherwise this is just a normal field set
+                    statement = Some(Statement::Assign {
+                        declaration: false,
+                        variable: ast::field(expr!(obj), f.regtype(obj), field, code),
+                        assign: expr!(src),
+                    });
+                }
+            }
+            &Opcode::ToVirtual { dst, src } => {
+                push_expr!(i, dst, expr!(src));
             }
             _ => {}
         }
