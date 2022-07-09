@@ -379,6 +379,23 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     }
                 }
             }
+            &Opcode::StaticClosure { dst, fun } => {
+                push_expr!(
+                    i,
+                    dst,
+                    Expr::Closure(fun, make_statements(code, fun.resolve_as_fn(code).unwrap()))
+                );
+            }
+            &Opcode::InstanceClosure { dst, obj, fun } => {
+                push_expr!(
+                    i,
+                    dst,
+                    Expr::Field(
+                        Box::new(expr!(obj)),
+                        fun.resolve_as_fn(code).unwrap().name.unwrap().display(code),
+                    )
+                );
+            }
             &Opcode::Call0 { dst, fun } => {
                 if fun.resolve_as_fn(code).unwrap().ty(code).ret.is_void() {
                     statement = Some(Statement::Call(Call::new_fun(fun, Vec::new())));

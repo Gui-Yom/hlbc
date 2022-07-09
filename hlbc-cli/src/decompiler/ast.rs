@@ -219,6 +219,8 @@ pub(crate) enum Expr {
     Field(Box<Expr>, String),
     /// An anonymous structure : { field: value }
     Anonymous(RefType, HashMap<RefField, Expr>),
+    /// Arrow function (...) -> {...}
+    Closure(RefFun, Vec<Statement>),
 }
 
 pub(crate) fn cst_bool(cst: bool) -> Expr {
