@@ -155,11 +155,16 @@ pub(crate) enum Constant {
 
 #[derive(Debug, Clone)]
 pub(crate) enum Operation {
+    Add(Box<Expr>, Box<Expr>),
+    Sub(Box<Expr>, Box<Expr>),
+    Mul(Box<Expr>, Box<Expr>),
+    And(Box<Expr>, Box<Expr>),
+    Or(Box<Expr>, Box<Expr>),
+    Xor(Box<Expr>, Box<Expr>),
+    Neg(Box<Expr>),
     Not(Box<Expr>),
     Decr(Box<Expr>),
     Incr(Box<Expr>),
-    Add(Box<Expr>, Box<Expr>),
-    Sub(Box<Expr>, Box<Expr>),
     Eq(Box<Expr>, Box<Expr>),
     NotEq(Box<Expr>, Box<Expr>),
     Gt(Box<Expr>, Box<Expr>),
@@ -255,10 +260,15 @@ macro_rules! make_op_shorthand {
     }
 }
 
-make_op_shorthand!(decr, Decr, e1);
-make_op_shorthand!(incr, Incr, e1);
 make_op_shorthand!(add, Add, e1, e2);
 make_op_shorthand!(sub, Sub, e1, e2);
+make_op_shorthand!(mul, Mul, e1, e2);
+make_op_shorthand!(and, And, e1, e2);
+make_op_shorthand!(or, Or, e1, e2);
+make_op_shorthand!(xor, Xor, e1, e2);
+make_op_shorthand!(neg, Neg, e1);
+make_op_shorthand!(incr, Incr, e1);
+make_op_shorthand!(decr, Decr, e1);
 make_op_shorthand!(eq, Eq, e1, e2);
 make_op_shorthand!(noteq, NotEq, e1, e2);
 make_op_shorthand!(gt, Gt, e1, e2);
@@ -344,4 +354,5 @@ pub(crate) enum Statement {
         cond: Expr,
         stmts: Vec<Statement>,
     },
+    Throw(Expr),
 }

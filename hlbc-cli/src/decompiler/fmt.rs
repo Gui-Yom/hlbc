@@ -15,66 +15,98 @@ impl Display for FormatOptions {
 
 impl Operation {
     pub(crate) fn display(&self, indent: &FormatOptions, code: &Bytecode) -> String {
+        use Operation::*;
         match self {
-            Operation::Not(expr) => {
-                format!("!{}", expr.display(indent, code))
-            }
-            Operation::Decr(expr) => {
-                format!("{}--", expr.display(indent, code))
-            }
-            Operation::Incr(expr) => {
-                format!("{}++", expr.display(indent, code))
-            }
-            Operation::Add(e1, e2) => {
+            Add(e1, e2) => {
                 format!(
                     "{} + {}",
                     e1.display(indent, code),
                     e2.display(indent, code)
                 )
             }
-            Operation::Sub(e1, e2) => {
+            Sub(e1, e2) => {
                 format!(
                     "{} - {}",
                     e1.display(indent, code),
                     e2.display(indent, code)
                 )
             }
-            Operation::Eq(e1, e2) => {
+            Mul(e1, e2) => {
+                format!(
+                    "{} * {}",
+                    e1.display(indent, code),
+                    e2.display(indent, code)
+                )
+            }
+            And(e1, e2) => {
+                format!(
+                    "{} && {}",
+                    e1.display(indent, code),
+                    e2.display(indent, code)
+                )
+            }
+            Or(e1, e2) => {
+                format!(
+                    "{} || {}",
+                    e1.display(indent, code),
+                    e2.display(indent, code)
+                )
+            }
+            Xor(e1, e2) => {
+                format!(
+                    "{} ^ {}",
+                    e1.display(indent, code),
+                    e2.display(indent, code)
+                )
+            }
+            Neg(expr) => {
+                format!("-{}", expr.display(indent, code))
+            }
+            Not(expr) => {
+                format!("!{}", expr.display(indent, code))
+            }
+            Incr(expr) => {
+                format!("{}++", expr.display(indent, code))
+            }
+            Decr(expr) => {
+                format!("{}--", expr.display(indent, code))
+            }
+            Eq(e1, e2) => {
                 format!(
                     "{} == {}",
                     e1.display(indent, code),
                     e2.display(indent, code)
                 )
             }
-            Operation::NotEq(e1, e2) => {
+            NotEq(e1, e2) => {
                 format!(
                     "{} == {}",
                     e1.display(indent, code),
                     e2.display(indent, code)
                 )
             }
-            Operation::Gt(e1, e2) => {
+            Gt(e1, e2) => {
                 format!(
                     "{} > {}",
                     e1.display(indent, code),
                     e2.display(indent, code)
                 )
             }
-            Operation::Gte(e1, e2) => {
+            Gte(e1, e2) => {
                 format!(
                     "{} >= {}",
                     e1.display(indent, code),
                     e2.display(indent, code)
                 )
             }
-            Operation::Lt(e1, e2) => {
+            Lt(e1, e2) => {
                 format!(
                     "{} < {}",
                     e1.display(indent, code),
                     e2.display(indent, code)
                 )
             }
-            Operation::Lte(e1, e2) => {
+            Lte(e1, e2) => {
                 format!(
                     "{} <= {}",
                     e1.display(indent, code),
@@ -232,6 +264,9 @@ impl Statement {
                     stmt.display(w, &indent2, code, f)?;
                 }
                 writeln!(w, "{indent}}}")?;
+            }
+            Statement::Throw(exc) => {
+                write!(w, "throw {}", exc.display(indent, code))?;
             }
         }
         Ok(())

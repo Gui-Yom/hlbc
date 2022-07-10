@@ -83,7 +83,7 @@ pub struct EnumConstruct {
 }
 
 /// A reference to an enum variant
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RefEnumConstruct(pub usize);
 
 /// Common type for [Type::Fun] and [Type::Method]
