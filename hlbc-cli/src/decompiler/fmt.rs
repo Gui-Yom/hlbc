@@ -120,47 +120,6 @@ impl Operation {
 impl Expr {
     pub(crate) fn display(&self, indent: &FormatOptions, code: &Bytecode) -> String {
         match self {
-            Expr::Variable(x, name) => {
-                if let Some(name) = name {
-                    name.clone()
-                } else {
-                    format!("{x}")
-                }
-            }
-            Expr::Constant(x) => match x {
-                Constant::Int(c) => c.to_string(),
-                Constant::Float(c) => c.to_string(),
-                Constant::String(c) => format!("\"{c}\""),
-                Constant::Bool(c) => c.to_string(),
-                Constant::Null => "null".to_owned(),
-                Constant::This => "this".to_owned(),
-            },
-            Expr::Op(op) => op.display(indent, code),
-            Expr::Constructor(ConstructorCall { ty, args }) => {
-                format!(
-                    "new {}({})",
-                    ty.display(code),
-                    args.iter()
-                        .map(|a| a.display(indent, code))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            }
-            Expr::Call(call) => {
-                format!(
-                    "{}({})",
-                    call.fun.display(indent, code),
-                    call.args
-                        .iter()
-                        .map(|a| a.display(indent, code))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            }
-            Expr::Field(receiver, name) => {
-                format!("{}.{}", receiver.display(indent, code), name)
-            }
-            Expr::FunRef(fun) => fun.display_call(code).to_string(),
             Expr::Anonymous(ty, values) => match ty.resolve(&code.types) {
                 Type::Virtual { fields } => {
                     format!(
@@ -181,6 +140,35 @@ impl Expr {
                 }
                 _ => "[invalid anonymous type]".to_owned(),
             },
+            Expr::Call(call) => {
+                format!(
+                    "{}({})",
+                    call.fun.display(indent, code),
+                    call.args
+                        .iter()
+                        .map(|a| a.display(indent, code))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            Expr::Constant(x) => match x {
+                Constant::Int(c) => c.to_string(),
+                Constant::Float(c) => c.to_string(),
+                Constant::String(c) => format!("\"{c}\""),
+                Constant::Bool(c) => c.to_string(),
+                Constant::Null => "null".to_owned(),
+                Constant::This => "this".to_owned(),
+            },
+            Expr::Constructor(ConstructorCall { ty, args }) => {
+                format!(
+                    "new {}({})",
+                    ty.display(code),
+                    args.iter()
+                        .map(|a| a.display(indent, code))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
             Expr::Closure(f, stmts) => {
                 let mut buf = "() -> {\n".to_owned();
                 let indent = indent.inc_nesting();
@@ -190,6 +178,31 @@ impl Expr {
                 }
                 write!(buf, "}}").unwrap();
                 buf
+            }
+            Expr::EnumConstr(ty, constr, args) => {
+                format!(
+                    "{}({})",
+                    constr.display(*ty, code),
+                    args.iter()
+                        .map(|a| a.display(indent, code))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            }
+            Expr::Field(receiver, name) => {
+                format!("{}.{}", receiver.display(indent, code), name)
+            }
+            Expr::FunRef(fun) => fun.display_call(code).to_string(),
+            Expr::Op(op) => op.display(indent, code),
+            Expr::Unknown(msg) => {
+                format!("[{msg}]")
+            }
+            Expr::Variable(x, name) => {
+                if let Some(name) = name {
+                    name.clone()
+                } else {
+                    format!("{x}")
+                }
             }
         }
     }

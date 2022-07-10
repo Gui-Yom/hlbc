@@ -508,7 +508,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                             push_expr!(i, dst, Expr::Variable(dst, Some(obj.name.display(code))));
                         }
                         Type::Enum { global: eg, .. } => {
-                            println!("{:?} -> {:?}", global, eg);
+                            push_expr!(i, dst, Expr::Unknown("unknown enum variant".to_owned()));
                         }
                         _ => {}
                     }
@@ -698,7 +698,15 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 construct,
                 args,
             } => {
-                // TODO enum constructor
+                push_expr!(
+                    i,
+                    *dst,
+                    Expr::EnumConstr(
+                        f.regtype(*dst),
+                        *construct,
+                        args.iter().map(|x| expr!(x)).collect()
+                    )
+                );
             }
             //endregion
             _ => {}

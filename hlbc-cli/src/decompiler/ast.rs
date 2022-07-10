@@ -1,6 +1,7 @@
-use hlbc::types::{RefField, RefFun, RefType, Reg};
-use hlbc::Bytecode;
 use std::collections::HashMap;
+
+use hlbc::types::{RefEnumConstruct, RefField, RefFun, RefType, Reg};
+use hlbc::Bytecode;
 
 /// Helper to process a stack of scopes (branches, loops)
 pub(crate) struct Scopes {
@@ -150,29 +151,47 @@ pub(crate) enum Constant {
     String(String),
     Bool(bool),
     Null,
+    /// 'this' instance
     This,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum Operation {
+    /// \+
     Add(Box<Expr>, Box<Expr>),
+    /// \-
     Sub(Box<Expr>, Box<Expr>),
+    /// \*
     Mul(Box<Expr>, Box<Expr>),
+    /// && &
     And(Box<Expr>, Box<Expr>),
+    /// || |
     Or(Box<Expr>, Box<Expr>),
+    /// ^
     Xor(Box<Expr>, Box<Expr>),
+    /// \-
     Neg(Box<Expr>),
+    /// !
     Not(Box<Expr>),
-    Decr(Box<Expr>),
+    /// ++
     Incr(Box<Expr>),
+    /// --
+    Decr(Box<Expr>),
+    /// ==
     Eq(Box<Expr>, Box<Expr>),
+    /// !=
     NotEq(Box<Expr>, Box<Expr>),
+    /// \>
     Gt(Box<Expr>, Box<Expr>),
+    /// \>=
     Gte(Box<Expr>, Box<Expr>),
+    /// \<
     Lt(Box<Expr>, Box<Expr>),
+    /// \<=
     Lte(Box<Expr>, Box<Expr>),
 }
 
+/// Constructor call
 #[derive(Debug, Clone)]
 pub(crate) struct ConstructorCall {
     pub(crate) ty: RefType,
@@ -208,28 +227,27 @@ impl Call {
 /// An expression with a value
 #[derive(Debug, Clone)]
 pub(crate) enum Expr {
-    /// Variable identifier
-    Variable(Reg, Option<String>),
+    /// An anonymous structure : { field: value }
+    Anonymous(RefType, HashMap<RefField, Expr>),
+    /// Function call
+    Call(Box<Call>),
     /// Constant value
     Constant(Constant),
     /// Constructor call
     Constructor(ConstructorCall),
-    /// Function call
-    Call(Box<Call>),
-    /// Operator
-    Op(Operation),
+    /// Arrow function (...) -> {...}
+    Closure(RefFun, Vec<Statement>),
+    EnumConstr(RefType, RefEnumConstruct, Vec<Expr>),
     /// Function reference
     FunRef(RefFun),
     /// Field access : obj.field
     Field(Box<Expr>, String),
-    /// An anonymous structure : { field: value }
-    Anonymous(RefType, HashMap<RefField, Expr>),
-    /// Arrow function (...) -> {...}
-    Closure(RefFun, Vec<Statement>),
-}
-
-pub(crate) fn cst_bool(cst: bool) -> Expr {
-    Expr::Constant(Constant::Bool(cst))
+    /// Operator
+    Op(Operation),
+    // For when there should be something, but we don't known what
+    Unknown(String),
+    /// Variable identifier
+    Variable(Reg, Option<String>),
 }
 
 pub(crate) fn cst_int(cst: i32) -> Expr {
@@ -238,6 +256,10 @@ pub(crate) fn cst_int(cst: i32) -> Expr {
 
 pub(crate) fn cst_float(cst: f64) -> Expr {
     Expr::Constant(Constant::Float(cst))
+}
+
+pub(crate) fn cst_bool(cst: bool) -> Expr {
+    Expr::Constant(Constant::Bool(cst))
 }
 
 pub(crate) fn cst_string(cst: String) -> Expr {
@@ -252,6 +274,7 @@ pub(crate) fn cst_this() -> Expr {
     Expr::Constant(Constant::This)
 }
 
+/// Create a shorthand function to create an expression from an operator
 macro_rules! make_op_shorthand {
     ($name:ident, $op:ident, $( $e:ident ),+) => {
         pub(crate) fn $name($( $e: Expr ),+) -> Expr {
@@ -276,7 +299,7 @@ make_op_shorthand!(gte, Gte, e1, e2);
 make_op_shorthand!(lt, Lt, e1, e2);
 make_op_shorthand!(lte, Lte, e1, e2);
 
-// Invert an expression, will also optimize the expression.
+/// Invert an expression, will also optimize the expression.
 pub(crate) fn not(e: Expr) -> Expr {
     use Expr::Op;
     use Operation::*;
@@ -292,7 +315,7 @@ pub(crate) fn not(e: Expr) -> Expr {
     }
 }
 
-// Flip the operands of an expression
+/// Flip the operands of an expression
 pub(crate) fn flip(e: Expr) -> Expr {
     use Expr::Op;
     use Operation::*;
