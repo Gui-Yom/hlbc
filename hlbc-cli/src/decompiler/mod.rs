@@ -193,7 +193,7 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
     let mut start = 0;
     // First argument / First register is 'this'
-    if f.is_method() {
+    if f.is_method() || f.name.unwrap().resolve(&code.strings) == "__constructor__" {
         reg_state.insert(Reg(0), cst_this());
         start = 1;
     }
@@ -414,20 +414,19 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 }
             }
             Opcode::CallMethod { dst, field, args } => {
+                let method = f.regtype(args[0]).method(field.0, code).unwrap();
                 let call = Call::new(
                     Expr::Field(
                         Box::new(expr!(args[0])),
-                        field
-                            .display_obj(f.regtype(args[0]).resolve(&code.types), code)
-                            .to_string(),
+                        method.name.resolve(&code.strings).to_owned(),
                     ),
                     args.iter().skip(1).map(|x| expr!(x)).collect::<Vec<_>>(),
                 );
-                if f.regtype(args[0])
-                    .field(*field, code)
-                    .and_then(|fi| fi.t.resolve_as_fun(&code.types))
-                    .map(|ty| ty.ret.is_void())
-                    .unwrap()
+                if method
+                    .findex
+                    .resolve_as_fn(code)
+                    .map(|fun| fun.ty(code).ret.is_void())
+                    .unwrap_or(false)
                 {
                     push_stmt!(Statement::Call(call));
                 } else {
@@ -435,20 +434,19 @@ fn make_statements(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 }
             }
             Opcode::CallThis { dst, field, args } => {
+                let method = f.regs[0].method(field.0, code).unwrap();
                 let call = Call::new(
                     Expr::Field(
                         Box::new(cst_this()),
-                        field
-                            .display_obj(f.regs[0].resolve(&code.types), code)
-                            .to_string(),
+                        method.name.resolve(&code.strings).to_owned(),
                     ),
                     args.iter().map(|x| expr!(x)).collect::<Vec<_>>(),
                 );
-                if f.regs[0]
-                    .field(*field, code)
-                    .and_then(|fi| fi.t.resolve_as_fun(&code.types))
-                    .map(|ty| ty.ret.is_void())
-                    .unwrap()
+                if method
+                    .findex
+                    .resolve_as_fn(code)
+                    .map(|fun| fun.ty(code).ret.is_void())
+                    .unwrap_or(false)
                 {
                     push_stmt!(Statement::Call(call));
                 } else {

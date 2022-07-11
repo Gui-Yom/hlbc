@@ -319,9 +319,10 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                             println!("protos:");
                             for p in &obj.protos {
                                 println!(
-                                    "  {}: {}",
+                                    "  {}: {} ({})",
                                     p.name.display(code),
-                                    p.findex.display_header(code)
+                                    p.findex.display_header(code),
+                                    p.pindex
                                 );
                             }
                             println!("bindings:");
