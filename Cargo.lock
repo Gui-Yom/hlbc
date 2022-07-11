@@ -69,7 +69,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "chumsky"
 version = "0.8.0"
-source = "git+https://github.com/zesterer/chumsky#43449ba1b49e6659a02c4e1e93f2084680ed6fa4"
+source = "git+https://github.com/zesterer/chumsky#84635664bd97ad997e1badb955cff78d00959eb1"
 dependencies = [
  "hashbrown 0.11.2",
  "stacker",
@@ -131,6 +131,12 @@ name = "fixedbitset"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
+
+[[package]]
+name = "fmtools"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06e445fbebce56ca378adcacced37a72833e752c1b07be05908c94f643d7b7c6"
 
 [[package]]
 name = "fsevent"
@@ -226,6 +232,7 @@ dependencies = [
  "atty",
  "chumsky",
  "clap",
+ "fmtools",
  "hlbc",
  "notify",
  "temp-dir",

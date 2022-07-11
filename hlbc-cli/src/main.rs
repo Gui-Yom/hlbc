@@ -14,7 +14,7 @@ use hlbc::types::{FunPtr, RefFun, RefGlobal, Type};
 use hlbc::*;
 
 use crate::command::{commands_parser, Command, ElementRef, FileOrIndex, ParseContext, Parser};
-use crate::decompiler::FormatOptions;
+use crate::decompiler::fmt::FormatOptions;
 
 mod command;
 mod decompiler;
@@ -569,17 +569,20 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
             match ty {
                 Type::Obj(obj) => {
                     println!("Dumping type@{idx} : {}", ty.display(code));
-                    println!("{}", decompiler::decompile_class(code, obj));
+                    println!(
+                        "{}",
+                        decompiler::decompile_class(code, obj)
+                            .display(code, &FormatOptions::new("  "))
+                    );
                 }
                 _ => println!("Type {idx} is not an obj"),
             }
         }
         Command::Decomp(idx) => {
             if let Some(fun) = RefFun(idx).resolve_as_fn(code) {
-                println!(
-                    "{}",
-                    decompiler::decompile_function_body(code, &FormatOptions::new("  "), fun)
-                );
+                for stmt in decompiler::decompile_function(code, fun) {
+                    fmtools::println! { |f| stmt.display(f, &FormatOptions::new("  "), code, fun)?; };
+                }
             }
         }
     }

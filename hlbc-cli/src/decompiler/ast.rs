@@ -3,149 +3,37 @@ use std::collections::HashMap;
 use hlbc::types::{RefEnumConstruct, RefField, RefFun, RefType, Reg};
 use hlbc::Bytecode;
 
-/// Helper to process a stack of scopes (branches, loops)
-pub(crate) struct Scopes {
-    // A linked list would be appreciable i think
-    /// There is always at least one scope, the root scope
-    scopes: Vec<Scope>,
+#[derive(Debug)]
+pub(crate) struct SourceFile {
+    pub class: Class,
 }
 
-impl Scopes {
-    pub(crate) fn new() -> Self {
-        Self {
-            scopes: vec![Scope {
-                ty: ScopeType::RootScope,
-                stmts: Vec::new(),
-            }],
-        }
-    }
-
-    pub(crate) fn pop_last_loop(&mut self) -> Option<(LoopScope, Vec<Statement>)> {
-        for idx in (0..self.depth()).rev() {
-            let scope = self.scopes.remove(idx);
-            match scope.ty {
-                ScopeType::Loop(l) => {
-                    return Some((l, scope.stmts));
-                }
-                _ => {
-                    self.scopes.insert(idx, scope);
-                }
-            }
-        }
-        None
-    }
-
-    pub(crate) fn last_mut(&mut self) -> &mut Scope {
-        self.scopes.last_mut().unwrap()
-    }
-
-    pub(crate) fn push_scope(&mut self, scope: Scope) {
-        self.scopes.push(scope);
-    }
-
-    pub(crate) fn depth(&self) -> usize {
-        self.scopes.len()
-    }
-
-    pub(crate) fn push_stmt(&mut self, mut stmt: Option<Statement>) {
-        // Start to iterate from the end ('for' because we need the index)
-        for idx in (0..self.depth()).rev() {
-            let mut scope = self.scopes.remove(idx);
-
-            if let Some(stmt) = stmt.take() {
-                scope.stmts.push(stmt);
-            }
-
-            // We only handle branches we know the length of
-            // We can't know the end of a loop scope before seeing the jump back
-            match scope.ty {
-                ScopeType::Branch { mut len, cond } => {
-                    // Decrease scope len
-                    len -= 1;
-                    if len <= 0 {
-                        //println!("Decrease nesting {parent:?}");
-                        stmt = Some(Statement::If {
-                            cond,
-                            stmts: scope.stmts,
-                        });
-                    } else {
-                        // Scope continues
-                        self.scopes.insert(
-                            idx,
-                            Scope {
-                                ty: ScopeType::Branch { len, cond },
-                                stmts: scope.stmts,
-                            },
-                        );
-                    }
-                }
-                ScopeType::Else { mut len } => {
-                    // Decrease scope len
-                    len -= 1;
-                    if len <= 0 {
-                        //println!("Decrease nesting {parent:?}");
-                        stmt = Some(Statement::Else { stmts: scope.stmts });
-                    } else {
-                        // Scope continues
-                        self.scopes.insert(
-                            idx,
-                            Scope {
-                                ty: ScopeType::Else { len },
-                                stmts: scope.stmts,
-                            },
-                        );
-                    }
-                }
-                _ => {
-                    self.scopes.insert(idx, scope);
-                }
-            }
-        }
-        if let Some(stmt) = stmt.take() {
-            self.last_mut().stmts.push(stmt);
-        }
-    }
-
-    pub(crate) fn statements(mut self) -> Vec<Statement> {
-        self.scopes.pop().unwrap().stmts
-    }
+#[derive(Debug)]
+pub struct Class {
+    pub name: String,
+    pub parent: Option<String>,
+    pub fields: Vec<ClassField>,
+    pub methods: Vec<Method>,
 }
 
-pub(crate) struct Scope {
-    pub(crate) ty: ScopeType,
-    pub(crate) stmts: Vec<Statement>,
+#[derive(Debug)]
+pub struct ClassField {
+    pub(crate) name: String,
+    pub(crate) ty: RefType,
+    pub(crate) static_: bool,
 }
 
-impl Scope {
-    pub(crate) fn new(ty: ScopeType) -> Self {
-        Self {
-            ty,
-            stmts: Vec::new(),
-        }
-    }
-}
-
-pub(crate) enum ScopeType {
-    RootScope,
-    Branch { len: i32, cond: Expr },
-    Else { len: i32 },
-    Loop(LoopScope),
-}
-
-pub(crate) struct LoopScope {
-    pub(crate) cond: Option<Expr>,
-}
-
-impl LoopScope {
-    pub(crate) fn new() -> Self {
-        Self { cond: None }
-    }
+#[derive(Debug)]
+pub struct Method {
+    pub(crate) fun: RefFun,
+    pub(crate) static_: bool,
+    pub(crate) dynamic: bool,
 }
 
 // TODO make this zero copy by accepting the Ref* types instead and only resolving on demand
 
 #[derive(Debug, Clone)]
-pub(crate) enum Constant {
+pub enum Constant {
     Int(i32),
     Float(f64),
     String(String),
@@ -156,7 +44,7 @@ pub(crate) enum Constant {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum Operation {
+pub enum Operation {
     /// \+
     Add(Box<Expr>, Box<Expr>),
     /// \-
@@ -193,7 +81,7 @@ pub(crate) enum Operation {
 
 /// Constructor call
 #[derive(Debug, Clone)]
-pub(crate) struct ConstructorCall {
+pub struct ConstructorCall {
     pub(crate) ty: RefType,
     pub(crate) args: Vec<Expr>,
 }
@@ -206,7 +94,7 @@ impl ConstructorCall {
 
 /// Function or method call
 #[derive(Debug, Clone)]
-pub(crate) struct Call {
+pub struct Call {
     pub(crate) fun: Expr,
     pub(crate) args: Vec<Expr>,
 }
@@ -226,7 +114,7 @@ impl Call {
 
 /// An expression with a value
 #[derive(Debug, Clone)]
-pub(crate) enum Expr {
+pub enum Expr {
     /// An anonymous structure : { field: value }
     Anonymous(RefType, HashMap<RefField, Expr>),
     /// Function call
@@ -349,7 +237,7 @@ pub(crate) fn field(expr: Expr, obj: RefType, field: RefField, code: &Bytecode) 
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum Statement {
+pub enum Statement {
     /// Variable assignment
     Assign {
         /// Should 'var' appear

@@ -111,6 +111,17 @@ pub struct TypeObj {
     pub fields: Vec<ObjField>,
 }
 
+impl TypeObj {
+    /// Get the static part of this class
+    pub fn get_static_type<'a>(&self, ctx: &'a Bytecode) -> Option<&'a TypeObj> {
+        if self.global.0 > 0 {
+            ctx.globals[self.global.0 - 1].resolve_as_obj(&ctx.types)
+        } else {
+            None
+        }
+    }
+}
+
 /// Type available in the hashlink type system. Every type is one of those.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
@@ -201,6 +212,11 @@ impl RefType {
         self.resolve_as_obj(&code.types)
             .map(|obj| &obj.fields[field.0])
     }
+
+    pub fn method<'a>(&self, meth: usize, code: &'a Bytecode) -> Option<&'a ObjProto> {
+        self.resolve_as_obj(&code.types)
+            .map(|obj| &obj.protos[meth])
+    }
 }
 
 /// A native function reference. Contains no code but indicates the library from where to load it.
@@ -239,6 +255,10 @@ impl Function {
     /// Get the type of a register
     pub fn regtype(&self, reg: Reg) -> RefType {
         self.regs[reg.0 as usize]
+    }
+
+    pub fn name<'a>(&self, code: &'a Bytecode) -> Option<&'a str> {
+        self.name.map(|n| n.resolve(&code.strings))
     }
 
     /// Get the function signature type

@@ -4,12 +4,69 @@ use std::fmt::{Display, Formatter, Write};
 use hlbc::types::{Function, RefField, Type};
 use hlbc::Bytecode;
 
-use crate::decompiler::ast::{Call, Constant, ConstructorCall, Expr, Operation, Statement};
-use crate::FormatOptions;
+use crate::decompiler::ast::{Call, Class, Constant, ConstructorCall, Expr, Operation, Statement};
+
+#[derive(Clone)]
+pub struct FormatOptions {
+    indent: String,
+    inc_indent: String,
+}
+
+impl FormatOptions {
+    pub fn new(inc_indent: &str) -> Self {
+        Self {
+            indent: String::new(),
+            inc_indent: inc_indent.to_string(),
+        }
+    }
+
+    pub fn with_base_indent(indent: &str, inc_indent: &str) -> Self {
+        Self {
+            indent: indent.to_string(),
+            inc_indent: inc_indent.to_string(),
+        }
+    }
+
+    pub fn inc_nesting(&self) -> Self {
+        FormatOptions {
+            indent: format!("{}{}", self.indent, self.inc_indent),
+            inc_indent: self.inc_indent.clone(),
+        }
+    }
+}
 
 impl Display for FormatOptions {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.indent)
+    }
+}
+
+fn to_haxe_type(ty: &Type, ctx: &Bytecode) -> impl Display {
+    match ty {
+        Type::I32 => "Int",
+        _ => "other",
+    }
+}
+
+impl Class {
+    pub fn display<'a>(&'a self, ctx: &'a Bytecode, opts: &'a FormatOptions) -> impl Display + 'a {
+        let new_opts = opts.inc_nesting();
+        fmtools::fmt! { move
+            {opts}"class "{self.name} if let Some(parent) = self.parent.as_ref() { " extends "{parent} } " {\n"
+            for f in &self.fields {
+                {new_opts} if f.static_ { "static " } "var "{f.name}": "{to_haxe_type(f.ty.resolve(&ctx.types), ctx)}";\n"
+            }
+            for m in &self.methods {
+                let fun = m.fun.resolve_as_fn(ctx).unwrap();
+
+                {new_opts} if m.static_ { "static " } if m.dynamic { "dynamic " }
+                "function "{fun.name(ctx).unwrap()}
+                ": "{to_haxe_type(fun.ty(ctx).ret.resolve(&ctx.types), ctx)}" {\n"
+
+                {new_opts}"}\n"
+            }
+            {opts}"}"
+        }
     }
 }
 
