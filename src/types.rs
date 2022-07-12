@@ -268,14 +268,14 @@ impl Function {
     }
 
     /// Uses the assigns to find the name of an argument
-    pub fn arg_name(&self, code: &Bytecode, pos: usize) -> Option<String> {
+    pub fn arg_name<'a>(&self, code: &'a Bytecode, pos: usize) -> Option<&'a str> {
         self.assigns.as_ref().and_then(|a| {
             a.iter()
                 .filter(|&&(_, i)| i == 0)
                 .enumerate()
                 .find_map(|(j, (s, _))| {
                     if j == pos {
-                        Some(s.resolve(&code.strings).to_string())
+                        Some(s.resolve(&code.strings))
                     } else {
                         None
                     }

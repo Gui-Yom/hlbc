@@ -4,7 +4,9 @@ use std::fmt::{Display, Formatter, Write};
 use hlbc::types::{Function, RefField, Type};
 use hlbc::Bytecode;
 
-use crate::decompiler::ast::{Call, Class, Constant, ConstructorCall, Expr, Operation, Statement};
+use crate::decompiler::ast::{
+    Call, Class, Constant, ConstructorCall, Expr, Method, Operation, Statement,
+};
 
 #[derive(Clone)]
 pub struct FormatOptions {
@@ -43,7 +45,10 @@ impl Display for FormatOptions {
 
 fn to_haxe_type(ty: &Type, ctx: &Bytecode) -> impl Display {
     match ty {
+        Type::Void => "Void",
         Type::I32 => "Int",
+        Type::F64 => "Float",
+        Type::Bool => "Bool",
         _ => "other",
     }
 }
@@ -57,15 +62,37 @@ impl Class {
                 {new_opts} if f.static_ { "static " } "var "{f.name}": "{to_haxe_type(f.ty.resolve(&ctx.types), ctx)}";\n"
             }
             for m in &self.methods {
-                let fun = m.fun.resolve_as_fn(ctx).unwrap();
-
-                {new_opts} if m.static_ { "static " } if m.dynamic { "dynamic " }
-                "function "{fun.name(ctx).unwrap()}
-                ": "{to_haxe_type(fun.ty(ctx).ret.resolve(&ctx.types), ctx)}" {\n"
-
-                {new_opts}"}\n"
+                "\n"
+                {m.display(ctx, &new_opts)}
             }
             {opts}"}"
+        }
+    }
+}
+
+impl Method {
+    pub fn display<'a>(&'a self, ctx: &'a Bytecode, opts: &'a FormatOptions) -> impl Display + 'a {
+        let new_opts = opts.inc_nesting();
+        let fun = self.fun.resolve_as_fn(ctx).unwrap();
+        fmtools::fmt! { move
+            {opts} if self.static_ { "static " } if self.dynamic { "dynamic " }
+            "function "{fun.name(ctx).unwrap()}"("
+            {fmtools::join(", ", fun.ty(ctx).args.iter().enumerate().skip(if self.static_ { 0 } else { 1 })
+                .map(move |(i, arg)| fmtools::fmt! {move
+                    {fun.arg_name(ctx, i).unwrap_or("_")}": "{to_haxe_type(fun.ty(ctx).ret.resolve(&ctx.types), ctx)}
+                }))}
+            ")" if !fun.ty(ctx).ret.is_void() { ": "{to_haxe_type(fun.ty(ctx).ret.resolve(&ctx.types), ctx)} } " {"
+
+            if self.statements.is_empty() {
+                "}"
+            } else {
+                "\n"
+                for stmt in &self.statements {
+                    |f| stmt.display(f, &new_opts, ctx, fun)?;
+                }
+                {opts}"}"
+            }
+            "\n"
         }
     }
 }

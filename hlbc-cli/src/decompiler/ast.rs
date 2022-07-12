@@ -28,6 +28,7 @@ pub struct Method {
     pub(crate) fun: RefFun,
     pub(crate) static_: bool,
     pub(crate) dynamic: bool,
+    pub(crate) statements: Vec<Statement>,
 }
 
 // TODO make this zero copy by accepting the Ref* types instead and only resolving on demand

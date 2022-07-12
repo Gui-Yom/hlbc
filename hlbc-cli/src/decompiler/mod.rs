@@ -57,6 +57,7 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
             fun: *fun,
             static_: false,
             dynamic: true,
+            statements: decompile_function(code, fun.resolve_as_fn(code).unwrap()),
         })
     }
     if let Some(ty) = static_type {
@@ -64,7 +65,8 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
             methods.push(Method {
                 fun: *fun,
                 static_: true,
-                dynamic: true,
+                dynamic: false,
+                statements: decompile_function(code, fun.resolve_as_fn(code).unwrap()),
             })
         }
     }
@@ -73,6 +75,7 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
             fun: f.findex,
             static_: false,
             dynamic: false,
+            statements: decompile_function(code, f.findex.resolve_as_fn(code).unwrap()),
         })
     }
 
@@ -262,7 +265,10 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
     for i in start..f.ty(code).args.len() {
         reg_state.insert(
             Reg(i as u32),
-            Expr::Variable(Reg(i as u32), f.arg_name(code, i - start)),
+            Expr::Variable(
+                Reg(i as u32),
+                f.arg_name(code, i - start).map(ToOwned::to_owned),
+            ),
         );
     }
 
