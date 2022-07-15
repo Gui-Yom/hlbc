@@ -20,12 +20,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Callgraph generation is now a default feature
-
-### Decompiler
-
-#### Added
-
-- Handle expressions and statements correctly
-- Generate code with indentation
-- Handle branches
-- Handle early returns

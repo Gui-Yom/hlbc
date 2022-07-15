@@ -1,13 +1,13 @@
 [package]
 name = "hlbc-cli"
 version = "0.3.0"
-edition = "2021"
-license = "MIT"
-description = "Hashlink bytecode disassembler and analyzer"
 authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
+edition = "2021"
+rust-version = "1.56"
+description = "Hashlink bytecode disassembler, analyzer and decompiler"
 repository = "https://github.com/Gui-Yom/hlbc"
-keywords = ["hashlink", "bytecode", "disassembler", "analysis"]
-categories = ["command-line-utilities", "parsing", "visualization"]
+license = "MIT"
+categories = ["command-line-utilities", "parser-implementations", "visualization", "compilers"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -34,5 +34,7 @@ temp-dir = "0.1"
 
 [features]
 default = ["graph", "watch"]
+# Generate a callgraph
 graph = ["hlbc/graph"]
+# Watch for file changes
 watch = ["notify"]

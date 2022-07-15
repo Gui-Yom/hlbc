@@ -1,14 +1,15 @@
 [package]
 name = "hlbc"
 version = "0.3.0"
-edition = "2021"
-include = ["src/**/*", "LICENSE", "README.md"]
-license = "MIT"
-description = "Hashlink bytecode disassembler and analyzer"
 authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
+edition = "2021"
+rust-version = "1.56"
+description = "Hashlink bytecode disassembler, analyzer and decompiler"
 repository = "https://github.com/Gui-Yom/hlbc"
-keywords = ["hashlink", "bytecode", "disassembler", "analysis"]
-categories = ["parsing", "visualization"]
+license = "MIT"
+keywords = ["hashlink", "bytecode", "disassembler", "analysis", "decompiler"]
+categories = ["parser-implementations", "visualization", "compilers"]
+include = ["src/**/*", "LICENSE", "README.md"]
 
 [workspace]
 members = ["hlbc-cli", "hlbc-derive"]
@@ -16,11 +17,18 @@ members = ["hlbc-cli", "hlbc-derive"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hlbc-derive = { version = "0.3", path = "hlbc-derive" }
-byteorder = "1"
+# Easy errors
 anyhow = "1"
+# Endianess utilities
+byteorder = "1"
+# Advanced formatting functionalities
+fmtools = "0.1"
+# Compile time code generation for hlbc::Opcode
+hlbc-derive = { version = "0.3", path = "hlbc-derive" }
+# Graph utilities
 petgraph = { version = "0.6", default-features = false, features = ["graphmap"], optional = true }
 
 [features]
 default = ["graph"]
+# Generate a callgraph
 graph = ["petgraph"]

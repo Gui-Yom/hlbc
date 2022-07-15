@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Correctly handle bytes pool
 - Store a reference to the parent type in the function struct
 
+#### Decompiler
+
+- Handle expressions and statements
+- Generate code with proper indentation
+- Handle branches and while loops
+- Handle early returns, constructors and closures
+
 ### Changed
 
 - Callgraph generation is now a default feature

@@ -11,16 +11,16 @@
 - Parse the whole bytecode file or any bytecode element
 - Display any bytecode element
 - Restore all possible names
-- Link elements between them (references are manual for flexibility)
+- Link elements between them (with manual references for flexibility)
 - Link elements with their debug information
 - Serialize bytecode back to bytes
+- Decompiler to haxe source code for classes and functions
+- Commandline interface to use the features of this library ([hlbc-cli](hlbc-cli))
 
 ## Planned features
 
 - Handcrafted error types instead of `anyhow::Result`
-- Restore and analyze variable names
 - Integrate with the Haxe/Hashlink standard library to restore more names, exclude them from analysis and such
-- Decompile parts of the code to potentially working haxe code (much easier to understand than individual instructions)
 - Gui to render the callgraph in real time
 - Gui to render instructions and decompiled code
 - C API to integrate with other tools
@@ -37,16 +37,17 @@ See [CHANGELOG.md](CHANGELOG.md).
 - `hlbc-cli/` : CLI using hlbc
 - `data/` : Haxe source files to test the decompiler
 
+## Wiki
+
+A wiki detailing the specifics of Hashlink bytecode is available [here](https://github.com/Gui-Yom/hlbc/wiki).
+The wiki also details the inner workings of haxe to hashlink compilation and decompilation.
+
 ## Macros
 
 There are 98 different bytecode instructions, there is no way I manually write code for it each time. Most of the code
 for these opcodes is generated through a proc macro (see [hlbc-derive](/hlbc-derive)).
 The only time I needed to write 98 different branches was for the formatting used when displaying the
 instructions ([src/fmt.rs](src/fmt.rs)).
-
-## Wiki
-
-A wiki detailing the specifics of Hashlink bytecode is available [here](https://github.com/Gui-Yom/hlbc/wiki).
 
 ## Credits
 

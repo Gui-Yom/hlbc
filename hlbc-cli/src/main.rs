@@ -9,19 +9,21 @@ use temp_dir::TempDir;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use hlbc::analysis::{find_fun_refs, iter_ops};
+use hlbc::decompiler;
+use hlbc::decompiler::fmt::FormatOptions;
 use hlbc::opcodes::Opcode;
 use hlbc::types::{FunPtr, RefFun, RefGlobal, Type};
 use hlbc::*;
 
 use crate::command::{commands_parser, Command, ElementRef, FileOrIndex, ParseContext, Parser};
-use crate::decompiler::fmt::FormatOptions;
 
+/// Command parser
 mod command;
-mod decompiler;
 
 #[derive(ClapParser, Debug)]
 #[clap(author, version, about)]
 struct Args {
+    /// The file to open, can be Hashlink bytecode or Haxe source file
     file: PathBuf,
     /// Execute the command each time the file changes
     #[clap(short, long)]
@@ -99,10 +101,10 @@ fn main() -> anyhow::Result<()> {
         ($code:expr, $commands:expr; $onexit:stmt) => {
             for cmd in $commands {
                 match cmd {
-                    #[rustfmt::skip]
-                                                                                Command::Exit => {
-                                                                                    $onexit
-                                                                                },
+                    #[allow(redundant_semicolons)]
+                    Command::Exit => {
+                        $onexit;
+                    }
                     cmd => {
                         process_command(&mut stdout, $code, cmd)?;
                     }
@@ -589,6 +591,8 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
     Ok(())
 }
 
+/// Compile a Haxe source file to Hashlink bytecode by directly calling the Haxe compiler.
+/// Requires having the haxe compiler in the `PATH`.
 fn compile(source: &Path, bytecode: &Path) -> anyhow::Result<()> {
     let result = std::process::Command::new("haxe")
         .arg("-hl")

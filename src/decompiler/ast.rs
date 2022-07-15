@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use hlbc::types::{RefEnumConstruct, RefField, RefFun, RefType, Reg};
-use hlbc::Bytecode;
+use crate::types::{RefEnumConstruct, RefField, RefFun, RefType, Reg};
+use crate::Bytecode;
 
 #[derive(Debug)]
-pub(crate) struct SourceFile {
+pub struct SourceFile {
     pub class: Class,
 }
 
@@ -18,17 +18,17 @@ pub struct Class {
 
 #[derive(Debug)]
 pub struct ClassField {
-    pub(crate) name: String,
-    pub(crate) ty: RefType,
-    pub(crate) static_: bool,
+    pub name: String,
+    pub ty: RefType,
+    pub static_: bool,
 }
 
 #[derive(Debug)]
 pub struct Method {
-    pub(crate) fun: RefFun,
-    pub(crate) static_: bool,
-    pub(crate) dynamic: bool,
-    pub(crate) statements: Vec<Statement>,
+    pub fun: RefFun,
+    pub static_: bool,
+    pub dynamic: bool,
+    pub statements: Vec<Statement>,
 }
 
 // TODO make this zero copy by accepting the Ref* types instead and only resolving on demand
@@ -83,12 +83,12 @@ pub enum Operation {
 /// Constructor call
 #[derive(Debug, Clone)]
 pub struct ConstructorCall {
-    pub(crate) ty: RefType,
-    pub(crate) args: Vec<Expr>,
+    pub ty: RefType,
+    pub args: Vec<Expr>,
 }
 
 impl ConstructorCall {
-    pub(crate) fn new(ty: RefType, args: Vec<Expr>) -> Self {
+    pub fn new(ty: RefType, args: Vec<Expr>) -> Self {
         Self { ty, args }
     }
 }
@@ -96,16 +96,16 @@ impl ConstructorCall {
 /// Function or method call
 #[derive(Debug, Clone)]
 pub struct Call {
-    pub(crate) fun: Expr,
-    pub(crate) args: Vec<Expr>,
+    pub fun: Expr,
+    pub args: Vec<Expr>,
 }
 
 impl Call {
-    pub(crate) fn new(fun: Expr, args: Vec<Expr>) -> Self {
+    pub fn new(fun: Expr, args: Vec<Expr>) -> Self {
         Self { fun, args }
     }
 
-    pub(crate) fn new_fun(fun: RefFun, args: Vec<Expr>) -> Self {
+    pub fn new_fun(fun: RefFun, args: Vec<Expr>) -> Self {
         Self {
             fun: Expr::FunRef(fun),
             args,
@@ -139,27 +139,27 @@ pub enum Expr {
     Variable(Reg, Option<String>),
 }
 
-pub(crate) fn cst_int(cst: i32) -> Expr {
+pub fn cst_int(cst: i32) -> Expr {
     Expr::Constant(Constant::Int(cst))
 }
 
-pub(crate) fn cst_float(cst: f64) -> Expr {
+pub fn cst_float(cst: f64) -> Expr {
     Expr::Constant(Constant::Float(cst))
 }
 
-pub(crate) fn cst_bool(cst: bool) -> Expr {
+pub fn cst_bool(cst: bool) -> Expr {
     Expr::Constant(Constant::Bool(cst))
 }
 
-pub(crate) fn cst_string(cst: String) -> Expr {
+pub fn cst_string(cst: String) -> Expr {
     Expr::Constant(Constant::String(cst))
 }
 
-pub(crate) fn cst_null() -> Expr {
+pub fn cst_null() -> Expr {
     Expr::Constant(Constant::Null)
 }
 
-pub(crate) fn cst_this() -> Expr {
+pub fn cst_this() -> Expr {
     Expr::Constant(Constant::This)
 }
 
@@ -189,7 +189,7 @@ make_op_shorthand!(lt, Lt, e1, e2);
 make_op_shorthand!(lte, Lte, e1, e2);
 
 /// Invert an expression, will also optimize the expression.
-pub(crate) fn not(e: Expr) -> Expr {
+pub fn not(e: Expr) -> Expr {
     use Expr::Op;
     use Operation::*;
     match e {
@@ -205,7 +205,7 @@ pub(crate) fn not(e: Expr) -> Expr {
 }
 
 /// Flip the operands of an expression
-pub(crate) fn flip(e: Expr) -> Expr {
+pub fn flip(e: Expr) -> Expr {
     use Expr::Op;
     use Operation::*;
     match e {
@@ -220,15 +220,15 @@ pub(crate) fn flip(e: Expr) -> Expr {
     }
 }
 
-pub(crate) fn call(fun: Expr, args: Vec<Expr>) -> Expr {
+pub fn call(fun: Expr, args: Vec<Expr>) -> Expr {
     Expr::Call(Box::new(Call::new(fun, args)))
 }
 
-pub(crate) fn call_fun(fun: RefFun, args: Vec<Expr>) -> Expr {
+pub fn call_fun(fun: RefFun, args: Vec<Expr>) -> Expr {
     Expr::Call(Box::new(Call::new_fun(fun, args)))
 }
 
-pub(crate) fn field(expr: Expr, obj: RefType, field: RefField, code: &Bytecode) -> Expr {
+pub fn field(expr: Expr, obj: RefType, field: RefField, code: &Bytecode) -> Expr {
     Expr::Field(
         Box::new(expr),
         field

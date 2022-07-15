@@ -1,8 +1,8 @@
 use std::fmt;
 use std::fmt::{Display, Formatter, Write};
 
-use hlbc::types::{Function, RefField, Type};
-use hlbc::Bytecode;
+use crate::types::{Function, RefField, Type};
+use crate::Bytecode;
 
 use crate::decompiler::ast::{
     Call, Class, Constant, ConstructorCall, Expr, Method, Operation, Statement,
@@ -98,7 +98,7 @@ impl Method {
 }
 
 impl Operation {
-    pub(crate) fn display(&self, indent: &FormatOptions, code: &Bytecode) -> String {
+    pub fn display(&self, indent: &FormatOptions, code: &Bytecode) -> String {
         use Operation::*;
         match self {
             Add(e1, e2) => {
@@ -202,7 +202,7 @@ impl Operation {
 }
 
 impl Expr {
-    pub(crate) fn display(&self, indent: &FormatOptions, code: &Bytecode) -> String {
+    pub fn display(&self, indent: &FormatOptions, code: &Bytecode) -> String {
         match self {
             Expr::Anonymous(ty, values) => match ty.resolve(&code.types) {
                 Type::Virtual { fields } => {
@@ -293,7 +293,7 @@ impl Expr {
 }
 
 impl Statement {
-    pub(crate) fn display(
+    pub fn display(
         &self,
         w: &mut impl Write,
         indent: &FormatOptions,
