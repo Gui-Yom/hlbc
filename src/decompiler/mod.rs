@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use ast::*;
 
-use crate::types::{Function, RefField, RefGlobal, Reg, Type, TypeObj};
+use crate::types::{Function, RefField, Reg, Type, TypeObj};
 use crate::Bytecode;
 use crate::Opcode;
 

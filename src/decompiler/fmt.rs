@@ -1,12 +1,11 @@
 use std::fmt;
-use std::fmt::{Display, Formatter, Write};
-
-use crate::types::{Function, RefField, Type};
-use crate::Bytecode;
+use std::fmt::{Display, Formatter};
 
 use crate::decompiler::ast::{
     Call, Class, Constant, ConstructorCall, Expr, Method, Operation, Statement,
 };
+use crate::types::{Function, RefField, Type};
+use crate::Bytecode;
 
 #[derive(Clone)]
 pub struct FormatOptions {
@@ -44,11 +43,15 @@ impl Display for FormatOptions {
 }
 
 fn to_haxe_type(ty: &Type, ctx: &Bytecode) -> impl Display {
+    use crate::Type::*;
     match ty {
-        Type::Void => "Void",
-        Type::I32 => "Int",
-        Type::F64 => "Float",
-        Type::Bool => "Bool",
+        Void => "Void",
+        I32 => "Int",
+        F64 => "Float",
+        Bool => "Bool",
+        Bytes => "hl.Bytes",
+        Dyn => "Dynamic",
+        Fun(_) => "Function",
         _ => "other",
     }
 }
@@ -88,7 +91,7 @@ impl Method {
             } else {
                 "\n"
                 for stmt in &self.statements {
-                    |f| stmt.display(f, &new_opts, ctx, fun)?;
+                    {opts}{stmt.display(&new_opts, ctx, fun)}"\n"
                 }
                 {opts}"}"
             }
@@ -97,275 +100,166 @@ impl Method {
     }
 }
 
-impl Operation {
-    pub fn display(&self, indent: &FormatOptions, code: &Bytecode) -> String {
-        use Operation::*;
+impl Display for Constant {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        use Constant::*;
         match self {
-            Add(e1, e2) => {
-                format!(
-                    "{} + {}",
-                    e1.display(indent, code),
-                    e2.display(indent, code)
-                )
-            }
-            Sub(e1, e2) => {
-                format!(
-                    "{} - {}",
-                    e1.display(indent, code),
-                    e2.display(indent, code)
-                )
-            }
-            Mul(e1, e2) => {
-                format!(
-                    "{} * {}",
-                    e1.display(indent, code),
-                    e2.display(indent, code)
-                )
-            }
-            And(e1, e2) => {
-                format!(
-                    "{} && {}",
-                    e1.display(indent, code),
-                    e2.display(indent, code)
-                )
-            }
-            Or(e1, e2) => {
-                format!(
-                    "{} || {}",
-                    e1.display(indent, code),
-                    e2.display(indent, code)
-                )
-            }
-            Xor(e1, e2) => {
-                format!(
-                    "{} ^ {}",
-                    e1.display(indent, code),
-                    e2.display(indent, code)
-                )
-            }
-            Neg(expr) => {
-                format!("-{}", expr.display(indent, code))
-            }
-            Not(expr) => {
-                format!("!{}", expr.display(indent, code))
-            }
-            Incr(expr) => {
-                format!("{}++", expr.display(indent, code))
-            }
-            Decr(expr) => {
-                format!("{}--", expr.display(indent, code))
-            }
-            Eq(e1, e2) => {
-                format!(
-                    "{} == {}",
-                    e1.display(indent, code),
-                    e2.display(indent, code)
-                )
-            }
-            NotEq(e1, e2) => {
-                format!(
-                    "{} == {}",
-                    e1.display(indent, code),
-                    e2.display(indent, code)
-                )
-            }
-            Gt(e1, e2) => {
-                format!(
-                    "{} > {}",
-                    e1.display(indent, code),
-                    e2.display(indent, code)
-                )
-            }
-            Gte(e1, e2) => {
-                format!(
-                    "{} >= {}",
-                    e1.display(indent, code),
-                    e2.display(indent, code)
-                )
-            }
-            Lt(e1, e2) => {
-                format!(
-                    "{} < {}",
-                    e1.display(indent, code),
-                    e2.display(indent, code)
-                )
-            }
-            Lte(e1, e2) => {
-                format!(
-                    "{} <= {}",
-                    e1.display(indent, code),
-                    e2.display(indent, code)
-                )
+            Int(c) => Display::fmt(c, f),
+            Float(c) => Display::fmt(c, f),
+            String(c) => write!(f, "\"{c}\""),
+            Bool(c) => Display::fmt(c, f),
+            Null => Display::fmt("null", f),
+            This => Display::fmt("this", f),
+        }
+    }
+}
+
+impl Operation {
+    pub fn display<'a>(
+        &'a self,
+        indent: &'a FormatOptions,
+        code: &'a Bytecode,
+    ) -> impl Display + 'a {
+        use Operation::*;
+        macro_rules! disp {
+            ($e:ident) => {
+                $e.display(indent, code)
+            };
+        }
+        fmtools::fmt! { move
+            match self {
+                Add(e1, e2) => {{disp!(e1)}" + "{disp!(e2)}}
+                Sub(e1, e2) => {{disp!(e1)}" - "{disp!(e2)}}
+                Mul(e1, e2) => {{disp!(e1)}" * "{disp!(e2)}}
+                And(e1, e2) => {{disp!(e1)}" && "{disp!(e2)}}
+                Or(e1, e2) => {{disp!(e1)}" || "{disp!(e2)}}
+                Xor(e1, e2) => {{disp!(e1)}" ^ "{disp!(e2)}}
+                Neg(expr) => {"-"{disp!(expr)}}
+                Not(expr) => {"!"{disp!(expr)}}
+                Incr(expr) => {{disp!(expr)}"++"}
+                Decr(expr) => {{disp!(expr)}"--"}
+                Eq(e1, e2) => {{disp!(e1)}" == "{disp!(e2)}}
+                NotEq(e1, e2) => {{disp!(e1)}" != "{disp!(e2)}}
+                Gt(e1, e2) => {{disp!(e1)}" > "{disp!(e2)}}
+                Gte(e1, e2) => {{disp!(e1)}" >= "{disp!(e2)}}
+                Lt(e1, e2) => {{disp!(e1)}" < "{disp!(e2)}}
+                Lte(e1, e2) => {{disp!(e1)}" <= "{disp!(e2)}}
             }
         }
     }
 }
 
 impl Expr {
-    pub fn display(&self, indent: &FormatOptions, code: &Bytecode) -> String {
-        match self {
-            Expr::Anonymous(ty, values) => match ty.resolve(&code.types) {
-                Type::Virtual { fields } => {
-                    format!(
-                        "{{ {} }}",
-                        fields
+    pub fn display<'a>(
+        &'a self,
+        indent: &'a FormatOptions,
+        code: &'a Bytecode,
+    ) -> impl Display + 'a {
+        fmtools::fmt! { move
+            match self {
+                Expr::Anonymous(ty, values) => match ty.resolve(&code.types) {
+                    Type::Virtual { fields } => {
+                        "{"{ fmtools::join(", ", fields
                             .iter()
                             .enumerate()
                             .map(|(i, f)| {
-                                format!(
-                                    "{}: {}",
-                                    f.name.resolve(&code.strings),
-                                    values.get(&RefField(i)).unwrap().display(indent, code)
-                                )
-                            })
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    )
+                                fmtools::fmt! { move
+                                    {f.name.resolve(&code.strings)}": "{values.get(&RefField(i)).unwrap().display(indent, code)}
+                                }
+                            })) }"}"
+                    }
+                    _ => "[invalid anonymous type]",
+                },
+                Expr::Call(call) => {
+                    {call.fun.display(indent, code)}"("{fmtools::join(", ", call.args.iter().map(|e| e.display(indent, code)))}")"
                 }
-                _ => "[invalid anonymous type]".to_owned(),
-            },
-            Expr::Call(call) => {
-                format!(
-                    "{}({})",
-                    call.fun.display(indent, code),
-                    call.args
-                        .iter()
-                        .map(|a| a.display(indent, code))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            }
-            Expr::Constant(x) => match x {
-                Constant::Int(c) => c.to_string(),
-                Constant::Float(c) => c.to_string(),
-                Constant::String(c) => format!("\"{c}\""),
-                Constant::Bool(c) => c.to_string(),
-                Constant::Null => "null".to_owned(),
-                Constant::This => "this".to_owned(),
-            },
-            Expr::Constructor(ConstructorCall { ty, args }) => {
-                format!(
-                    "new {}({})",
-                    ty.display(code),
-                    args.iter()
-                        .map(|a| a.display(indent, code))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            }
-            Expr::Closure(f, stmts) => {
-                let mut buf = "() -> {\n".to_owned();
-                let indent = indent.inc_nesting();
-                for s in stmts {
-                    s.display(&mut buf, &indent, code, f.resolve_as_fn(code).unwrap())
-                        .unwrap();
+                Expr::Constant(c) => {{c}},
+                Expr::Constructor(ConstructorCall { ty, args }) => {
+                    "new "{ty.display(code)}"("{fmtools::join(", ", args.iter().map(|e| e.display(indent, code)))}");"
                 }
-                write!(buf, "}}").unwrap();
-                buf
-            }
-            Expr::EnumConstr(ty, constr, args) => {
-                format!(
-                    "{}({})",
-                    constr.display(*ty, code),
-                    args.iter()
-                        .map(|a| a.display(indent, code))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )
-            }
-            Expr::Field(receiver, name) => {
-                format!("{}.{}", receiver.display(indent, code), name)
-            }
-            Expr::FunRef(fun) => fun.display_call(code).to_string(),
-            Expr::Op(op) => op.display(indent, code),
-            Expr::Unknown(msg) => {
-                format!("[{msg}]")
-            }
-            Expr::Variable(x, name) => {
-                if let Some(name) = name {
-                    name.clone()
-                } else {
-                    format!("{x}")
+                Expr::Closure(f, stmts) => {
+                    // TODO display closure args
+                    "() -> {\n"
+                    let indent2 = indent.inc_nesting();
+                    for stmt in stmts {
+                        {indent2}{stmt.display(&indent2, code, f.resolve_as_fn(code).unwrap())}"\n"
+                    }
+                    {indent}"}"
                 }
+                Expr::EnumConstr(ty, constr, args) => {
+                    {constr.display(*ty, code)}"("{fmtools::join(", ", args.iter().map(|e| e.display(indent, code)))}")"
+                }
+                Expr::Field(receiver, name) => {
+                    {receiver.display(indent, code)}"."{name}
+                }
+                Expr::FunRef(fun) => {{fun.display_call(code).to_string()}},
+                Expr::Op(op) => {{op.display(indent, code)}},
+                Expr::Unknown(msg) => {
+                     "["{msg}"]"
+                }
+                Expr::Variable(x, name) => {{
+                    if let Some(name) = name {
+                        name.clone()
+                    } else {
+                        x.to_string()
+                    }
+                }}
             }
         }
     }
 }
 
 impl Statement {
-    pub fn display(
-        &self,
-        w: &mut impl Write,
-        indent: &FormatOptions,
-        code: &Bytecode,
-        f: &Function,
-    ) -> fmt::Result {
-        write!(w, "{indent}")?;
-        match self {
-            Statement::Assign {
-                declaration,
-                variable,
-                assign,
-            } => {
-                writeln!(
-                    w,
-                    "{}{} = {};",
-                    if *declaration { "var " } else { "" },
-                    variable.display(indent, code),
-                    /*
-                    if *declaration {
-                        format!(": {}", f.regtype(*reg).display(code))
-                    } else {
-                        "".to_owned()
-                    },*/
-                    assign.display(indent, code)
-                )?;
-            }
-            Statement::Call(Call { fun, args }) => {
-                writeln!(
-                    w,
-                    "{}({});",
-                    fun.display(indent, code),
-                    args.iter()
-                        .map(|a| a.display(indent, code))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                )?;
-            }
-            Statement::Return(expr) => {
-                writeln!(w, "return {};", expr.display(indent, code))?;
-            }
-            Statement::ReturnVoid => {
-                writeln!(w, "return;")?;
-            }
-            Statement::If { cond, stmts } => {
-                writeln!(w, "if ({}) {{", cond.display(indent, code))?;
-                let indent2 = indent.inc_nesting();
-                for stmt in stmts {
-                    stmt.display(w, &indent2, code, f)?;
+    pub fn display<'a>(
+        &'a self,
+        indent: &'a FormatOptions,
+        code: &'a Bytecode,
+        f: &'a Function,
+    ) -> impl Display + 'a {
+        fmtools::fmt! { move
+            match self {
+                Statement::Assign {
+                    declaration,
+                    variable,
+                    assign,
+                } => {
+                    if *declaration { "var " } else { "" }{variable.display(indent, code)}" = "{assign.display(indent, code)}";"
                 }
-                writeln!(w, "{indent}}}")?;
-            }
-            Statement::Else { stmts } => {
-                writeln!(w, "else {{")?;
-                let indent2 = indent.inc_nesting();
-                for stmt in stmts {
-                    stmt.display(w, &indent2, code, f)?;
+                Statement::Call(Call { fun, args }) => {
+                    {fun.display(indent, code)}"("{fmtools::join(", ", args.iter().map(|e| e.display(indent, code)))}");"
                 }
-                writeln!(w, "{indent}}}")?;
-            }
-            Statement::While { cond, stmts } => {
-                writeln!(w, "while ({}) {{", cond.display(indent, code))?;
-                let indent2 = indent.inc_nesting();
-                for stmt in stmts {
-                    stmt.display(w, &indent2, code, f)?;
+                Statement::Return(expr) => {
+                    "return "{expr.display(indent, code)}";"
                 }
-                writeln!(w, "{indent}}}")?;
-            }
-            Statement::Throw(exc) => {
-                write!(w, "throw {}", exc.display(indent, code))?;
+                Statement::ReturnVoid => "return;",
+                Statement::If { cond, stmts } => {
+                    "if ("{cond.display(indent, code)}") {\n"
+                    let indent2 = indent.inc_nesting();
+                    for stmt in stmts {
+                        {indent2}{stmt.display(&indent2, code, f)}"\n"
+                    }
+                    {indent}"}"
+                }
+                Statement::Else { stmts } => {
+                    "else {\n"
+                    let indent2 = indent.inc_nesting();
+                    for stmt in stmts {
+                        {indent2}{stmt.display(&indent2, code, f)}"\n"
+                    }
+                    {indent}"}"
+                }
+                Statement::While { cond, stmts } => {
+                    "while ("{cond.display(indent, code)}") {\n"
+                    let indent2 = indent.inc_nesting();
+                    for stmt in stmts {
+                        {indent2}{stmt.display(&indent2, code, f)}"\n"
+                    }
+                    {indent}"}"
+                }
+                Statement::Throw(exc) => {
+                    "throw "{exc.display(indent, code)}
+                }
             }
         }
-        Ok(())
     }
 }

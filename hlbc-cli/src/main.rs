@@ -583,7 +583,7 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
         Command::Decomp(idx) => {
             if let Some(fun) = RefFun(idx).resolve_as_fn(code) {
                 for stmt in decompiler::decompile_function(code, fun) {
-                    fmtools::println! { |f| stmt.display(f, &FormatOptions::new("  "), code, fun)?; };
+                    println!("{}", stmt.display(&FormatOptions::new("  "), code, fun));
                 }
             }
         }
