@@ -30,12 +30,9 @@
 
 See [CHANGELOG.md](CHANGELOG.md).
 
-## Repository structure
+## Decompiler
 
-- `/` : hlbc (lib)
-- `hlbc-derive/` : hlbc-derive, helper proc macros for hlbc
-- `hlbc-cli/` : CLI using hlbc
-- `data/` : Haxe source files to test the decompiler
+The decompiler is currently incomplete. [See the wiki](https://github.com/Gui-Yom/hlbc/wiki/Decompilation) for examples of decompilation output.
 
 ## Wiki
 
@@ -48,6 +45,13 @@ There are 98 different bytecode instructions, there is no way I manually write c
 for these opcodes is generated through a proc macro (see [hlbc-derive](/hlbc-derive)).
 The only time I needed to write 98 different branches was for the formatting used when displaying the
 instructions ([src/fmt.rs](src/fmt.rs)).
+
+## Repository structure
+
+- `/` : hlbc (lib)
+- `hlbc-derive/` : hlbc-derive, helper proc macros for hlbc
+- `hlbc-cli/` : CLI using hlbc
+- `data/` : Haxe source files to test the decompiler
 
 ## Credits
 
