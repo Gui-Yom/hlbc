@@ -706,8 +706,16 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         }
                     }
                 } else {
-                    // It's the jump over of an else clause
-                    scopes.push_scope(Scope::new(ScopeType::Else { len: offset + 1 }));
+                    // Check the instruction just before the jump target
+                    // If it's a jump back of a loop
+                    if matches!(f.ops[(i as i32 + offset) as usize], Opcode::JAlways {offset} if offset < 0)
+                    {
+                        // It's a break condition
+                        push_stmt!(Statement::Break);
+                    } else {
+                        // It's the jump over of an else clause
+                        scopes.push_scope(Scope::new(ScopeType::Else { len: offset + 1 }));
+                    }
                 }
             }
             &Opcode::Label => scopes.push_scope(Scope::new(ScopeType::Loop(LoopScope::new()))),

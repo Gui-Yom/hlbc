@@ -256,6 +256,9 @@ impl Statement {
                     }
                     {indent}"}"
                 }
+                Statement::Break => {
+                    "break;"
+                }
                 Statement::Throw(exc) => {
                     "throw "{exc.display(indent, code)}
                 }

@@ -266,5 +266,6 @@ pub enum Statement {
         cond: Expr,
         stmts: Vec<Statement>,
     },
+    Break,
     Throw(Expr),
 }
