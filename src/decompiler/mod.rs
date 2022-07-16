@@ -385,6 +385,8 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
             //region OPERATORS
             &Opcode::Mov { dst, src } => {
                 push_expr!(i, dst, expr!(src));
+                // Workaround for when the instructions after this one use dst and src interchangeably.
+                reg_state.insert(src, Expr::Variable(dst, f.var_name(code, i)));
             }
             &Opcode::Add { dst, a, b } => {
                 push_expr!(i, dst, add(expr!(a), expr!(b)));
