@@ -19,7 +19,6 @@
 
 ## Planned features
 
-- Handcrafted error types instead of `anyhow::Result`
 - Integrate with the Haxe/Hashlink standard library to restore more names, exclude them from analysis and such
 - Gui to render the callgraph in real time
 - Gui to render instructions and decompiled code

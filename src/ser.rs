@@ -1,11 +1,11 @@
 use std::ffi::CString;
 use std::io::Write;
 
-use anyhow::Result;
 use byteorder::{LittleEndian, WriteBytesExt};
 
 use crate::types::TypeFun;
 use crate::{ConstantDef, Function, Native, ObjField, Type, TypeObj};
+use crate::{Error, Result};
 
 /// Extension trait to write bytecode elements to anything that implements [Write]
 pub trait WriteHlExt: WriteBytesExt {
@@ -37,7 +37,10 @@ impl<T: Write> WriteHlExt for T {
                 self.write_u8(((value >> 8) | 0xA0) as u8)?;
                 self.write_u8((value & 0xFF) as u8)?;
             } else if value >= 20000000 {
-                anyhow::bail!("value can't be >= 0x20000000")
+                return Err(Error::ValueOutOfBounds {
+                    value,
+                    limit: 20000000,
+                });
             } else {
                 self.write_u8(((value >> 24) | 0xE0) as u8)?;
                 self.write_u8(((value >> 16) | 0xFF) as u8)?;
@@ -50,7 +53,10 @@ impl<T: Write> WriteHlExt for T {
             self.write_u8(((value >> 8) | 0x80) as u8)?;
             self.write_u8((value & 0xFF) as u8)?;
         } else if value >= 0x20000000 {
-            anyhow::bail!("value can't be >= 0x20000000")
+            return Err(Error::ValueOutOfBounds {
+                value,
+                limit: 20000000,
+            });
         } else {
             self.write_u8(((value >> 24) | 0xC0) as u8)?;
             self.write_u8(((value >> 16) | 0xFF) as u8)?;

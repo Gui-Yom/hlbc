@@ -17,8 +17,6 @@ members = ["hlbc-cli", "hlbc-derive"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# Easy errors
-anyhow = "1"
 # Endianess utilities
 byteorder = "1"
 # Advanced formatting functionalities
@@ -27,6 +25,8 @@ fmtools = "0.1"
 hlbc-derive = { version = "0.3", path = "hlbc-derive" }
 # Graph utilities
 petgraph = { version = "0.6", default-features = false, features = ["graphmap"], optional = true }
+# Error types
+thiserror = "1"
 
 [features]
 default = ["graph"]

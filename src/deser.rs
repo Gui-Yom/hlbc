@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::ffi::CStr;
 use std::io::Read;
 
-use anyhow::Result;
 use byteorder::{LittleEndian, ReadBytesExt};
 
 use crate::types::{
@@ -10,6 +9,7 @@ use crate::types::{
     TypeFun, TypeObj,
 };
 use crate::{ConstantDef, Opcode, RefFun, RefGlobal};
+use crate::{Error, Result};
 
 /// Extension trait to read bytecode elements from anything that implements [Read]
 pub trait ReadHlExt: ReadBytesExt {
@@ -57,7 +57,9 @@ impl<T: Read> ReadHlExt for T {
     fn read_varu(&mut self) -> Result<u32> {
         let i = self.read_vari()?;
         if i < 0 {
-            anyhow::bail!("Negative index")
+            Err(Error::MalformedBytecode(format!(
+                "Got negative index '{i}' (expected > 0)"
+            )))
         } else {
             Ok(i as u32)
         }
@@ -195,9 +197,9 @@ impl<T: Read> ReadHlExt for T {
             19 => Ok(Type::Null(self.read_type_ref()?)),
             20 => Ok(Type::Method(self.read_type_fun()?)),
             21 => Ok(Type::Struct(self.read_type_obj()?)),
-            other => {
-                anyhow::bail!("Invalid type kind {other}")
-            }
+            other => Err(Error::MalformedBytecode(format!(
+                "Invalid type kind '{other}'"
+            ))),
         }
     }
 

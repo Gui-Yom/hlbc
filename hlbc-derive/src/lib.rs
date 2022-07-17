@@ -56,7 +56,7 @@ pub fn derive_opcode_helper(input: TokenStream) -> TokenStream {
     TokenStream::from(quote! {
         impl #name {
             /// Decode an instruction
-            pub fn decode(r: &mut impl std::io::Read) -> anyhow::Result<#name> {
+            pub fn decode(r: &mut impl std::io::Read) -> crate::Result<#name> {
 
                 use byteorder::ReadBytesExt;
                 use crate::deser::ReadHlExt;
@@ -65,12 +65,12 @@ pub fn derive_opcode_helper(input: TokenStream) -> TokenStream {
                 let op = r.read_u8()?;
                 match op {
                     #( #i => #initr, )*
-                    other => anyhow::bail!("Unknown opcode {}", op),
+                    other => Err(crate::Error::MalformedBytecode(format!("Unknown opcode {}", op))),
                 }
             }
 
             /// Encode an instruction
-            pub fn encode(&self, w: &mut impl std::io::Write) -> anyhow::Result<()> {
+            pub fn encode(&self, w: &mut impl std::io::Write) -> crate::Result<()> {
 
                 use byteorder::WriteBytesExt;
                 use crate::ser::WriteHlExt;

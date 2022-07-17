@@ -9,7 +9,6 @@ use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
 use std::io::{Read, Write};
 
-use anyhow::Result;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::deser::ReadHlExt;
@@ -82,11 +81,11 @@ impl Bytecode {
         let mut header = [0u8; 3];
         r.read_exact(&mut header)?;
         if header != [b'H', b'L', b'B'] {
-            anyhow::bail!("invalid header magic");
+            return Err(Error::InvalidMagic(header));
         }
         let version = r.read_u8()?;
         if version < 4 {
-            anyhow::bail!("Unsupported version {version} < 4");
+            return Err(Error::UnsupportedVersion(version));
         }
         let flags = r.read_varu()?;
         let has_debug = flags & 1 == 1;
@@ -334,4 +333,20 @@ impl Bytecode {
         }
         Ok(())
     }
+}
+
+pub type Result<T> = core::result::Result<T, Error>;
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("Invalid magic bytes (expected {:?}, found {0:?})", [b'H', b'L', b'B'])]
+    InvalidMagic([u8; 3]),
+    #[error("Unsupported bytecode version {0} (expected < 4)")]
+    UnsupportedVersion(u8),
+    #[error("Malformed bytecode ({0})")]
+    MalformedBytecode(String),
+    #[error("Value '{value}' is too big to be serialized (expected < {limit})")]
+    ValueOutOfBounds { value: i32, limit: u32 },
+    #[error(transparent)]
+    IoError(#[from] std::io::Error),
 }
