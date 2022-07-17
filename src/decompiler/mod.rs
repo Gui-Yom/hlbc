@@ -123,6 +123,18 @@ impl Scopes {
         None
     }
 
+    pub fn last_loop(&self) -> Option<&LoopScope> {
+        for idx in (0..self.depth()).rev() {
+            match &self.scopes[idx].ty {
+                ScopeType::Loop(l) => {
+                    return Some(l);
+                }
+                _ => {}
+            }
+        }
+        None
+    }
+
     pub fn last_mut(&mut self) -> &mut Scope {
         self.scopes.last_mut().unwrap()
     }
@@ -222,11 +234,12 @@ pub enum ScopeType {
 
 pub struct LoopScope {
     pub cond: Option<Expr>,
+    pub start: usize,
 }
 
 impl LoopScope {
-    pub fn new() -> Self {
-        Self { cond: None }
+    pub fn new(start: usize) -> Self {
+        Self { cond: None, start }
     }
 }
 
@@ -347,7 +360,19 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 // It's a loop
                 if matches!(f.ops[$i + $offset as usize], Opcode::JAlways { offset } if offset < 0) {
                     if let ScopeType::Loop(loop_) = &mut scopes.last_mut().ty {
-                        loop_.cond = Some($cond);
+                        if loop_.cond.is_none() {
+                            loop_.cond = Some($cond);
+                        } else {
+                            scopes.push_scope(Scope::new(ScopeType::Branch {
+                                len: $offset + 1,
+                                cond: $cond,
+                            }));
+                        }
+                    } else {
+                        scopes.push_scope(Scope::new(ScopeType::Branch {
+                            len: $offset + 1,
+                            cond: $cond,
+                        }));
                     }
                 } else {
                     // It's an if
@@ -694,20 +719,36 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
             }
             &Opcode::JAlways { offset } => {
                 if offset < 0 {
-                    // It's the jump back of a loop
-                    if let Some((loop_, stmts)) = scopes.pop_last_loop() {
-                        if let Some(cond) = loop_.cond {
-                            statement = Some(Statement::While { cond, stmts });
+                    println!("opcode {i}");
+                    // It's either the jump backward of a loop or a continue statement
+                    let loop_ = scopes.last_loop().unwrap();
+                    // Scan the next instructions in order to find another jump to the same place
+                    if f.ops.iter().enumerate().skip(i + 1).find_map(|(j, o)| {
+                        // We found another jump to the same place !
+                        if matches!(o, Opcode::JAlways {offset} if (j as i32 + offset + 1) as usize == loop_.start) {
+                            Some(true)
                         } else {
-                            statement = Some(Statement::While {
+                            None
+                        }
+                    }).unwrap_or(false) {
+                        // If this jump is not the last jump backward for the current loop,
+                        // It's definitely a continue; statement
+                        push_stmt!(Statement::Continue);
+                    } else {
+                        let (loop_, stmts) = scopes.pop_last_loop().unwrap();
+                        // It's the last jump backward of the loop, we generate the loop statement
+                        if let Some(cond) = loop_.cond {
+                            push_stmt!(Statement::While { cond, stmts });
+                        } else {
+                            push_stmt!(Statement::While {
                                 cond: cst_bool(true),
-                                stmts,
+                                stmts
                             });
                         }
                     }
                 } else {
                     // Check the instruction just before the jump target
-                    // If it's a jump back of a loop
+                    // If it's a jump backward of a loop
                     if matches!(f.ops[(i as i32 + offset) as usize], Opcode::JAlways {offset} if offset < 0)
                     {
                         // It's a break condition
@@ -718,7 +759,7 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     }
                 }
             }
-            &Opcode::Label => scopes.push_scope(Scope::new(ScopeType::Loop(LoopScope::new()))),
+            &Opcode::Label => scopes.push_scope(Scope::new(ScopeType::Loop(LoopScope::new(i)))),
             &Opcode::Ret { ret } => {
                 // Do not display return void; only in case of an early return
                 if scopes.depth() > 1 {

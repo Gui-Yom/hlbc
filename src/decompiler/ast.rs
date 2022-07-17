@@ -267,5 +267,6 @@ pub enum Statement {
         stmts: Vec<Statement>,
     },
     Break,
+    Continue,
     Throw(Expr),
 }
