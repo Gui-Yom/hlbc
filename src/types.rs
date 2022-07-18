@@ -267,6 +267,14 @@ impl Function {
         self.t.resolve_as_fun(&code.types).expect("Unknown type ?")
     }
 
+    pub fn args<'a>(&self, code: &'a Bytecode) -> &'a [RefType] {
+        &self.ty(code).args
+    }
+
+    pub fn ret<'a>(&self, code: &'a Bytecode) -> &'a Type {
+        self.ty(code).ret.resolve(&code.types)
+    }
+
     /// Uses the assigns to find the name of an argument
     pub fn arg_name<'a>(&self, code: &'a Bytecode, pos: usize) -> Option<&'a str> {
         self.assigns.as_ref().and_then(|a| {

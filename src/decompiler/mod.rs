@@ -271,7 +271,11 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
     let mut start = 0;
     // First argument / First register is 'this'
-    if f.is_method() || f.name.unwrap().resolve(&code.strings) == "__constructor__" {
+    if f.is_method()
+        || f.name
+            .map(|n| n.resolve(&code.strings) == "__constructor__")
+            .unwrap_or(false)
+    {
         reg_state.insert(Reg(0), cst_this());
         start = 1;
     }
@@ -591,7 +595,11 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     dst,
                     Expr::Field(
                         Box::new(expr!(obj)),
-                        fun.resolve_as_fn(code).unwrap().name.unwrap().display(code),
+                        fun.resolve_as_fn(code)
+                            .unwrap()
+                            .name(code)
+                            .unwrap_or("_")
+                            .to_owned(),
                     )
                 );
             }

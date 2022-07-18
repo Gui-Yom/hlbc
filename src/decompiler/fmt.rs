@@ -80,9 +80,9 @@ impl Method {
         fmtools::fmt! { move
             {opts} if self.static_ { "static " } if self.dynamic { "dynamic " }
             "function "{fun.name(ctx).unwrap()}"("
-            {fmtools::join(", ", fun.ty(ctx).args.iter().enumerate().skip(if self.static_ { 0 } else { 1 })
+            {fmtools::join(", ", fun.args(ctx).iter().enumerate().skip(if self.static_ { 0 } else { 1 })
                 .map(move |(i, arg)| fmtools::fmt! {move
-                    {fun.arg_name(ctx, i).unwrap_or("_")}": "{to_haxe_type(fun.ty(ctx).ret.resolve(&ctx.types), ctx)}
+                    {fun.arg_name(ctx, i).unwrap_or("_")}": "{to_haxe_type(arg.resolve(&ctx.types), ctx)}
                 }))}
             ")" if !fun.ty(ctx).ret.is_void() { ": "{to_haxe_type(fun.ty(ctx).ret.resolve(&ctx.types), ctx)} } " {"
 
@@ -188,11 +188,15 @@ impl Expr {
                     "new "{ty.display(code)}"("{fmtools::join(", ", args.iter().map(|e| disp!(e)))}");"
                 }
                 Expr::Closure(f, stmts) => {
-                    // TODO display closure args
-                    "() -> {\n"
+                    let fun = f.resolve_as_fn(code).unwrap();
+                    "("{fmtools::join(", ", fun.ty(code).args.iter().enumerate().map(move |(i, arg)|
+                        fmtools::fmt! { move
+                            {fun.arg_name(code, i).unwrap_or("_")}": "{to_haxe_type(arg.resolve(&code.types), code)}
+                        }
+                    ))}") -> {\n"
                     let indent2 = indent.inc_nesting();
                     for stmt in stmts {
-                        {indent2}{stmt.display(&indent2, code, f.resolve_as_fn(code).unwrap())}"\n"
+                        {indent2}{stmt.display(&indent2, code, fun)}"\n"
                     }
                     {indent}"}"
                 }

@@ -21,7 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Handle expressions and statements
 - Generate code with proper indentation
 - Handle branches and while loops
-- Handle early returns, constructors and closures
+- Handle early returns, constructors, closures and  methods
+- break and continue statements
+- Partial result with \[missing expr]
+- Initial support for primitive array accesses
+- Decompile whole classes
+- Anonymous structures
+- Initial support for enums
 
 ### Changed
 
@@ -29,3 +35,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improve opcode display
 - Make bytecode elements serialization and deserialization functions public
 - Global function indexes are resolved through a vec instead of a map
+- Return a custom error type instead of using anyhow
