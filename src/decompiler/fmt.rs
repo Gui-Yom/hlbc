@@ -131,6 +131,8 @@ impl Operation {
                 Add(e1, e2) => {{disp!(e1)}" + "{disp!(e2)}}
                 Sub(e1, e2) => {{disp!(e1)}" - "{disp!(e2)}}
                 Mul(e1, e2) => {{disp!(e1)}" * "{disp!(e2)}}
+                Shl(e1, e2) => {{disp!(e1)}" << "{disp!(e2)}}
+                Shr(e1, e2) => {{disp!(e1)}" >> "{disp!(e2)}}
                 And(e1, e2) => {{disp!(e1)}" && "{disp!(e2)}}
                 Or(e1, e2) => {{disp!(e1)}" || "{disp!(e2)}}
                 Xor(e1, e2) => {{disp!(e1)}" ^ "{disp!(e2)}}
@@ -155,6 +157,11 @@ impl Expr {
         indent: &'a FormatOptions,
         code: &'a Bytecode,
     ) -> impl Display + 'a {
+        macro_rules! disp {
+            ($e:expr) => {
+                $e.display(indent, code)
+            };
+        }
         fmtools::fmt! { move
             match self {
                 Expr::Anonymous(ty, values) => match ty.resolve(&code.types) {
@@ -170,12 +177,15 @@ impl Expr {
                     }
                     _ => "[invalid anonymous type]",
                 },
+                Expr::Array(array, index) => {
+                    {disp!(array)}"["{disp!(index)}"]"
+                }
                 Expr::Call(call) => {
-                    {call.fun.display(indent, code)}"("{fmtools::join(", ", call.args.iter().map(|e| e.display(indent, code)))}")"
+                    {disp!(call.fun)}"("{fmtools::join(", ", call.args.iter().map(|e| disp!(e)))}")"
                 }
                 Expr::Constant(c) => {{c}},
                 Expr::Constructor(ConstructorCall { ty, args }) => {
-                    "new "{ty.display(code)}"("{fmtools::join(", ", args.iter().map(|e| e.display(indent, code)))}");"
+                    "new "{ty.display(code)}"("{fmtools::join(", ", args.iter().map(|e| disp!(e)))}");"
                 }
                 Expr::Closure(f, stmts) => {
                     // TODO display closure args
@@ -187,13 +197,13 @@ impl Expr {
                     {indent}"}"
                 }
                 Expr::EnumConstr(ty, constr, args) => {
-                    {constr.display(*ty, code)}"("{fmtools::join(", ", args.iter().map(|e| e.display(indent, code)))}")"
+                    {constr.display(*ty, code)}"("{fmtools::join(", ", args.iter().map(|e| disp!(e)))}")"
                 }
                 Expr::Field(receiver, name) => {
-                    {receiver.display(indent, code)}"."{name}
+                    {disp!(receiver)}"."{name}
                 }
                 Expr::FunRef(fun) => {{fun.display_call(code).to_string()}},
-                Expr::Op(op) => {{op.display(indent, code)}},
+                Expr::Op(op) => {{disp!(op)}},
                 Expr::Unknown(msg) => {
                      "["{msg}"]"
                 }
@@ -216,6 +226,11 @@ impl Statement {
         code: &'a Bytecode,
         f: &'a Function,
     ) -> impl Display + 'a {
+        macro_rules! disp {
+            ($e:expr) => {
+                $e.display(indent, code)
+            };
+        }
         fmtools::fmt! { move
             match self {
                 Statement::Assign {
@@ -223,17 +238,17 @@ impl Statement {
                     variable,
                     assign,
                 } => {
-                    if *declaration { "var " } else { "" }{variable.display(indent, code)}" = "{assign.display(indent, code)}";"
+                    if *declaration { "var " } else { "" }{disp!(variable)}" = "{disp!(assign)}";"
                 }
                 Statement::Call(Call { fun, args }) => {
-                    {fun.display(indent, code)}"("{fmtools::join(", ", args.iter().map(|e| e.display(indent, code)))}");"
+                    {disp!(fun)}"("{fmtools::join(", ", args.iter().map(|e| disp!(e)))}");"
                 }
                 Statement::Return(expr) => {
-                    "return "{expr.display(indent, code)}";"
+                    "return "{disp!(expr)}";"
                 }
                 Statement::ReturnVoid => "return;",
                 Statement::If { cond, stmts } => {
-                    "if ("{cond.display(indent, code)}") {\n"
+                    "if ("{disp!(cond)}") {\n"
                     let indent2 = indent.inc_nesting();
                     for stmt in stmts {
                         {indent2}{stmt.display(&indent2, code, f)}"\n"
@@ -249,7 +264,7 @@ impl Statement {
                     {indent}"}"
                 }
                 Statement::While { cond, stmts } => {
-                    "while ("{cond.display(indent, code)}") {\n"
+                    "while ("{disp!(cond)}") {\n"
                     let indent2 = indent.inc_nesting();
                     for stmt in stmts {
                         {indent2}{stmt.display(&indent2, code, f)}"\n"
@@ -263,7 +278,7 @@ impl Statement {
                     "continue;"
                 }
                 Statement::Throw(exc) => {
-                    "throw "{exc.display(indent, code)}
+                    "throw "{disp!(exc)}
                 }
             }
         }

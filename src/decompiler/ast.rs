@@ -52,6 +52,10 @@ pub enum Operation {
     Sub(Box<Expr>, Box<Expr>),
     /// \*
     Mul(Box<Expr>, Box<Expr>),
+    /// <<
+    Shl(Box<Expr>, Box<Expr>),
+    /// \>>
+    Shr(Box<Expr>, Box<Expr>),
     /// && &
     And(Box<Expr>, Box<Expr>),
     /// || |
@@ -118,6 +122,8 @@ impl Call {
 pub enum Expr {
     /// An anonymous structure : { field: value }
     Anonymous(RefType, HashMap<RefField, Expr>),
+    /// Array access : array\[index]
+    Array(Box<Expr>, Box<Expr>),
     /// Function call
     Call(Box<Call>),
     /// Constant value
@@ -175,6 +181,8 @@ macro_rules! make_op_shorthand {
 make_op_shorthand!(add, Add, e1, e2);
 make_op_shorthand!(sub, Sub, e1, e2);
 make_op_shorthand!(mul, Mul, e1, e2);
+make_op_shorthand!(shl, Shl, e1, e2);
+make_op_shorthand!(shr, Shr, e1, e2);
 make_op_shorthand!(and, And, e1, e2);
 make_op_shorthand!(or, Or, e1, e2);
 make_op_shorthand!(xor, Xor, e1, e2);
@@ -218,6 +226,10 @@ pub fn flip(e: Expr) -> Expr {
         Op(Lte(a, b)) => Op(Gte(b, a)),
         _ => e,
     }
+}
+
+pub fn array(array: Expr, index: Expr) -> Expr {
+    Expr::Array(Box::new(array), Box::new(index))
 }
 
 pub fn call(fun: Expr, args: Vec<Expr>) -> Expr {

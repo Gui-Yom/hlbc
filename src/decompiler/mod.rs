@@ -312,10 +312,12 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
         };
     }
 
+    let missing_expr = || Expr::Unknown("missing expr".to_owned());
+
     // Get the expr for a register
     macro_rules! expr {
         ($reg:expr) => {
-            reg_state.get(&$reg).expect("No expr for reg ?").clone()
+            reg_state.get(&$reg).cloned().unwrap_or_else(missing_expr)
         };
     }
 
@@ -421,6 +423,12 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
             }
             &Opcode::Mul { dst, a, b } => {
                 push_expr!(i, dst, mul(expr!(a), expr!(b)));
+            }
+            &Opcode::Shl { dst, a, b } => {
+                push_expr!(i, dst, shl(expr!(a), expr!(b)));
+            }
+            &Opcode::SShr { dst, a, b } | &Opcode::UShr { dst, a, b } => {
+                push_expr!(i, dst, shr(expr!(a), expr!(b)));
             }
             &Opcode::And { dst, a, b } => {
                 push_expr!(i, dst, and(expr!(a), expr!(b)));
@@ -838,6 +846,9 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 );
             }
             //endregion
+            &Opcode::GetMem { dst, bytes, index } => {
+                push_expr!(i, dst, array(expr!(bytes), expr!(index)));
+            }
             _ => {}
         }
 
