@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use ast::*;
 
-use crate::types::{Function, RefField, Reg, Type, TypeObj};
+use crate::types::{FunPtr, Function, RefField, Reg, Type, TypeObj};
 use crate::Bytecode;
 use crate::Opcode;
 
@@ -344,16 +344,27 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     expr_ctx.pop();
                 }
             } else {
-                let func = $fun.resolve_as_fn(code).unwrap();
-                let call = if func.is_method() {
-                    Call::new(Expr::Field(Box::new(expr!($arg0)), func.name.clone().unwrap().resolve(&code.strings).to_owned()), make_args!($($args),*))
-                } else {
-                    Call::new_fun($fun, make_args!($arg0 $(, $args)*))
-                };
-                if func.ty(code).ret.is_void() {
-                    push_stmt!(Statement::Call(call));
-                } else {
-                    push_expr!($i, $dst, Expr::Call(Box::new(call)));
+                match $fun.resolve(code) {
+                    FunPtr::Fun(func) => {
+                        let call = if func.is_method() {
+                            Call::new(Expr::Field(Box::new(expr!($arg0)), func.name.clone().unwrap().resolve(&code.strings).to_owned()), make_args!($($args),*))
+                        } else {
+                            Call::new_fun($fun, make_args!($arg0 $(, $args)*))
+                        };
+                        if func.ty(code).ret.is_void() {
+                            push_stmt!(Statement::Call(call));
+                        } else {
+                            push_expr!($i, $dst, Expr::Call(Box::new(call)));
+                        }
+                    }
+                    FunPtr::Native(n) => {
+                        let call = Call::new_fun($fun, make_args!($arg0 $(, $args)*));
+                        if n.ty(code).ret.is_void() {
+                            push_stmt!(Statement::Call(call));
+                        } else {
+                            push_expr!($i, $dst, Expr::Call(Box::new(call)));
+                        }
+                    }
                 }
             }
         };
@@ -459,7 +470,7 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
             //region CALLS
             &Opcode::Call0 { dst, fun } => {
-                if fun.resolve_as_fn(code).unwrap().ty(code).ret.is_void() {
+                if fun.ty(code).ret.is_void() {
                     push_stmt!(Statement::Call(Call::new_fun(fun, Vec::new())));
                 } else {
                     push_expr!(i, dst, call_fun(fun, Vec::new()));
@@ -836,7 +847,11 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 }
             }
             &Opcode::EnumAlloc { dst, construct } => {
-                // TODO enum constructor
+                push_expr!(
+                    i,
+                    dst,
+                    Expr::EnumConstr(f.regtype(dst), construct, Vec::new())
+                );
             }
             Opcode::MakeEnum {
                 dst,

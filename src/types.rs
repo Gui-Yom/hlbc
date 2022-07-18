@@ -230,6 +230,26 @@ pub struct Native {
     pub findex: RefFun,
 }
 
+impl Native {
+    pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
+        self.name.resolve(&code.strings)
+    }
+
+    /// Get the native function signature type
+    pub fn ty<'a>(&self, code: &'a Bytecode) -> &'a TypeFun {
+        // Guaranteed to be a TypeFun
+        self.t.resolve_as_fun(&code.types).expect("Unknown type ?")
+    }
+
+    pub fn args<'a>(&self, code: &'a Bytecode) -> &'a [RefType] {
+        &self.ty(code).args
+    }
+
+    pub fn ret<'a>(&self, code: &'a Bytecode) -> &'a Type {
+        self.ty(code).ret.resolve(&code.types)
+    }
+}
+
 /// A function definition with its code.
 #[derive(Debug, Clone)]
 pub struct Function {
@@ -324,6 +344,28 @@ impl RefFun {
     /// Useful when you already know you should be getting a Function
     pub fn resolve_as_fn<'a>(&self, code: &'a Bytecode) -> Option<&'a Function> {
         code.findexes[self.0].resolve_as_fn(code)
+    }
+
+    pub fn name<'a>(&self, code: &'a Bytecode) -> Option<&'a str> {
+        match self.resolve(code) {
+            FunPtr::Fun(fun) => fun.name(code),
+            FunPtr::Native(n) => Some(n.name.resolve(&code.strings)),
+        }
+    }
+
+    pub fn ty<'a>(&self, code: &'a Bytecode) -> &'a TypeFun {
+        match self.resolve(code) {
+            FunPtr::Fun(fun) => fun.ty(code),
+            FunPtr::Native(n) => n.ty(code),
+        }
+    }
+
+    pub fn args<'a>(&self, code: &'a Bytecode) -> &'a [RefType] {
+        &self.ty(code).args
+    }
+
+    pub fn ret<'a>(&self, code: &'a Bytecode) -> &'a Type {
+        self.ty(code).ret.resolve(&code.types)
     }
 }
 
