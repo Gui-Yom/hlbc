@@ -42,7 +42,7 @@ impl Display for FormatOptions {
     }
 }
 
-fn to_haxe_type(ty: &Type, ctx: &Bytecode) -> impl Display {
+fn to_haxe_type<'a>(ty: &Type, ctx: &'a Bytecode) -> impl Display + 'a {
     use crate::Type::*;
     match ty {
         Void => "Void",
@@ -52,6 +52,7 @@ fn to_haxe_type(ty: &Type, ctx: &Bytecode) -> impl Display {
         Bytes => "hl.Bytes",
         Dyn => "Dynamic",
         Fun(_) => "Function",
+        Obj(obj) => obj.name.resolve(&ctx.strings),
         _ => "other",
     }
 }
@@ -91,7 +92,7 @@ impl Method {
             } else {
                 "\n"
                 for stmt in &self.statements {
-                    {opts}{stmt.display(&new_opts, ctx, fun)}"\n"
+                    {new_opts}{stmt.display(&new_opts, ctx, fun)}"\n"
                 }
                 {opts}"}"
             }

@@ -282,13 +282,11 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
     // Initialize register state with the function arguments
     for i in start..f.ty(code).args.len() {
-        reg_state.insert(
-            Reg(i as u32),
-            Expr::Variable(
-                Reg(i as u32),
-                f.arg_name(code, i - start).map(ToOwned::to_owned),
-            ),
-        );
+        let name = f.arg_name(code, i - start).map(ToOwned::to_owned);
+        reg_state.insert(Reg(i as u32), Expr::Variable(Reg(i as u32), name.clone()));
+        if let Some(name) = name {
+            seen.insert(name);
+        }
     }
 
     macro_rules! push_stmt {
@@ -518,17 +516,19 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                             ))
                         );
                     }
-                } else if fun.resolve_as_fn(code).unwrap().ty(code).ret.is_void() {
-                    push_stmt!(Statement::Call(Call::new_fun(
-                        *fun,
-                        args.iter().map(|x| expr!(x)).collect::<Vec<_>>(),
-                    )));
                 } else {
-                    push_expr!(
-                        i,
-                        *dst,
-                        call_fun(*fun, args.iter().map(|x| expr!(x)).collect::<Vec<_>>())
-                    );
+                    if fun.ty(code).ret.is_void() {
+                        push_stmt!(Statement::Call(Call::new_fun(
+                            *fun,
+                            args.iter().map(|x| expr!(x)).collect::<Vec<_>>(),
+                        )));
+                    } else {
+                        push_expr!(
+                            i,
+                            *dst,
+                            call_fun(*fun, args.iter().map(|x| expr!(x)).collect::<Vec<_>>())
+                        );
+                    }
                 }
             }
             Opcode::CallMethod { dst, field, args } => {
@@ -578,9 +578,8 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 );
                 if f.regtype(*fun)
                     .resolve_as_fun(&code.types)
-                    .unwrap()
-                    .ret
-                    .is_void()
+                    .map(|ty| ty.ret.is_void())
+                    .unwrap_or(false)
                 {
                     push_stmt!(Statement::Call(call));
                 } else {
@@ -746,7 +745,7 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
             }
             &Opcode::JAlways { offset } => {
                 if offset < 0 {
-                    println!("opcode {i}");
+                    //println!("opcode {i}");
                     // It's either the jump backward of a loop or a continue statement
                     let loop_ = scopes.last_loop().unwrap();
                     // Scan the next instructions in order to find another jump to the same place
