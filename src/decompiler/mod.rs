@@ -101,7 +101,7 @@ struct Scopes {
 impl Scopes {
     fn new() -> Self {
         Self {
-            scopes: vec![Scope::RootScope(Vec::new())],
+            scopes: vec![Scope::Root(Vec::new())],
         }
     }
 
@@ -182,11 +182,8 @@ impl Scopes {
 
     fn last_loop(&self) -> Option<&LoopScope> {
         for idx in (0..self.depth()).rev() {
-            match &self.scopes[idx] {
-                Scope::Loop(l) => {
-                    return Some(l);
-                }
-                _ => {}
+            if let Scope::Loop(l) = &self.scopes[idx] {
+                return Some(l);
             }
         }
         None
@@ -198,10 +195,6 @@ impl Scopes {
 
     fn last_mut(&mut self) -> &mut Scope {
         self.scopes.last_mut().unwrap()
-    }
-
-    fn push_scope(&mut self, scope: Scope) {
-        self.scopes.push(scope);
     }
 
     fn pop(&mut self) -> Scope {
@@ -286,11 +279,11 @@ impl Scopes {
                         }
                     }
                 }
-                Scope::RootScope(mut stmts) => {
+                Scope::Root(mut stmts) => {
                     if let Some(stmt) = stmt.take() {
                         stmts.push(stmt);
                     }
-                    self.scopes.insert(idx, Scope::RootScope(stmts));
+                    self.scopes.insert(idx, Scope::Root(stmts));
                 }
                 Scope::Loop(mut loop_) => {
                     if let Some(stmt) = stmt.take() {
@@ -302,7 +295,7 @@ impl Scopes {
         }
         if let Some(stmt) = stmt.take() {
             match self.last_mut() {
-                Scope::RootScope(stmts)
+                Scope::Root(stmts)
                 | Scope::If { stmts, .. }
                 | Scope::Else { stmts, .. }
                 | Scope::Switch(SwitchScope { default: stmts, .. })
@@ -315,7 +308,7 @@ impl Scopes {
     }
 
     fn statements(mut self) -> Vec<Statement> {
-        if let Scope::RootScope(stmts) = self.pop() {
+        if let Scope::Root(stmts) = self.pop() {
             stmts
         } else {
             unreachable!("mmmmhhh kinda sus:\n{:#?}\n", self.scopes);
@@ -325,7 +318,7 @@ impl Scopes {
 
 #[derive(Debug)]
 enum Scope {
-    RootScope(Vec<Statement>),
+    Root(Vec<Statement>),
     If {
         len: i32,
         cond: Expr,
@@ -437,7 +430,7 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
     macro_rules! push_expr_stmt {
         ($i:ident, $dst:ident, $e:expr) => {
             if f.var_name(code, $i).is_some() {
-                push_stmt!(stmt($e))
+                push_stmt!(stmt($e));
             } else {
                 reg_state.insert($dst, $e);
             }
@@ -580,10 +573,11 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 push_expr!(i, dst, not(expr!(src)));
             }
             &Opcode::Incr { dst } => {
-                push_expr_stmt!(i, dst, incr(expr!(dst)));
+                // FIXME sometimes it should be an expression
+                push_stmt!(stmt(incr(expr!(dst))));
             }
             &Opcode::Decr { dst } => {
-                push_expr_stmt!(i, dst, decr(expr!(dst)));
+                push_stmt!(stmt(decr(expr!(dst))));
             }
             //endregion
 
@@ -638,32 +632,22 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         );
                     }
                 } else {
+                    let call = call_fun(*fun, args.iter().map(|x| expr!(x)).collect::<Vec<_>>());
                     if fun.ty(code).ret.is_void() {
-                        push_stmt!(stmt(call_fun(
-                            *fun,
-                            args.iter().map(|x| expr!(x)).collect::<Vec<_>>(),
-                        )));
+                        push_stmt!(stmt(call));
                     } else {
-                        push_expr!(
-                            i,
-                            *dst,
-                            call_fun(*fun, args.iter().map(|x| expr!(x)).collect::<Vec<_>>())
-                        );
+                        push_expr!(i, *dst, call);
                     }
                 }
             }
             Opcode::CallMethod { dst, field, args } => {
-                let method = f.regtype(args[0]).method(field.0, code).unwrap();
                 let call = call(
-                    Expr::Field(
-                        Box::new(expr!(args[0])),
-                        method.name.resolve(&code.strings).to_owned(),
-                    ),
+                    ast::field(expr!(args[0]), f.regtype(args[0]), *field, code),
                     args.iter().skip(1).map(|x| expr!(x)).collect::<Vec<_>>(),
                 );
-                if method
-                    .findex
-                    .resolve_as_fn(code)
+                if f.regtype(args[0])
+                    .method(field.0, code)
+                    .and_then(|p| p.findex.resolve_as_fn(code))
                     .map(|fun| fun.ty(code).ret.is_void())
                     .unwrap_or(false)
                 {
@@ -759,7 +743,7 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         Type::Obj(obj) | Type::Struct(obj) => {
                             push_expr!(i, dst, Expr::Variable(dst, Some(obj.name.display(code))));
                         }
-                        Type::Enum { global: eg, .. } => {
+                        Type::Enum { .. } => {
                             push_expr!(i, dst, Expr::Unknown("unknown enum variant".to_owned()));
                         }
                         _ => {}
@@ -811,6 +795,7 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     assign: expr!(src),
                 });
             }
+            /*
             &Opcode::DynGet { dst, obj, field } => {
                 // TODO dyn get
             }
@@ -830,7 +815,7 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
             }
             &Opcode::SetEnumField { value, field, src } => {
                 // TODO set enum field
-            }
+            }*/
             //endregion
 
             //region CONTROL FLOW
