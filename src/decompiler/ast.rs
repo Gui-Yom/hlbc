@@ -258,12 +258,10 @@ pub enum Statement {
         variable: Expr,
         assign: Expr,
     },
-    // Call a void function (no assignment)
-    Call(Call),
-    /// Return an expression
-    Return(Expr),
-    /// Return nothing / early return
-    ReturnVoid,
+    /// Expression statement
+    ExprStatement(Expr),
+    /// Return an expression or nothing (void)
+    Return(Option<Expr>),
     /// If statement
     If {
         cond: Expr,
@@ -273,6 +271,11 @@ pub enum Statement {
     Else {
         stmts: Vec<Statement>,
     },
+    Switch {
+        arg: Expr,
+        default: Vec<Statement>,
+        cases: Vec<(Expr, Vec<Statement>)>,
+    },
     /// While statement
     While {
         cond: Expr,
@@ -281,4 +284,9 @@ pub enum Statement {
     Break,
     Continue,
     Throw(Expr),
+}
+
+/// Create an expression statement
+pub fn stmt(e: Expr) -> Statement {
+    Statement::ExprStatement(e)
 }

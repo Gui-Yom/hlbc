@@ -2,7 +2,7 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 
 use crate::decompiler::ast::{
-    Call, Class, Constant, ConstructorCall, Expr, Method, Operation, Statement,
+    Class, Constant, ConstructorCall, Expr, Method, Operation, Statement,
 };
 use crate::types::{Function, RefField, Type};
 use crate::Bytecode;
@@ -245,13 +245,12 @@ impl Statement {
                 } => {
                     if *declaration { "var " } else { "" }{disp!(variable)}" = "{disp!(assign)}";"
                 }
-                Statement::Call(Call { fun, args }) => {
-                    {disp!(fun)}"("{fmtools::join(", ", args.iter().map(|e| disp!(e)))}");"
+                Statement::ExprStatement(expr) => {
+                    {disp!(expr)}";"
                 }
                 Statement::Return(expr) => {
-                    "return "{disp!(expr)}";"
+                    "return" if let Some(e) = expr { " "{disp!(e)} } ";"
                 }
-                Statement::ReturnVoid => "return;",
                 Statement::If { cond, stmts } => {
                     "if ("{disp!(cond)}") {\n"
                     let indent2 = indent.inc_nesting();
@@ -265,6 +264,24 @@ impl Statement {
                     let indent2 = indent.inc_nesting();
                     for stmt in stmts {
                         {indent2}{stmt.display(&indent2, code, f)}"\n"
+                    }
+                    {indent}"}"
+                }
+                Statement::Switch {arg, default, cases} => {
+                    "switch ("{disp!(arg)}") {\n"
+                    let indent2 = indent.inc_nesting();
+                    let indent3 = indent2.inc_nesting();
+                    if !default.is_empty() {
+                        {indent2}"default:\n"
+                        for stmt in default {
+                            {indent3}{stmt.display(&indent3, code, f)}"\n"
+                        }
+                    }
+                    for (pattern, stmts) in cases {
+                        {indent2}"case "{disp!(pattern)}":\n"
+                        for stmt in stmts {
+                            {indent3}{stmt.display(&indent3, code, f)}"\n"
+                        }
                     }
                     {indent}"}"
                 }
