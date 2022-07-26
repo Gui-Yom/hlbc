@@ -24,6 +24,7 @@
 - Gui to render instructions and decompiled code
 - C API to integrate with other tools
 - Text search engine to search for strings and names
+- Assemble and inject bytecode or inject haxe source code directly
 
 ## Changelog
 

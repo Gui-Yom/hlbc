@@ -1,8 +1,14 @@
-# hlbc-cli
+# hlbc-cli ![Crates.io](https://img.shields.io/crates/v/hlbc-cli?label=hlbc-cli)
 
-![Crates.io](https://img.shields.io/crates/v/hlbc-cli?label=hlbc-cli)
+A CLI to navigate through [Hashlink](https://hashlink.haxe.org/) bytecode files. This is the command line interface
+for [hlbc](https://github.com/Gui-Yom/hlbc), the **H**ash**l**ink **b**yte**c**ode
+disassembler, analyzer, decompiler and assembler.
 
-A CLI to navigate through [Hashlink](https://hashlink.haxe.org/) bytecode files.
+*This crate is a program, see [hlbc](https://github.com/Gui-Yom/hlbc) for a library to use.*
+
+![screenshot](screenshot.png)
+
+---
 
 ## Installation
 
@@ -62,11 +68,17 @@ present in the `PATH`.
 - `refto <any@idx>` Find references to a given bytecode element
 - `saveto <filename>` Serialize the bytecode to a file
 - `callgraph <findex> <depth>` Create a dot call graph from a function and a max depth
+- `decomp <findex>` Decompile a function
+- `decomptype <idx>` Decompile a class
 
 ### Indexes
 
 In most of the commands that accept an index, you can pass a Rust style range too : `a..b`, `..b`, `a..`, `a..=b`, `..`.
 Where `..10` means '*select the first 10 items*' and `..` means '*display everything*'.
+
+## Decompiler
+
+More info about the decompiler [here](https://github.com/Gui-Yom/hlbc/blob/master/README.md#decompiler).
 
 ## Changelog
 
@@ -78,4 +90,5 @@ A wiki detailing the specifics of Hashlink bytecode is available [here](https://
 
 ## Planned features
 
-- Use commands as expressions in arguments to other commands to compose analysis like `fn (entrypoint)` to display the entry function or `refto (sstr Hello)`
+- Use commands as expressions in arguments to other commands to compose analysis like `fn (entrypoint)` to display the
+  entry function or `refto (sstr Hello)`
