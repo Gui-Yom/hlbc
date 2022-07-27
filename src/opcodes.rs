@@ -3,14 +3,6 @@ use crate::types::{
     Reg, ValBool,
 };
 
-/*
-static OPCODE_ARGS: &[i8; 99] = &[
-    2, 2, 2, 2, 2, 2, 1, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2, 2, 1, 1, 2, 3, 4, 5, 6, -1, -1,
-    -1, -1, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 2, 2, 2,
-    2, 2, 2, 2, 0, 1, 1, 1, -1, 1, 2, 1, 3, 3, 3, 3, 3, 3, 3, 3, 1, 2, 2, 2, 2, 2, 2, 2, -1, 2, 2,
-    4, 3, 0, 2, 3, 0,
-];*/
-
 /// Offset for jump instruction. Can be negative, indicating a backward jump.
 pub type JumpOffset = i32;
 
@@ -77,36 +69,43 @@ pub enum Opcode {
         a: Reg,
         b: Reg,
     },
+    /// Signed division
     SDiv {
         dst: Reg,
         a: Reg,
         b: Reg,
     },
+    /// Unsigned division
     UDiv {
         dst: Reg,
         a: Reg,
         b: Reg,
     },
+    /// Signed modulo
     SMod {
         dst: Reg,
         a: Reg,
         b: Reg,
     },
+    /// Unsigned modulo
     UMod {
         dst: Reg,
         a: Reg,
         b: Reg,
     },
+    /// Shift bits left
     Shl {
         dst: Reg,
         a: Reg,
         b: Reg,
     },
+    /// Signed shift bits right
     SShr {
         dst: Reg,
         a: Reg,
         b: Reg,
     },
+    /// Unsigned shift bits right
     UShr {
         dst: Reg,
         a: Reg,
@@ -268,47 +267,60 @@ pub enum Opcode {
         global: RefGlobal,
         src: Reg,
     },
+    /// Access an object field
     Field {
         dst: Reg,
         obj: Reg,
         field: RefField,
     },
+    /// Set an object field
     SetField {
         obj: Reg,
         field: RefField,
         src: Reg,
     },
-    // Equivalent to RefField with obj = reg0
+    /// Get a field from the *this* instance
+    ///
+    /// Equivalent to `Field dst reg0 field`
     GetThis {
         dst: Reg,
         field: RefField,
     },
+    /// Set a field from the *this* instance
+    ///
+    /// Equivalent to `SetField reg0 field src`
     SetThis {
         field: RefField,
         src: Reg,
     },
+    /// Access a field of a [crate::Type::Dyn] instance by its name.
     DynGet {
         dst: Reg,
         obj: Reg,
         field: RefString,
     },
+    /// Set a field of a [crate::Type::Dyn] instance by its name.
     DynSet {
         obj: Reg,
         field: RefString,
         src: Reg,
     },
+    /// Jump by an offset if the condition is true
     JTrue {
         cond: Reg,
         offset: JumpOffset,
     },
+    /// Jump by an offset if the condition is false
     JFalse {
         cond: Reg,
         offset: JumpOffset,
     },
+    /// Jump by an offset if the value is null
     JNull {
         reg: Reg,
         offset: JumpOffset,
     },
+    /// Jump by an offset if the value is not null
     JNotNull {
         reg: Reg,
         offset: JumpOffset,
@@ -363,6 +375,7 @@ pub enum Opcode {
         b: Reg,
         offset: JumpOffset,
     },
+    /// Jump by an offset unconditionally
     JAlways {
         offset: JumpOffset,
     },
@@ -394,17 +407,22 @@ pub enum Opcode {
         dst: Reg,
         src: Reg,
     },
-    // Negative jump offsets must target a label
+    /// No-op, mark a position as being the target of a backward jump (for loops)
+    ///
+    /// Negative jump offsets must always target a label
     Label,
+    /// Return a value from the current function
     Ret {
         ret: Reg,
     },
+    /// Throw an exception
     Throw {
         exc: Reg,
     },
     Rethrow {
         exc: Reg,
     },
+    /// Select a jump offset based on the integer value
     Switch {
         reg: Reg,
         offsets: Vec<JumpOffset>,
@@ -460,6 +478,7 @@ pub enum Opcode {
         index: Reg,
         src: Reg,
     },
+    /// Allocate an object
     New {
         dst: Reg,
     },
@@ -467,10 +486,12 @@ pub enum Opcode {
         dst: Reg,
         array: Reg,
     },
+    /// Get the type object from its identifier
     Type {
         dst: Reg,
         ty: RefType,
     },
+    /// Get the type object of a value
     GetType {
         dst: Reg,
         src: Reg,
@@ -491,26 +512,32 @@ pub enum Opcode {
         dst: Reg,
         value: Reg,
     },
+    /// Allocate and initialize an enum variant
     MakeEnum {
         dst: Reg,
         construct: RefEnumConstruct,
         args: Vec<Reg>,
     },
+    /// Allocate an enum variant, its fields are initialized to default values
     EnumAlloc {
         dst: Reg,
         construct: RefEnumConstruct,
     },
     /// Get the enum value construct index (the enum tag)
+    ///
+    /// Useful for [Opcode::Switch]
     EnumIndex {
         dst: Reg,
         value: Reg,
     },
+    /// Access a field of an enum
     EnumField {
         dst: Reg,
         value: Reg,
         construct: RefEnumConstruct,
         field: RefField,
     },
+    /// Set a field of an enum
     SetEnumField {
         value: Reg,
         field: RefField,
@@ -526,5 +553,6 @@ pub enum Opcode {
         reg: Reg,
         offset: Reg,
     },
+    /// No-op
     Nop,
 }

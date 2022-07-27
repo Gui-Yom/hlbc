@@ -132,6 +132,8 @@ impl Operation {
                 Add(e1, e2) => {{disp!(e1)}" + "{disp!(e2)}}
                 Sub(e1, e2) => {{disp!(e1)}" - "{disp!(e2)}}
                 Mul(e1, e2) => {{disp!(e1)}" * "{disp!(e2)}}
+                Div(e1, e2) => {{disp!(e1)}" / "{disp!(e2)}}
+                Mod(e1, e2) => {{disp!(e1)}" % "{disp!(e2)}}
                 Shl(e1, e2) => {{disp!(e1)}" << "{disp!(e2)}}
                 Shr(e1, e2) => {{disp!(e1)}" >> "{disp!(e2)}}
                 And(e1, e2) => {{disp!(e1)}" && "{disp!(e2)}}

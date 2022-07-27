@@ -91,6 +91,35 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
     }
 }
 
+/*
+fn if_expression(stmts: &mut Vec<Statement>) {
+    let mut iter = stmts.iter_mut();
+    while let Some(stmt) = iter.next() {
+        if let Statement::If {
+            stmts: if_stmts, ..
+        } = stmt
+        {
+            if let Some(Statement::Assign { variable: if_v, .. }) = if_stmts.last() {
+                if let Some(Statement::Else {
+                    stmts: else_stmts, ..
+                }) = iter.next()
+                {
+                    if let Some(Statement::Assign {
+                        variable: else_v, ..
+                    }) = else_stmts.last()
+                    {
+                        if if_v == else_v {
+                            // This if/else could be used as an expression
+                        }
+                    }
+                } else {
+                    // This if could be used as en expression
+                }
+            }
+        }
+    }
+}*/
+
 /// Helper to process a stack of scopes (branches, loops)
 struct Scopes {
     // A linked list would be appreciable i think
@@ -529,7 +558,7 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 push_expr!(i, dst, cst_bool(value.0));
             }
             &Opcode::String { dst, ptr } => {
-                push_expr!(i, dst, cst_string(ptr.resolve(&code.strings).to_owned()));
+                push_expr!(i, dst, cst_refstring(ptr, code));
             }
             &Opcode::Null { dst } => {
                 push_expr!(i, dst, cst_null());
@@ -550,6 +579,12 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
             }
             &Opcode::Mul { dst, a, b } => {
                 push_expr!(i, dst, mul(expr!(a), expr!(b)));
+            }
+            &Opcode::SDiv { dst, a, b } | &Opcode::UDiv { dst, a, b } => {
+                push_expr!(i, dst, div(expr!(a), expr!(b)));
+            }
+            &Opcode::SMod { dst, a, b } | &Opcode::UMod { dst, a, b } => {
+                push_expr!(i, dst, modulo(expr!(a), expr!(b)));
             }
             &Opcode::Shl { dst, a, b } => {
                 push_expr!(i, dst, shl(expr!(a), expr!(b)));
@@ -795,13 +830,17 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     assign: expr!(src),
                 });
             }
-            /*
             &Opcode::DynGet { dst, obj, field } => {
-                // TODO dyn get
+                push_expr!(i, dst, array(expr!(obj), cst_refstring(field, code)));
             }
             &Opcode::DynSet { obj, field, src } => {
-                // TODO dyn set
+                push_stmt!(Statement::Assign {
+                    declaration: false,
+                    variable: array(expr!(obj), cst_refstring(field, code)),
+                    assign: expr!(src)
+                });
             }
+            /*
             &Opcode::EnumIndex { dst, value } => {
                 // TODO get enum variant
             }
@@ -963,6 +1002,9 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 push_expr!(i, dst, expr!(src));
             }
             &Opcode::ToVirtual { dst, src } => {
+                push_expr!(i, dst, expr!(src));
+            }
+            &Opcode::SafeCast { dst, src } => {
                 push_expr!(i, dst, expr!(src));
             }
             &Opcode::New { dst } => {

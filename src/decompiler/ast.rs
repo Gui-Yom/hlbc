@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::types::{RefEnumConstruct, RefField, RefFun, RefType, Reg};
+use crate::types::{RefEnumConstruct, RefField, RefFun, RefString, RefType, Reg};
 use crate::Bytecode;
 
 #[derive(Debug)]
@@ -46,15 +46,19 @@ pub enum Constant {
 
 #[derive(Debug, Clone)]
 pub enum Operation {
-    /// \+
+    /// `+`
     Add(Box<Expr>, Box<Expr>),
-    /// \-
+    /// `-`
     Sub(Box<Expr>, Box<Expr>),
-    /// \*
+    /// `*`
     Mul(Box<Expr>, Box<Expr>),
-    /// <<
+    /// `/`
+    Div(Box<Expr>, Box<Expr>),
+    /// `%`
+    Mod(Box<Expr>, Box<Expr>),
+    /// `<<`
     Shl(Box<Expr>, Box<Expr>),
-    /// \>>
+    /// `>>`
     Shr(Box<Expr>, Box<Expr>),
     /// && &
     And(Box<Expr>, Box<Expr>),
@@ -161,6 +165,11 @@ pub fn cst_string(cst: String) -> Expr {
     Expr::Constant(Constant::String(cst))
 }
 
+// TODO make an ast node to contain a RefString directly
+pub fn cst_refstring(cst: RefString, code: &Bytecode) -> Expr {
+    cst_string(cst.resolve(&code.strings).to_owned())
+}
+
 pub fn cst_null() -> Expr {
     Expr::Constant(Constant::Null)
 }
@@ -181,6 +190,8 @@ macro_rules! make_op_shorthand {
 make_op_shorthand!(add, Add, e1, e2);
 make_op_shorthand!(sub, Sub, e1, e2);
 make_op_shorthand!(mul, Mul, e1, e2);
+make_op_shorthand!(div, Div, e1, e2);
+make_op_shorthand!(modulo, Mod, e1, e2);
 make_op_shorthand!(shl, Shl, e1, e2);
 make_op_shorthand!(shr, Shr, e1, e2);
 make_op_shorthand!(and, And, e1, e2);
