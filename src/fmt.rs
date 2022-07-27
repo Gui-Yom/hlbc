@@ -221,7 +221,7 @@ impl Opcode {
     ) -> impl Display {
         macro_rules! op {
             ($($arg:tt)*) => {
-                format!("{:<align$}{}", self.name(), format_args!($($arg)*))
+                format!("{:<align$} {}", self.name(), format_args!($($arg)*))
             };
         }
 
@@ -495,49 +495,27 @@ impl Function {
         )
     }
 
-    pub fn display(&self, ctx: &Bytecode) -> impl Display {
-        let regs: Vec<String> = self
-            .regs
-            .iter()
-            .enumerate()
-            .map(|(i, r)| format!("reg{:<2} {}", i, r.display(ctx)))
-            .collect();
-        let ops: Vec<String> = if let Some(debug) = &self.debug_info {
-            self.ops
-                .iter()
-                .enumerate()
-                .zip(debug.iter())
-                .map(|((i, o), (file, line))| {
-                    format!(
-                        "{:>12}:{line:<3} {i:>3}: {}",
-                        ctx.debug_files.as_ref().unwrap()[*file as usize],
-                        o.display(ctx, self, i as i32, 16)
-                    )
-                })
-                .collect()
-        } else {
-            self.ops
-                .iter()
-                .enumerate()
-                .map(|(i, o)| format!("{i:>3}: {}", o.display(ctx, self, i as i32, 16)))
-                .collect()
-        };
-        /*
-        let assigns: Vec<String> = self
-            .assigns
-            .as_ref()
-            .unwrap()
-            .iter()
-            .map(|(s, i)| format!("{} at opcode {}", s.resolve(&ctx.strings), i))
-            .collect();*/
-        format!(
-            "{} ({} regs, {} ops)\n    {}\n\n{}",
-            self.display_header(ctx),
-            self.regs.len(),
-            self.ops.len(),
-            regs.join("\n    "),
-            ops.join("\n"),
-            //assigns.join("\n")
-        )
+    pub fn display<'a>(&'a self, ctx: &'a Bytecode) -> impl Display + 'a {
+        fmtools::fmt! {
+            {self.display_header(ctx)}" ("{self.regs.len()}" regs, "{self.ops.len()}" ops)\n"
+            for (i, reg) in self.regs.iter().enumerate() {
+                "    reg"{i:<2}" "{reg.display(ctx)}"\n"
+            }
+            if let Some(debug) = &self.debug_info {
+                for ((i, o), (file, line)) in self.ops
+                    .iter()
+                    .enumerate()
+                    .zip(debug.iter())
+                {
+                    {ctx.debug_files.as_ref().unwrap()[*file as usize]:>12}":"{line:<3}" "{i:>3}": "{o.display(ctx, self, i as i32, 11)}"\n"
+                }
+            } else {
+                for (i, o) in self.ops
+                    .iter()
+                    .enumerate() {
+                    {i:>3}": "{o.display(ctx, self, i as i32, 11)}"\n"
+                }
+            }
+        }
     }
 }

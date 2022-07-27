@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Auto-reload with the `-w` flag
 - Add a proper cli parser and app with clap
 - Support passing a haxe source file to be compiled on the fly
+- New `decomp` command to decompile a function
+- New `decomptype` command to decompile a class
+- New `wiki` command to open the bytecode wiki page in a browser
 
 ### Changed
 

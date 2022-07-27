@@ -21,11 +21,19 @@ pub enum ElementRef {
 
 #[derive(Debug, Clone)]
 pub enum Command {
+    /// Exit the application
     Exit,
+    /// Print the help message about commands
     Help,
-    Info,
-    Entrypoint,
+    /// Show documentation for an opcode
     Explain(String),
+    /// Open the wiki in the browser
+    Wiki,
+
+    /// Show generale information about the bytecode
+    Info,
+    /// Show the function to be executed on startup (not the main)
+    Entrypoint,
     Int(IndexRange),
     Float(IndexRange),
     String(IndexRange),
@@ -84,89 +92,74 @@ pub fn command_parser(ctx: &ParseContext) -> impl Parser<char, Command, Error = 
 
     macro_rules! cmd {
         ($name:expr) => {
-            just($name).padded().ignored()
+            just($name).padded()
         };
-        ($name:expr, $name_min:expr) => {
-            just($name).or(just($name_min)).padded().ignored()
+        ($name:expr => $cmd:ident) => {
+            cmd!($name).map(|_| $cmd)
         };
-        ($name:expr; $then:expr) => {
-            just($name).padded().ignore_then($then)
+        ($name:expr; $then:expr => $cmd:ident) => {
+            cmd!($name).ignore_then($then).map($cmd)
         };
-        ($name:expr, $name_min:expr; $then:expr) => {
-            just($name).or(just($name_min)).padded().ignore_then($then)
+        ($name:expr, $name_min:expr; $then:expr => $cmd:ident) => {
+            just($name)
+                .or(just($name_min))
+                .padded()
+                .ignore_then($then)
+                .map($cmd)
         };
     }
 
     let string = string();
 
-    // The boxing is necessary because the items in an array must be of the same type.
-    // We can't use a tuple because the impl are for tuples of length 25 at most.
-    choice([
-        cmd!("exit").map(|_| Exit).boxed(),
-        cmd!("help").map(|_| Help).boxed(),
-        cmd!("info").map(|_| Info).boxed(),
-        cmd!("entrypoint").map(|_| Entrypoint).boxed(),
-        cmd!("explain"; string.clone()).map(Explain).boxed(),
-        cmd!("int", "i"; index_range(ctx.int_max)).map(Int).boxed(),
-        cmd!("float", "f"; index_range(ctx.float_max))
-            .map(Float)
-            .boxed(),
-        cmd!("string", "s"; index_range(ctx.string_max))
-            .map(String)
-            .boxed(),
-        cmd!("sstr"; string.clone()).map(SearchStr).boxed(),
-        cmd!("debugfile", "file"; index_range(ctx.debug_file_max))
-            .map(Debugfile)
-            .boxed(),
-        cmd!("sfile"; string.clone()).map(SearchDebugfile).boxed(),
-        cmd!("type", "t"; index_range(ctx.type_max))
-            .map(Type)
-            .boxed(),
-        cmd!("global", "g"; index_range(ctx.global_max))
-            .map(Global)
-            .boxed(),
-        cmd!("native", "n"; index_range(ctx.native_max))
-            .map(Native)
-            .boxed(),
-        cmd!("constant", "c"; index_range(ctx.constant_max))
-            .map(Constant)
-            .boxed(),
-        cmd!("fnh"; index_range(ctx.findex_max))
-            .map(FunctionHeader)
-            .boxed(),
-        cmd!("fn"; index_range(ctx.findex_max))
-            .map(Function)
-            .boxed(),
-        cmd!("fnamed", "fnn"; string.clone())
-            .map(FunctionNamed)
-            .boxed(),
-        cmd!("sfn"; string.clone()).map(SearchFunction).boxed(),
-        cmd!("infile")
-            .ignore_then(choice((
-                num().map(|n| InFile(FileOrIndex::Index(n))),
-                filter(|c: &char| !c.is_whitespace())
-                    .repeated()
-                    .map(|v| InFile(FileOrIndex::File(v.into_iter().collect()))),
-            )))
-            .boxed(),
-        cmd!("fileof"; num()).map(FileOf).boxed(),
-        cmd!("saveto"; string.clone()).map(SaveTo).boxed(),
+    // We split the parsers in 2 to not overflow the tuple maximum size
+
+    let core_cmds = choice((
+        cmd!("exit" => Exit),
+        cmd!("help" => Help),
+        cmd!("explain"; string.clone() => Explain),
+        cmd!("wiki" => Wiki),
+    ));
+
+    choice((
+        core_cmds,
+        cmd!("info" => Info),
+        cmd!("entrypoint" => Entrypoint),
+        cmd!("int", "i"; index_range(ctx.int_max) => Int),
+        cmd!("float", "f"; index_range(ctx.float_max) => Float),
+        cmd!("string", "s"; index_range(ctx.string_max) => String),
+        cmd!("sstr"; string.clone() => SearchStr),
+        cmd!("debugfile", "file"; index_range(ctx.debug_file_max) => Debugfile),
+        cmd!("sfile"; string.clone() => SearchDebugfile),
+        cmd!("type", "t"; index_range(ctx.type_max) => Type),
+        cmd!("global", "g"; index_range(ctx.global_max) => Global),
+        cmd!("constant", "c"; index_range(ctx.constant_max) => Constant),
+        cmd!("native", "n"; index_range(ctx.native_max) => Native),
+        cmd!("fnh"; index_range(ctx.findex_max) => FunctionHeader),
+        cmd!("fn"; index_range(ctx.findex_max) => Function),
+        cmd!("fnamed", "fnn"; string.clone() => FunctionNamed),
+        cmd!("sfn"; string.clone() => SearchFunction),
+        cmd!("infile").ignore_then(choice((
+            num().map(|n| InFile(FileOrIndex::Index(n))),
+            filter(|c: &char| !c.is_whitespace())
+                .repeated()
+                .map(|v| InFile(FileOrIndex::File(v.into_iter().collect()))),
+        ))),
+        cmd!("fileof"; num() => FileOf),
+        cmd!("saveto"; string.clone() => SaveTo),
         cmd!("callgraph")
             .ignore_then(num())
             .then(num())
-            .map(|(f, d)| Callgraph(f, d))
-            .boxed(),
+            .map(|(f, d)| Callgraph(f, d)),
         cmd!("refto")
             .ignore_then(choice((
                 just("string@").ignore_then(num()).map(ElementRef::String),
                 just("global@").ignore_then(num()).map(ElementRef::Global),
                 just("fn@").ignore_then(num()).map(ElementRef::Fn),
             )))
-            .map(RefTo)
-            .boxed(),
-        cmd!("decomptype"; num()).map(DecompType).boxed(),
-        cmd!("decomp"; num()).map(Decomp).boxed(),
-    ])
+            .map(RefTo),
+        cmd!("decomp"; num() => Decomp),
+        cmd!("decompt"; num() => DecompType),
+    ))
 }
 
 fn string() -> impl Parser<char, String, Error = Simple<char>> + Clone {
@@ -213,7 +206,6 @@ mod tests {
     use crate::command::{
         index_range, parse_command, parse_commands, Command, FileOrIndex, ParseContext,
     };
-    use crate::parse_commands;
 
     #[test]
     fn test_index_range() {

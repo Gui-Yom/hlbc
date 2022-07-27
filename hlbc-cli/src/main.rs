@@ -208,31 +208,47 @@ fn process_command(
         Command::Help => {
             println!(
                 r#"Commands :
-info                   | General information about the bytecode
-help                   | This message
-entrypoint             | Get the bytecode entrypoint
-explain     <op>       | Get information about an opcode
-i,int       <idx>      | Get the int at index
-f,float     <idx>      | Get the float at index
-s,string    <idx>      | Get the string at index
-sstr        <str>      | Find a string
-file,debugfile <idx>      | Get the debug file name at index
-sfile       <str>      | Find the debug file named
-t,type      <idx>      | Get the type at index
-g,global    <idx>      | Get global at index
-c,constant  <idx>      | Get constant at index
-n,native    <idx>      | Get native at index
-fnh         <findex>   | Get header of function at index
-fn          <findex>   | Get function at index
-sfn         <str>      | Get function named
-infile      <idx|str> | Find functions in file
-fileof      <findex>   | Get the file where findex is defined
-refto       <any@idx>  | Find references to a given bytecode element
-saveto      <filename> | Serialize the bytecode to a file
+exit                         | Exit hlbc-cli
+help                         | This message
+explain     <opcode>         | Get information about an opcode
+wiki                         | Open the bytecode wiki in a browser
+info                         | General information about the bytecode
+entrypoint                   | Get the bytecode entrypoint
+i,int       <idx>            | Get the int at index
+f,float     <idx>            | Get the float at index
+s,string    <idx>            | Get the string at index
+sstr        <str>            | Find a string
+file,debugfile <idx>         | Get the debug file name at index
+sfile       <str>            | Find the debug file named
+t,type      <idx>            | Get the type at index
+g,global    <idx>            | Get global at index
+c,constant  <idx>            | Get constant at index
+n,native    <idx>            | Get native at index
+fnh         <findex>         | Get header of function at index
+fn          <findex>         | Get function at index
+fnn,fnamed  <str>            | Show the function named
+sfn         <str>            | Find a function by name
+infile      <idx|str>        | Find functions in file
+fileof      <findex>         | Get the file where findex is defined
+refto       <any@idx>        | Find references to a given bytecode element
+saveto      <filename>       | Serialize the bytecode to a file
 callgraph   <findex> <depth> | Create a dot call graph froma function and a max depth
-                "#
+decomp      <findex>         | Decompile a function
+decompt     <idx>            | Decompile a type
+
+Remember you can use the range notation in place of an index to navigate through data : a..b
+This is the same range notation as Rust and is supported with most commands."#
             );
         }
+        Command::Explain(s) => {
+            if let Some(o) = Opcode::from_name(&s) {
+                print!("{} :\n{}", o.name(), o.description());
+                println!("Example : {}", o.display(code, &code.functions[0], 0, 0));
+            } else {
+                println!("No opcode named '{s}' exists.");
+            }
+        }
+        Command::Wiki => webbrowser::open("https://github.com/Gui-Yom/hlbc/wiki")?,
         Command::Info => {
             println!(
                 "version: {}\ndebug: {}\nnints: {}\nnfloats: {}\nnstrings: {}\nntypes: {}\nnnatives: {}\nnfunctions: {}\nnconstants: {}",
@@ -249,14 +265,6 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
         }
         Command::Entrypoint => {
             println!("{}", code.entrypoint.display_header(code));
-        }
-        Command::Explain(s) => {
-            if let Some(o) = Opcode::from_name(&s) {
-                print!("{} :\n{}", o.name(), o.description());
-                println!("Example : {}", o.display(code, &code.functions[0], 0, 0));
-            } else {
-                println!("No opcode named '{s}' exists.");
-            }
         }
         Command::Int(range) => {
             for i in range {
@@ -566,6 +574,13 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                     });
             }
         },
+        Command::Decomp(idx) => {
+            if let Some(fun) = RefFun(idx).resolve_as_fn(code) {
+                for stmt in decompiler::decompile_function(code, fun) {
+                    println!("{}", stmt.display(&FormatOptions::new("  "), code, fun));
+                }
+            }
+        }
         Command::DecompType(idx) => {
             let ty = &code.types[idx];
             match ty {
@@ -578,13 +593,6 @@ callgraph   <findex> <depth> | Create a dot call graph froma function and a max 
                     );
                 }
                 _ => println!("Type {idx} is not an obj"),
-            }
-        }
-        Command::Decomp(idx) => {
-            if let Some(fun) = RefFun(idx).resolve_as_fn(code) {
-                for stmt in decompiler::decompile_function(code, fun) {
-                    println!("{}", stmt.display(&FormatOptions::new("  "), code, fun));
-                }
             }
         }
     }

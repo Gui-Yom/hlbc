@@ -16,13 +16,10 @@ categories = ["command-line-utilities", "parser-implementations", "visualization
 anyhow = "1"
 # Disable colors when not a tty (piped output)
 atty = "0.2"
-# Command parser
-# Git dependency until https://github.com/zesterer/chumsky/commit/7d692d160e4a9ed78d0122777638637039dbff2b gets published
-chumsky = { version = "0.8", git = "https://github.com/zesterer/chumsky" }
+# Parser for commands
+chumsky = { version = "0.8" }
 # CLI args
 clap = { version = "3", features = ["derive"] }
-# Advanced formatting functionalities
-fmtools = "0.1"
 # Core functionnality
 hlbc = { version = "0.3", path = "..", default-features = false }
 # File system watching
@@ -31,6 +28,7 @@ notify = { version = "4", optional = true }
 termcolor = "1"
 # Temporary directory for compilation
 temp-dir = "0.1"
+webbrowser = "0.7"
 
 [features]
 default = ["graph", "watch"]
