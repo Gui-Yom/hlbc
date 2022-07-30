@@ -295,6 +295,12 @@ pub enum Statement {
     Break,
     Continue,
     Throw(Expr),
+    Try {
+        stmts: Vec<Statement>,
+    },
+    Catch {
+        stmts: Vec<Statement>,
+    },
 }
 
 /// Create an expression statement

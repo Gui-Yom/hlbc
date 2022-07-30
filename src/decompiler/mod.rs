@@ -6,6 +6,7 @@
 use std::collections::{HashMap, HashSet};
 
 use ast::*;
+use scopes::*;
 
 use crate::types::{FunPtr, Function, RefField, Reg, Type, TypeObj};
 use crate::Bytecode;
@@ -15,374 +16,8 @@ use crate::Opcode;
 pub mod ast;
 /// Functions to render the [ast] to a string
 pub mod fmt;
-
-/// Decompile a class with its static and instance fields and methods.
-pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
-    let static_type = obj.get_static_type(code);
-
-    let mut fields = Vec::new();
-    for (i, f) in obj.own_fields.iter().enumerate() {
-        if obj
-            .bindings
-            .get(&RefField(i + obj.fields.len() - obj.own_fields.len()))
-            .is_some()
-        {
-            continue;
-        }
-        fields.push(ClassField {
-            name: f.name.display(code),
-            static_: false,
-            ty: f.t,
-        });
-    }
-    if let Some(ty) = static_type {
-        for (i, f) in ty.own_fields.iter().enumerate() {
-            if ty
-                .bindings
-                .get(&RefField(i + ty.fields.len() - ty.own_fields.len()))
-                .is_some()
-            {
-                continue;
-            }
-            fields.push(ClassField {
-                name: f.name.display(code),
-                static_: true,
-                ty: f.t,
-            });
-        }
-    }
-
-    let mut methods = Vec::new();
-    for fun in obj.bindings.values() {
-        methods.push(Method {
-            fun: *fun,
-            static_: false,
-            dynamic: true,
-            statements: decompile_function(code, fun.resolve_as_fn(code).unwrap()),
-        })
-    }
-    if let Some(ty) = static_type {
-        for fun in ty.bindings.values() {
-            methods.push(Method {
-                fun: *fun,
-                static_: true,
-                dynamic: false,
-                statements: decompile_function(code, fun.resolve_as_fn(code).unwrap()),
-            })
-        }
-    }
-    for f in &obj.protos {
-        methods.push(Method {
-            fun: f.findex,
-            static_: false,
-            dynamic: false,
-            statements: decompile_function(code, f.findex.resolve_as_fn(code).unwrap()),
-        })
-    }
-
-    Class {
-        name: obj.name.resolve(&code.strings).to_owned(),
-        parent: obj
-            .super_
-            .and_then(|ty| ty.resolve_as_obj(&code.types))
-            .map(|ty| ty.name.display(code)),
-        fields,
-        methods,
-    }
-}
-
-/*
-fn if_expression(stmts: &mut Vec<Statement>) {
-    let mut iter = stmts.iter_mut();
-    while let Some(stmt) = iter.next() {
-        if let Statement::If {
-            stmts: if_stmts, ..
-        } = stmt
-        {
-            if let Some(Statement::Assign { variable: if_v, .. }) = if_stmts.last() {
-                if let Some(Statement::Else {
-                    stmts: else_stmts, ..
-                }) = iter.next()
-                {
-                    if let Some(Statement::Assign {
-                        variable: else_v, ..
-                    }) = else_stmts.last()
-                    {
-                        if if_v == else_v {
-                            // This if/else could be used as an expression
-                        }
-                    }
-                } else {
-                    // This if could be used as en expression
-                }
-            }
-        }
-    }
-}*/
-
-/// Helper to process a stack of scopes (branches, loops)
-struct Scopes {
-    // A linked list would be appreciable i think
-    /// There is always at least one scope, the root scope
-    scopes: Vec<Scope>,
-}
-
-impl Scopes {
-    fn new() -> Self {
-        Self {
-            scopes: vec![Scope::Root(Vec::new())],
-        }
-    }
-
-    fn push_if(&mut self, len: i32, cond: Expr) {
-        self.scopes.push(Scope::If {
-            len,
-            cond,
-            stmts: Vec::new(),
-        })
-    }
-
-    fn push_else(&mut self, len: i32) {
-        self.scopes.push(Scope::Else {
-            len,
-            stmts: Vec::new(),
-        })
-    }
-
-    fn push_loop(&mut self, start: usize) {
-        self.scopes.push(Scope::Loop(LoopScope {
-            start,
-            cond: None,
-            stmts: Vec::new(),
-        }))
-    }
-
-    fn push_switch(&mut self, len: i32, arg: Expr, offsets: Vec<usize>) {
-        self.scopes.push(Scope::Switch(SwitchScope {
-            len,
-            arg,
-            offsets,
-            default: Vec::new(),
-            cases: Vec::new(),
-        }))
-    }
-
-    fn push_switch_case(&mut self, cst: usize) {
-        let last = self.pop();
-        match last {
-            Scope::Switch(switch) => {
-                self.scopes.push(Scope::Switch(switch));
-                self.scopes.push(Scope::SwitchCase(SwitchCase {
-                    pattern: cst_int(cst as i32),
-                    stmts: Vec::new(),
-                }));
-            }
-            Scope::SwitchCase(case) => {
-                if let Scope::Switch(switch) = self.last_mut() {
-                    switch.cases.push(case);
-                } else {
-                    panic!("push switch case without switch ?\n{:#?}", self.scopes);
-                }
-                self.scopes.push(Scope::SwitchCase(SwitchCase {
-                    pattern: cst_int(cst as i32),
-                    stmts: Vec::new(),
-                }));
-            }
-            _ => {
-                self.scopes.push(last);
-            }
-        }
-    }
-
-    fn pop_last_loop(&mut self) -> Option<LoopScope> {
-        for idx in (0..self.depth()).rev() {
-            let scope = self.scopes.remove(idx);
-            match scope {
-                Scope::Loop(l) => {
-                    return Some(l);
-                }
-                _ => {
-                    self.scopes.insert(idx, scope);
-                }
-            }
-        }
-        None
-    }
-
-    fn last_loop(&self) -> Option<&LoopScope> {
-        for idx in (0..self.depth()).rev() {
-            if let Scope::Loop(l) = &self.scopes[idx] {
-                return Some(l);
-            }
-        }
-        None
-    }
-
-    fn last(&self) -> &Scope {
-        self.scopes.last().unwrap()
-    }
-
-    fn last_mut(&mut self) -> &mut Scope {
-        self.scopes.last_mut().unwrap()
-    }
-
-    fn pop(&mut self) -> Scope {
-        self.scopes.pop().unwrap()
-    }
-
-    fn depth(&self) -> usize {
-        self.scopes.len()
-    }
-
-    fn push_stmt(&mut self, mut stmt: Option<Statement>) {
-        // Start to iterate from the end ('for' because we need the index)
-        for idx in (0..self.depth()).rev() {
-            let scope = self.scopes.remove(idx);
-
-            // We only handle branches we know the length of
-            // We can't know the end of a loop scope before seeing the jump back
-            match scope {
-                Scope::If {
-                    mut len,
-                    cond,
-                    mut stmts,
-                } => {
-                    if let Some(stmt) = stmt.take() {
-                        stmts.push(stmt);
-                    }
-
-                    // Decrease scope len
-                    len -= 1;
-                    if len <= 0 {
-                        //println!("Decrease nesting {parent:?}");
-                        stmt = Some(Statement::If { cond, stmts });
-                    } else {
-                        // Scope continues
-                        self.scopes.insert(idx, Scope::If { len, cond, stmts });
-                    }
-                }
-                Scope::Else { mut len, mut stmts } => {
-                    if let Some(stmt) = stmt.take() {
-                        stmts.push(stmt);
-                    }
-
-                    // Decrease scope len
-                    len -= 1;
-                    if len <= 0 {
-                        //println!("Decrease nesting {parent:?}");
-                        stmt = Some(Statement::Else { stmts });
-                    } else {
-                        // Scope continues
-                        self.scopes.insert(idx, Scope::Else { len, stmts });
-                    }
-                }
-                Scope::Switch(mut switch) => {
-                    if let Some(stmt) = stmt.take() {
-                        switch.default.push(stmt);
-                    }
-
-                    switch.len -= 1;
-                    if switch.len <= 0 {
-                        stmt = Some(Statement::Switch {
-                            arg: switch.arg,
-                            default: switch.default,
-                            cases: switch
-                                .cases
-                                .into_iter()
-                                .map(|case| (case.pattern, case.stmts))
-                                .collect(),
-                        });
-                    } else {
-                        self.scopes.insert(idx, Scope::Switch(switch));
-                    }
-                }
-                Scope::SwitchCase(mut case) => {
-                    if let Some(stmt) = stmt.take() {
-                        case.stmts.push(stmt);
-                    }
-                    if let Scope::Switch(switch) = self.last_mut() {
-                        if switch.len <= 1 {
-                            switch.cases.push(case);
-                        } else {
-                            self.scopes.insert(idx, Scope::SwitchCase(case));
-                        }
-                    }
-                }
-                Scope::Root(mut stmts) => {
-                    if let Some(stmt) = stmt.take() {
-                        stmts.push(stmt);
-                    }
-                    self.scopes.insert(idx, Scope::Root(stmts));
-                }
-                Scope::Loop(mut loop_) => {
-                    if let Some(stmt) = stmt.take() {
-                        loop_.stmts.push(stmt);
-                    }
-                    self.scopes.insert(idx, Scope::Loop(loop_));
-                }
-            }
-        }
-        if let Some(stmt) = stmt.take() {
-            match self.last_mut() {
-                Scope::Root(stmts)
-                | Scope::If { stmts, .. }
-                | Scope::Else { stmts, .. }
-                | Scope::Switch(SwitchScope { default: stmts, .. })
-                | Scope::SwitchCase(SwitchCase { stmts, .. })
-                | Scope::Loop(LoopScope { stmts, .. }) => {
-                    stmts.push(stmt);
-                }
-            }
-        }
-    }
-
-    fn statements(mut self) -> Vec<Statement> {
-        if let Scope::Root(stmts) = self.pop() {
-            stmts
-        } else {
-            unreachable!("mmmmhhh kinda sus:\n{:#?}\n", self.scopes);
-        }
-    }
-}
-
-#[derive(Debug)]
-enum Scope {
-    Root(Vec<Statement>),
-    If {
-        len: i32,
-        cond: Expr,
-        stmts: Vec<Statement>,
-    },
-    Else {
-        len: i32,
-        stmts: Vec<Statement>,
-    },
-    Loop(LoopScope),
-    Switch(SwitchScope),
-    SwitchCase(SwitchCase),
-}
-
-#[derive(Debug)]
-struct LoopScope {
-    cond: Option<Expr>,
-    start: usize,
-    stmts: Vec<Statement>,
-}
-
-#[derive(Debug)]
-struct SwitchScope {
-    len: i32,
-    offsets: Vec<usize>,
-    arg: Expr,
-    default: Vec<Statement>,
-    cases: Vec<SwitchCase>,
-}
-
-#[derive(Debug)]
-struct SwitchCase {
-    pattern: Expr,
-    stmts: Vec<Statement>,
-}
+/// Scope handling structures
+mod scopes;
 
 enum ExprCtx {
     Constructor {
@@ -402,7 +37,7 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
     // Scope stack, holds the statements
     let mut scopes = Scopes::new();
     // Current iteration statement, to be pushed onto the finished statements or the nesting
-    let mut statement = None;
+    //let mut statement = None;
     // Expression values for each registers
     let mut reg_state = HashMap::with_capacity(f.regs.len());
     // For parsing statements made of multiple instructions like constructor calls and anonymous structures
@@ -433,7 +68,8 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
     macro_rules! push_stmt {
         ($stmt:expr) => {
-            statement = Some($stmt);
+            //statement = Some($stmt);
+            scopes.push_stmt($stmt);
         };
     }
 
@@ -452,16 +88,6 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     variable: Expr::Variable($dst, name),
                     assign: expr,
                 });
-            }
-        };
-    }
-
-    macro_rules! push_expr_stmt {
-        ($i:ident, $dst:ident, $e:expr) => {
-            if f.var_name(code, $i).is_some() {
-                push_stmt!(stmt($e));
-            } else {
-                reg_state.insert($dst, $e);
             }
         };
     }
@@ -524,20 +150,22 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
     macro_rules! push_jmp {
         ($i:ident, $offset:ident, $cond:expr) => {
             if $offset > 0 {
+                let cond = $cond;
                 // It's a loop
                 if matches!(f.ops[$i + $offset as usize], Opcode::JAlways { offset } if offset < 0) {
-                    if let Scope::Loop(loop_) = scopes.last_mut() {
-                        if loop_.cond.is_none() {
-                            loop_.cond = Some($cond);
+                    if let Some(loop_cond) = scopes.update_last_loop_cond() {
+                        if matches!(loop_cond, Expr::Unknown(_)) {
+                            println!("old loop cond : {:?}", loop_cond);
+                            *loop_cond = cond;
                         } else {
-                            scopes.push_if($offset + 1, $cond);
+                            scopes.push_if($offset + 1, cond);
                         }
                     } else {
-                        scopes.push_if($offset + 1, $cond);
+                        scopes.push_if($offset + 1, cond);
                     }
                 } else {
                     // It's an if
-                    scopes.push_if($offset + 1, $cond);
+                    scopes.push_if($offset + 1, cond);
                 }
             }
         }
@@ -545,8 +173,127 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
     let iter = f.ops.iter().enumerate();
     for (i, o) in iter {
-        // Opcodes are in semantic order
+        // Opcodes are grouped by semantic
+        // Control flow first because they are the most important
         match o {
+            //region CONTROL FLOW
+            &Opcode::JTrue { cond, offset } => {
+                push_jmp!(i, offset, not(expr!(cond)))
+            }
+            &Opcode::JFalse { cond, offset } => {
+                push_jmp!(i, offset, expr!(cond))
+            }
+            &Opcode::JNull { reg, offset } => {
+                push_jmp!(i, offset, noteq(expr!(reg), cst_null()))
+            }
+            &Opcode::JNotNull { reg, offset } => {
+                push_jmp!(i, offset, eq(expr!(reg), cst_null()))
+            }
+            &Opcode::JSGte { a, b, offset } | &Opcode::JUGte { a, b, offset } => {
+                push_jmp!(i, offset, gt(expr!(b), expr!(a)))
+            }
+            &Opcode::JSGt { a, b, offset } => {
+                push_jmp!(i, offset, gte(expr!(b), expr!(a)))
+            }
+            &Opcode::JSLte { a, b, offset } => {
+                push_jmp!(i, offset, lt(expr!(b), expr!(a)))
+            }
+            &Opcode::JSLt { a, b, offset } | &Opcode::JULt { a, b, offset } => {
+                push_jmp!(i, offset, lte(expr!(b), expr!(a)))
+            }
+            &Opcode::JEq { a, b, offset } => {
+                push_jmp!(i, offset, noteq(expr!(a), expr!(b)))
+            }
+            &Opcode::JNotEq { a, b, offset } => {
+                push_jmp!(i, offset, eq(expr!(a), expr!(b)))
+            }
+            // Unconditional jumps can actually mean a lot of things
+            &Opcode::JAlways { offset } => {
+                if offset < 0 {
+                    // It's either the jump backward of a loop or a continue statement
+                    let loop_start = scopes
+                        .last_loop_start()
+                        .expect("Backward jump but we aren't in a loop ?");
+
+                    // Scan the next instructions in order to find another jump to the same place
+                    if f.ops.iter().enumerate().skip(i + 1).find_map(|(j, o)| {
+                        // We found another jump to the same place !
+                        if matches!(o, Opcode::JAlways {offset} if (j as i32 + offset + 1) as usize == loop_start) {
+                            Some(true)
+                        } else {
+                            None
+                        }
+                    }).unwrap_or(false) {
+                        // If this jump is not the last jump backward for the current loop, so it's definitely a continue; statement
+                        push_stmt!(Statement::Continue);
+                    } else {
+                        // It's the last jump backward of the loop, which means the end of the loop
+                        // we generate the loop statement
+                        if let Some(stmt) = scopes.end_last_loop() {
+                            push_stmt!(stmt);
+                        } else {
+                            panic!("Last scope is not a loop !");
+                        }
+                    }
+                } else {
+                    if let Some(offsets) = scopes.last_is_switch_ctx() {
+                        if let Some(pos) = offsets.iter().position(|o| *o == i) {
+                            scopes.push_switch_case(pos);
+                        } else {
+                            panic!("no matching offset for switch case ({i})");
+                        }
+                    } else if scopes.last_loop_start().is_some() {
+                        // Check the instruction just before the jump target
+                        // If it's a jump backward of a loop
+                        if matches!(f.ops[(i as i32 + offset) as usize], Opcode::JAlways {offset} if offset < 0)
+                        {
+                            // It's a break condition
+                            push_stmt!(Statement::Break);
+                        }
+                    } else if scopes.last_is_if() {
+                        // It's the jump over of an else clause
+                        scopes.push_else(offset + 1);
+                    } else {
+                        println!("JAlways > 0 with no matching scope ?");
+                    }
+                }
+            }
+            Opcode::Switch { reg, offsets, end } => {
+                // Convert to absolute positions
+                scopes.push_switch(
+                    *end + 1,
+                    expr!(reg),
+                    offsets.iter().map(|o| i + *o as usize).collect(),
+                );
+                // The default switch case is implicit
+            }
+            &Opcode::Label => scopes.push_loop(i),
+            &Opcode::Ret { ret } => {
+                // Do not display return void; only in case of an early return
+                if scopes.has_scopes() {
+                    push_stmt!(Statement::Return(if f.regtype(ret).is_void() {
+                        None
+                    } else {
+                        Some(expr!(ret))
+                    }));
+                } else if !f.regtype(ret).is_void() {
+                    push_stmt!(Statement::Return(Some(expr!(ret))));
+                }
+            }
+            //endregion
+
+            //region EXCEPTIONS
+            &Opcode::Throw { exc } | &Opcode::Rethrow { exc } => {
+                push_stmt!(Statement::Throw(expr!(exc)));
+            }
+            &Opcode::Trap { exc, offset } => {
+                scopes.push_try(offset + 1);
+            }
+            &Opcode::EndTrap { exc } => {
+                // TODO try catch
+            }
+            //endregion
+
             //region CONSTANTS
             &Opcode::Int { dst, ptr } => {
                 push_expr!(i, dst, cst_int(ptr.resolve(&code.ints)));
@@ -840,171 +587,16 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     assign: expr!(src)
                 });
             }
-            /*
-            &Opcode::EnumIndex { dst, value } => {
-                // TODO get enum variant
-            }
-            &Opcode::EnumField {
-                dst,
-                value,
-                construct,
-                field,
-            } => {
-                // TODO get enum field
-            }
-            &Opcode::SetEnumField { value, field, src } => {
-                // TODO set enum field
-            }*/
-            //endregion
-
-            //region CONTROL FLOW
-            &Opcode::JTrue { cond, offset } => {
-                push_jmp!(i, offset, not(expr!(cond)))
-            }
-            &Opcode::JFalse { cond, offset } => {
-                push_jmp!(i, offset, expr!(cond))
-            }
-            &Opcode::JNull { reg, offset } => {
-                push_jmp!(i, offset, noteq(expr!(reg), cst_null()))
-            }
-            &Opcode::JNotNull { reg, offset } => {
-                push_jmp!(i, offset, eq(expr!(reg), cst_null()))
-            }
-            &Opcode::JSGte { a, b, offset } | &Opcode::JUGte { a, b, offset } => {
-                push_jmp!(i, offset, gt(expr!(b), expr!(a)))
-            }
-            &Opcode::JSGt { a, b, offset } => {
-                push_jmp!(i, offset, gte(expr!(b), expr!(a)))
-            }
-            &Opcode::JSLte { a, b, offset } => {
-                push_jmp!(i, offset, lt(expr!(b), expr!(a)))
-            }
-            &Opcode::JSLt { a, b, offset } | &Opcode::JULt { a, b, offset } => {
-                push_jmp!(i, offset, lte(expr!(b), expr!(a)))
-            }
-            &Opcode::JEq { a, b, offset } => {
-                push_jmp!(i, offset, noteq(expr!(a), expr!(b)))
-            }
-            &Opcode::JNotEq { a, b, offset } => {
-                push_jmp!(i, offset, eq(expr!(a), expr!(b)))
-            }
-            &Opcode::JAlways { offset } => {
-                if offset < 0 {
-                    //println!("opcode {i}");
-                    // It's either the jump backward of a loop or a continue statement
-                    let loop_ = scopes.last_loop().unwrap();
-                    // Scan the next instructions in order to find another jump to the same place
-                    if f.ops.iter().enumerate().skip(i + 1).find_map(|(j, o)| {
-                        // We found another jump to the same place !
-                        if matches!(o, Opcode::JAlways {offset} if (j as i32 + offset + 1) as usize == loop_.start) {
-                            Some(true)
-                        } else {
-                            None
-                        }
-                    }).unwrap_or(false) {
-                        // If this jump is not the last jump backward for the current loop,
-                        // It's definitely a continue; statement
-                        push_stmt!(Statement::Continue);
-                    } else {
-                        let loop_ = scopes.pop_last_loop().unwrap();
-                        // It's the last jump backward of the loop, we generate the loop statement
-                        if let Some(cond) = loop_.cond {
-                            push_stmt!(Statement::While { cond, stmts: loop_.stmts});
-                        } else {
-                            push_stmt!(Statement::While {
-                                cond: cst_bool(true),
-                                stmts: loop_.stmts
-                            });
-                        }
-                    }
-                } else {
-                    match &scopes.last() {
-                        Scope::Switch(switch) => {
-                            if let Some(pos) = switch.offsets.iter().position(|o| *o == i) {
-                                scopes.push_switch_case(pos);
-                            } else {
-                                panic!("no offset");
-                            }
-                        }
-                        Scope::SwitchCase(case) => {
-                            let len = scopes.scopes.len();
-                            let penult = &mut scopes.scopes[len - 2];
-                            if let Scope::Switch(switch) = penult {
-                                if let Some(pos) = switch.offsets.iter().position(|o| *o == i) {
-                                    scopes.push_switch_case(pos);
-                                } else {
-                                    panic!("no offset");
-                                }
-                            } else {
-                                panic!("wtf");
-                            }
-                        }
-                        Scope::Loop(_) => {
-                            // Check the instruction just before the jump target
-                            // If it's a jump backward of a loop
-                            if matches!(f.ops[(i as i32 + offset) as usize], Opcode::JAlways {offset} if offset < 0)
-                            {
-                                // It's a break condition
-                                push_stmt!(Statement::Break);
-                            }
-                        }
-                        Scope::If { .. } => {
-                            // It's the jump over of an else clause
-                            scopes.push_else(offset + 1);
-                        }
-                        _ => {
-                            println!("JAlways > 0 with no matching scope ?");
-                        }
-                    }
-                }
-            }
-            Opcode::Switch { reg, offsets, end } => {
-                // Convert to absolute positions
-                scopes.push_switch(
-                    *end + 1,
-                    expr!(reg),
-                    offsets.iter().map(|o| i + *o as usize).collect(),
-                );
-                // The default switch case is implicit
-            }
-            &Opcode::Label => scopes.push_loop(i),
-            &Opcode::Ret { ret } => {
-                // Do not display return void; only in case of an early return
-                if scopes.depth() > 1 {
-                    push_stmt!(Statement::Return(if f.regtype(ret).is_void() {
-                        None
-                    } else {
-                        Some(expr!(ret))
-                    }));
-                } else if !f.regtype(ret).is_void() {
-                    push_stmt!(Statement::Return(Some(expr!(ret))));
-                }
-            }
-            //endregion
-
-            //region CHECKS
-            &Opcode::Throw { exc } => {
-                push_stmt!(Statement::Throw(expr!(exc)));
-            }
-            &Opcode::Rethrow { exc } => {
-                push_stmt!(Statement::Throw(expr!(exc)));
-            }
-            &Opcode::Trap { exc, offset } => {
-                // TODO try catch
-            }
-            &Opcode::EndTrap { exc } => {
-                // TODO try catch
-            }
             //endregion
 
             //region VALUES
-            &Opcode::ToDyn { dst, src } => {
-                push_expr!(i, dst, expr!(src));
-            }
-            &Opcode::ToVirtual { dst, src } => {
-                push_expr!(i, dst, expr!(src));
-            }
-            &Opcode::SafeCast { dst, src } => {
+            &Opcode::ToDyn { dst, src }
+            | &Opcode::ToSFloat { dst, src }
+            | &Opcode::ToUFloat { dst, src }
+            | &Opcode::ToInt { dst, src }
+            | &Opcode::SafeCast { dst, src }
+            | &Opcode::UnsafeCast { dst, src }
+            | &Opcode::ToVirtual { dst, src } => {
                 push_expr!(i, dst, expr!(src));
             }
             &Opcode::New { dst } => {
@@ -1030,6 +622,9 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     }
                 }
             }
+            //endregion
+
+            //region ENUMS
             &Opcode::EnumAlloc { dst, construct } => {
                 push_expr!(
                     i,
@@ -1052,16 +647,132 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     )
                 );
             }
+            /*
+            &Opcode::EnumIndex { dst, value } => {
+                // TODO get enum variant
+            }
+            &Opcode::EnumField {
+                dst,
+                value,
+                construct,
+                field,
+            } => {
+                // TODO get enum field
+            }
+            &Opcode::SetEnumField { value, field, src } => {
+                // TODO set enum field
+            }*/
             //endregion
             &Opcode::GetMem { dst, bytes, index } => {
                 push_expr!(i, dst, array(expr!(bytes), expr!(index)));
             }
             _ => {}
         }
+        scopes.advance();
+    }
+    scopes.statements()
+}
 
-        // Pass trough all scopes and find which ones should finish
-        scopes.push_stmt(statement.take());
+/*
+fn if_expression(stmts: &mut Vec<Statement>) {
+    let mut iter = stmts.iter_mut();
+    while let Some(stmt) = iter.next() {
+        if let Statement::If {
+            stmts: if_stmts, ..
+        } = stmt
+        {
+            if let Some(Statement::Assign { variable: if_v, .. }) = if_stmts.last() {
+                if let Some(Statement::Else {
+                    stmts: else_stmts, ..
+                }) = iter.next()
+                {
+                    if let Some(Statement::Assign {
+                        variable: else_v, ..
+                    }) = else_stmts.last()
+                    {
+                        if if_v == else_v {
+                            // This if/else could be used as an expression
+                        }
+                    }
+                } else {
+                    // This if could be used as en expression
+                }
+            }
+        }
+    }
+}*/
+
+/// Decompile a class with its static and instance fields and methods.
+pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
+    let static_type = obj.get_static_type(code);
+
+    let mut fields = Vec::new();
+    for (i, f) in obj.own_fields.iter().enumerate() {
+        if obj
+            .bindings
+            .get(&RefField(i + obj.fields.len() - obj.own_fields.len()))
+            .is_some()
+        {
+            continue;
+        }
+        fields.push(ClassField {
+            name: f.name.display(code),
+            static_: false,
+            ty: f.t,
+        });
+    }
+    if let Some(ty) = static_type {
+        for (i, f) in ty.own_fields.iter().enumerate() {
+            if ty
+                .bindings
+                .get(&RefField(i + ty.fields.len() - ty.own_fields.len()))
+                .is_some()
+            {
+                continue;
+            }
+            fields.push(ClassField {
+                name: f.name.display(code),
+                static_: true,
+                ty: f.t,
+            });
+        }
     }
 
-    scopes.statements()
+    let mut methods = Vec::new();
+    for fun in obj.bindings.values() {
+        methods.push(Method {
+            fun: *fun,
+            static_: false,
+            dynamic: true,
+            statements: decompile_function(code, fun.resolve_as_fn(code).unwrap()),
+        })
+    }
+    if let Some(ty) = static_type {
+        for fun in ty.bindings.values() {
+            methods.push(Method {
+                fun: *fun,
+                static_: true,
+                dynamic: false,
+                statements: decompile_function(code, fun.resolve_as_fn(code).unwrap()),
+            })
+        }
+    }
+    for f in &obj.protos {
+        methods.push(Method {
+            fun: f.findex,
+            static_: false,
+            dynamic: false,
+            statements: decompile_function(code, f.findex.resolve_as_fn(code).unwrap()),
+        })
+    }
+
+    Class {
+        name: obj.name.resolve(&code.strings).to_owned(),
+        parent: obj
+            .super_
+            .and_then(|ty| ty.resolve_as_obj(&code.types))
+            .map(|ty| ty.name.display(code)),
+        fields,
+        methods,
+    }
 }

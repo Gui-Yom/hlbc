@@ -304,6 +304,22 @@ impl Statement {
                 Statement::Throw(exc) => {
                     "throw "{disp!(exc)}
                 }
+                Statement::Try { stmts } => {
+                    "try {\n"
+                    let indent2 = indent.inc_nesting();
+                    for stmt in stmts {
+                        {indent2}{stmt.display(&indent2, code, f)}"\n"
+                    }
+                    {indent}"}"
+                }
+                Statement::Catch { stmts } => {
+                    "catch () {\n"
+                    let indent2 = indent.inc_nesting();
+                    for stmt in stmts {
+                        {indent2}{stmt.display(&indent2, code, f)}"\n"
+                    }
+                    {indent}"}"
+                }
             }
         }
     }
