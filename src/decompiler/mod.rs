@@ -599,6 +599,22 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
             | &Opcode::ToVirtual { dst, src } => {
                 push_expr!(i, dst, expr!(src));
             }
+            &Opcode::Ref { dst, src } => {
+                push_expr!(i, dst, expr!(src));
+            }
+            &Opcode::Unref { dst, src } => {
+                push_expr!(i, dst, expr!(src));
+            }
+            &Opcode::Setref { dst, value } => {
+                push_stmt!(Statement::Assign {
+                    declaration: false,
+                    variable: expr!(dst),
+                    assign: expr!(value)
+                });
+            }
+            &Opcode::RefData { dst, src } => {
+                push_expr!(i, dst, expr!(src));
+            }
             &Opcode::New { dst } => {
                 // Constructor analysis
                 let ty = f.regtype(dst).resolve(&code.types);
@@ -647,9 +663,13 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     )
                 );
             }
-            /*
             &Opcode::EnumIndex { dst, value } => {
-                // TODO get enum variant
+                push_expr!(
+                    i,
+                    dst,
+                    Expr::Field(Box::new(expr!(value)), "constructorIndex".to_owned())
+                );
+                //push_expr!(i, dst, expr!(value));
             }
             &Opcode::EnumField {
                 dst,
@@ -657,15 +677,53 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 construct,
                 field,
             } => {
-                // TODO get enum field
+                push_expr!(
+                    i,
+                    dst,
+                    Expr::Field(Box::new(expr!(value)), field.0.to_string())
+                );
             }
             &Opcode::SetEnumField { value, field, src } => {
-                // TODO set enum field
-            }*/
+                push_stmt!(Statement::Assign {
+                    declaration: false,
+                    variable: Expr::Field(Box::new(expr!(value)), field.0.to_string()),
+                    assign: expr!(src)
+                });
+            }
             //endregion
+
+            //region ARRAYS
+            &Opcode::ArraySize { dst, array } => {
+                push_expr!(
+                    i,
+                    dst,
+                    Expr::Field(Box::new(expr!(array)), "length".to_owned())
+                );
+            }
+            &Opcode::GetArray { dst, array, index } => {
+                push_expr!(i, dst, ast::array(expr!(array), expr!(index)));
+            }
+            &Opcode::SetArray { array, index, src } => {
+                push_stmt!(Statement::Assign {
+                    declaration: false,
+                    variable: ast::array(expr!(array), expr!(index)),
+                    assign: expr!(src)
+                });
+            }
+            //endregion
+
+            //region MEM
             &Opcode::GetMem { dst, bytes, index } => {
                 push_expr!(i, dst, array(expr!(bytes), expr!(index)));
             }
+            &Opcode::SetMem { bytes, index, src } => {
+                push_stmt!(Statement::Assign {
+                    declaration: false,
+                    variable: array(expr!(bytes), expr!(index)),
+                    assign: expr!(src)
+                });
+            }
+            //endregion
             _ => {}
         }
         scopes.advance();
