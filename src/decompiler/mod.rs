@@ -31,9 +31,9 @@ enum ExprCtx {
     },
 }
 
-/// Decompile a function to a list of [Statement]s.
-/// This works by analyzing each opcodes in order while trying to construct contexts and intents.
-pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
+/// Decompile a function code to a list of [Statement]s.
+/// This works by analyzing each opcodes in order while trying to reconstruct scopes, contexts and intents.
+pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
     // Scope stack, holds the statements
     let mut scopes = Scopes::new();
     // Current iteration statement, to be pushed onto the finished statements or the nesting
@@ -483,10 +483,7 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 push_expr!(
                     i,
                     dst,
-                    Expr::Closure(
-                        fun,
-                        decompile_function(code, fun.resolve_as_fn(code).unwrap())
-                    )
+                    Expr::Closure(fun, decompile_code(code, fun.resolve_as_fn(code).unwrap()))
                 );
             }
             &Opcode::InstanceClosure { dst, obj, fun } => {
@@ -763,6 +760,16 @@ fn if_expression(stmts: &mut Vec<Statement>) {
     }
 }*/
 
+/// Decompile a function out of context
+pub fn decompile_function(code: &Bytecode, f: &Function) -> Method {
+    Method {
+        fun: f.findex,
+        static_: true,
+        dynamic: false,
+        statements: decompile_code(code, f),
+    }
+}
+
 /// Decompile a class with its static and instance fields and methods.
 pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
     let static_type = obj.get_static_type(code);
@@ -805,7 +812,7 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
             fun: *fun,
             static_: false,
             dynamic: true,
-            statements: decompile_function(code, fun.resolve_as_fn(code).unwrap()),
+            statements: decompile_code(code, fun.resolve_as_fn(code).unwrap()),
         })
     }
     if let Some(ty) = static_type {
@@ -814,7 +821,7 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
                 fun: *fun,
                 static_: true,
                 dynamic: false,
-                statements: decompile_function(code, fun.resolve_as_fn(code).unwrap()),
+                statements: decompile_code(code, fun.resolve_as_fn(code).unwrap()),
             })
         }
     }
@@ -823,7 +830,7 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
             fun: f.findex,
             static_: false,
             dynamic: false,
-            statements: decompile_function(code, f.findex.resolve_as_fn(code).unwrap()),
+            statements: decompile_code(code, f.findex.resolve_as_fn(code).unwrap()),
         })
     }
 
