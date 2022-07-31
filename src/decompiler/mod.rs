@@ -254,7 +254,10 @@ pub fn decompile_function(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         // It's the jump over of an else clause
                         scopes.push_else(offset + 1);
                     } else {
-                        println!("JAlways > 0 with no matching scope ?");
+                        eprintln!(
+                            "{i}: JAlways has no matching scope (last: {:?})",
+                            scopes.scopes.last()
+                        );
                     }
                 }
             }

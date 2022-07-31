@@ -243,10 +243,10 @@ impl Scopes {
     pub(crate) fn last_is_switch_ctx(&self) -> Option<&[usize]> {
         self.scopes.last().and_then(|s| match &s.data {
             ScopeData::Switch { offsets, .. } => Some(offsets.as_slice()),
-            ScopeData::SwitchCase { .. } => self.scopes.last().and_then(|s| match &s.data {
+            ScopeData::SwitchCase { .. } => match &self.scopes[self.scopes.len() - 2].data {
                 ScopeData::Switch { offsets, .. } => Some(offsets.as_slice()),
                 _ => None,
-            }),
+            },
             _ => None,
         })
     }
