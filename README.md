@@ -32,7 +32,8 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## Decompiler
 
-The decompiler is currently incomplete. [See the wiki](https://github.com/Gui-Yom/hlbc/wiki/Decompilation) for examples of decompilation output.
+The decompiler is currently incomplete (and will probably always be).
+[See the wiki](https://github.com/Gui-Yom/hlbc/wiki/Decompilation) for examples of decompilation output.
 
 ## Wiki
 
@@ -68,3 +69,8 @@ Other alternatives include :
 - Tinkering directly with the [hashlink](https://github.com/HaxeFoundation/hashlink) source code in C
 - Using the in-progress [**_*dashlink*_**](https://github.com/Steviegt6/dashlink) made in Haxe but probably compilable
   to many other languages.
+
+## Notes about using Rust
+
+Rust isn't a very good fit for this project, the whole bytecode is a large graph and self-references do not mix well
+with Rust. Further iterations of this crate could make use of an arena.
