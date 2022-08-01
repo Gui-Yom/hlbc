@@ -490,18 +490,33 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 );
             }
             &Opcode::InstanceClosure { dst, obj, fun } => {
-                push_expr!(
-                    i,
-                    dst,
-                    Expr::Field(
-                        Box::new(expr!(obj)),
-                        fun.resolve_as_fn(code)
-                            .unwrap()
-                            .name(code)
-                            .unwrap_or("_")
-                            .to_owned(),
-                    )
-                );
+                match f.regtype(obj).resolve(&code.types) {
+                    // This is an anonymous enum holding the capture for the closure
+                    Type::Enum { .. } => {
+                        push_expr!(
+                            i,
+                            dst,
+                            Expr::Closure(
+                                fun,
+                                decompile_code(code, fun.resolve_as_fn(code).unwrap())
+                            )
+                        );
+                    }
+                    _ => {
+                        push_expr!(
+                            i,
+                            dst,
+                            Expr::Field(
+                                Box::new(expr!(obj)),
+                                fun.resolve_as_fn(code)
+                                    .unwrap()
+                                    .name(code)
+                                    .unwrap_or("_")
+                                    .to_owned(),
+                            )
+                        );
+                    }
+                }
             }
             //endregion
 
