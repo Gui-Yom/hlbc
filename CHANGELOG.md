@@ -10,8 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Decompiler
+
+- If and else statements are unified for better formatting and easier post-processing
 - New (currently hidden) ast post-processing step (AST-PP) to improve the decompiler output
 - New AST_PP : if-expressions
+- New AST-PP : string concatenations :(`__add__("a", "b")` to `"a" + "b"`)
+- New AST-PP : Hide calls to itos. Int to strings conversions are usually hidden.
+- Ability to generate comments in the AST
+- Display closure if InstanceClosure on an enum (the enum is the closure capture)
+
+### Fixed
+
+#### Decompiler
+
+- Remove excessive `;` in constructor calls
 
 ## [0.3.0](https://github.com/Gui-Yom/hlbc/compare/v0.2.0...v0.3.0) - 2022-07-31
 
@@ -28,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Handle expressions and statements
 - Generate code with proper indentation
 - Handle branches and while loops
-- Handle early returns, constructors, closures and  methods
+- Handle early returns, constructors, closures and methods
 - break and continue statements
 - Partial result with \[missing expr]
 - Initial support for primitive array accesses

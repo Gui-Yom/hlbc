@@ -8,7 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/Gui-Yom/hlbc/compare/v0.3.0...HEAD)
 
-- Updated to `hlbc` 0.4
+### New
+
+- Updated to `hlbc` 0.4 ([Changelog](../CHANGELOG.md))
+
+### Fixed
+
+- `callgraph` command parsing wasn't working
 
 ## [0.3.0](https://github.com/Gui-Yom/hlbc/compare/v0.2.0...v0.3.0) - 2022-07-31
 
