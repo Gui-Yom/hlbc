@@ -319,37 +319,193 @@ pub fn comment(comment: &str) -> Statement {
     Statement::Comment(comment.to_owned())
 }
 
-pub fn visit_if(stmts: &mut [Statement], visitor: &mut impl FnMut(&mut Statement)) {
+pub fn visit_stmt(stmts: &mut [Statement], visitor: &mut impl FnMut(&mut Statement)) {
+    macro_rules! rec {
+        ($stmts:expr) => {
+            visit_stmt($stmts, visitor)
+        };
+    }
     for stmt in stmts {
-        let ok = match stmt {
+        match stmt {
             Statement::IfElse { if_, else_, .. } => {
-                visit_if(if_, visitor);
-                visit_if(else_, visitor);
-                Some(stmt)
+                rec!(if_);
+                rec!(else_);
             }
             Statement::Switch { default, cases, .. } => {
-                visit_if(default, visitor);
-                for (_, case) in cases {
-                    visit_if(case, visitor);
-                }
-                None
+                rec!(default);
+                cases.iter_mut().for_each(|(_, case)| rec!(case));
             }
             Statement::While { stmts, .. } => {
-                visit_if(stmts, visitor);
-                None
+                rec!(stmts);
             }
             Statement::Try { stmts } => {
-                visit_if(stmts, visitor);
-                None
+                rec!(stmts);
             }
             Statement::Catch { stmts } => {
-                visit_if(stmts, visitor);
-                None
+                rec!(stmts);
             }
-            _ => None,
-        };
-        if let Some(ifelse) = ok {
-            visitor(ifelse);
+            _ => {}
         }
+        visitor(stmt);
     }
+}
+
+/// Visit expressions by recursion into [Statement].
+pub fn visit_expr(stmts: &mut [Statement], visitor: &mut impl FnMut(&mut Expr)) {
+    macro_rules! v {
+        ($e:expr) => {
+            visit_expr_expr($e, visitor)
+        };
+    }
+    visit_stmt(stmts, &mut |stmt| match stmt {
+        Statement::Assign {
+            assign, variable, ..
+        } => {
+            v!(assign);
+            v!(variable);
+        }
+        Statement::ExprStatement(e) => {
+            v!(e);
+        }
+        Statement::Return(opt_e) => {
+            if let Some(e) = opt_e {
+                v!(e);
+            }
+        }
+        Statement::IfElse { cond, .. } => {
+            v!(cond);
+        }
+        Statement::Switch { arg, .. } => {
+            v!(arg);
+        }
+        Statement::While { cond, .. } => {
+            v!(cond);
+        }
+        Statement::Throw(e) => {
+            v!(e);
+        }
+        _ => {}
+    });
+}
+
+/// Visit expressions by recursion into [Expr]. Does not expand [Statement].
+pub(crate) fn visit_expr_expr(expr: &mut Expr, visitor: &mut impl FnMut(&mut Expr)) {
+    macro_rules! rec {
+        ($e:expr) => {
+            visit_expr_expr($e, visitor)
+        };
+    }
+    match expr {
+        Expr::Anonymous(_, fields) => {
+            for e in fields.values_mut() {
+                rec!(e);
+            }
+        }
+        Expr::Array(arr, index) => {
+            rec!(arr);
+            rec!(index);
+        }
+        Expr::Call(call) => {
+            rec!(&mut call.fun);
+            for arg in call.args.iter_mut() {
+                rec!(arg);
+            }
+        }
+        Expr::Constructor(constr) => {
+            for arg in constr.args.iter_mut() {
+                rec!(arg);
+            }
+        }
+        Expr::EnumConstr(_, _, args) => {
+            for arg in args.iter_mut() {
+                rec!(arg);
+            }
+        }
+        Expr::Field(obj, _) => {
+            rec!(obj);
+        }
+        Expr::IfElse { cond, if_, else_ } => {
+            rec!(cond);
+        }
+        Expr::Op(op) => match op {
+            Operation::Add(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::Sub(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::Mul(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::Div(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::Mod(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::Shl(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::Shr(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::And(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::Or(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::Xor(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::Neg(e1) => {
+                rec!(e1);
+            }
+            Operation::Not(e1) => {
+                rec!(e1);
+            }
+            Operation::Incr(e1) => {
+                rec!(e1);
+            }
+            Operation::Decr(e1) => {
+                rec!(e1);
+            }
+            Operation::Eq(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::NotEq(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::Gt(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::Gte(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::Lt(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+            Operation::Lte(e1, e2) => {
+                rec!(e1);
+                rec!(e2);
+            }
+        },
+        _ => {}
+    }
+    visitor(expr);
 }

@@ -1,4 +1,5 @@
-use crate::decompiler::ast::{Expr, Statement};
+use crate::decompiler::ast::{add, Expr, Statement};
+use crate::Bytecode;
 
 /// Transforms an if/else statement where both branches assign a value to the same variable to an if/else expression.
 /// ```haxe
@@ -51,7 +52,7 @@ pub(crate) fn if_expression(stmt: &mut Statement) {
                 _ => None,
             }
         }
-        _ => unreachable!("The visitor gave us something other than an IfElse statement"),
+        _ => None,
     };
 
     if let Some((decl, var, cond, if_assign, else_assign, mut if_stmts, mut else_stmts)) = opt {
@@ -70,3 +71,58 @@ pub(crate) fn if_expression(stmt: &mut Statement) {
 }
 
 // TODO AST-PP switch expressions
+
+/// Restore string concatenation. They are translated to calls to \_\_add__ at compilation.
+/// ```haxe
+/// __add__("hello ", "world")
+/// ```
+/// becomes :
+/// ```haxe
+/// "hello " + "world"
+/// ```
+pub(crate) fn string_concat(code: &Bytecode, expr: &mut Expr) {
+    let args = match expr {
+        Expr::Call(call) => match call.fun {
+            Expr::FunRef(fun) => {
+                if fun.name(code).map(|n| n == "__add__").unwrap_or(false) && call.args.len() == 2 {
+                    Some((call.args[0].clone(), call.args[1].clone()))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        },
+        _ => None,
+    };
+
+    if let Some((arg0, arg1)) = args {
+        *expr = add(arg0, arg1);
+    }
+}
+
+pub(crate) fn itos(code: &Bytecode, expr: &mut Expr) {
+    let var = match expr {
+        Expr::Call(call) => match call.fun {
+            Expr::FunRef(fun) if fun.name(code).map(|n| n == "__alloc__").unwrap_or(false) => {
+                match &call.args[0] {
+                    Expr::Call(call) => match call.fun {
+                        Expr::FunRef(fun)
+                            if fun.name(code).map(|n| n == "itos").unwrap_or(false) =>
+                        {
+                            println!("");
+                            Some(call.args[0].clone())
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                }
+            }
+            _ => None,
+        },
+        _ => None,
+    };
+
+    if let Some(int) = var {
+        *expr = int;
+    }
+}

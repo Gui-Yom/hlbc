@@ -3,7 +3,6 @@
 //!
 //! The decompiler takes bytecode elements as input and outputs [ast] structures that can be displayed.
 
-use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 
 use ast::*;
@@ -759,8 +758,11 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
     let mut statements = scopes.statements();
 
     // AST post processing step !
-    let passes: [Box<dyn Fn(&mut [Statement])>; 1] =
-        [Box::new(|stmts| visit_if(stmts, &mut post::if_expression))];
+    let passes: [Box<dyn Fn(&mut [Statement])>; 3] = [
+        Box::new(|stmts| visit_stmt(stmts, &mut post::if_expression)),
+        Box::new(|stmts| visit_expr(stmts, &mut |e| post::string_concat(code, e))),
+        Box::new(|stmts| visit_expr(stmts, &mut |e| post::itos(code, e))),
+    ];
 
     for pass in passes {
         pass(&mut statements);
