@@ -148,7 +148,7 @@ pub fn command_parser(ctx: &ParseContext) -> impl Parser<char, Command, Error = 
         cmd!("saveto"; string.clone() => SaveTo),
         cmd!("callgraph")
             .ignore_then(num())
-            .then(num())
+            .then(num().padded())
             .map(|(f, d)| Callgraph(f, d)),
         cmd!("refto")
             .ignore_then(choice((
