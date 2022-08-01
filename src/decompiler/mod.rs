@@ -701,13 +701,23 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     Expr::Field(Box::new(expr!(value)), field.0.to_string())
                 );
             }
-            &Opcode::SetEnumField { value, field, src } => {
-                push_stmt!(Statement::Assign {
-                    declaration: false,
-                    variable: Expr::Field(Box::new(expr!(value)), field.0.to_string()),
-                    assign: expr!(src)
-                });
-            }
+            &Opcode::SetEnumField { value, field, src } => match expr!(value) {
+                Expr::Variable(r, name) => {
+                    push_stmt!(Statement::Assign {
+                        declaration: false,
+                        variable: Expr::Field(Box::new(expr!(value)), field.0.to_string()),
+                        assign: expr!(src)
+                    });
+                }
+                _ => {
+                    push_stmt!(comment("closure capture"));
+                    push_stmt!(Statement::Assign {
+                        declaration: false,
+                        variable: Expr::Field(Box::new(expr!(value)), field.0.to_string()),
+                        assign: expr!(src)
+                    });
+                }
+            },
             //endregion
 
             //region ARRAYS

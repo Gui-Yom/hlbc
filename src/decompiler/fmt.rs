@@ -333,6 +333,9 @@ impl Statement {
                     }
                     {indent}"}"
                 }
+                Statement::Comment(comment) => {
+                    "// "{comment}
+                }
             }
         }
     }

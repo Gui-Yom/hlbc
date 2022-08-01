@@ -307,11 +307,16 @@ pub enum Statement {
     Catch {
         stmts: Vec<Statement>,
     },
+    Comment(String),
 }
 
 /// Create an expression statement
 pub fn stmt(e: Expr) -> Statement {
     Statement::ExprStatement(e)
+}
+
+pub fn comment(comment: &str) -> Statement {
+    Statement::Comment(comment.to_owned())
 }
 
 pub fn visit_if(stmts: &mut [Statement], visitor: &mut impl FnMut(&mut Statement)) {
