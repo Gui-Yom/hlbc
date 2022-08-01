@@ -1,4 +1,4 @@
-use crate::decompiler::ast::{cst_int, Expr, Statement};
+use crate::ast::{cst_int, Expr, Statement};
 
 #[derive(Debug)]
 pub(crate) enum ScopeType {
@@ -105,17 +105,11 @@ impl Scopes {
                     scope.stmts.push(stmt);
                 }
                 // Exception for Switch where a switch scope can be closed with a switch case open
-                match &mut scope.data {
-                    ScopeData::Switch { cases, .. } => {
-                        let case = self.scopes.remove(i);
-                        match case.data {
-                            ScopeData::SwitchCase { pattern } => {
-                                cases.push((pattern, case.stmts));
-                            }
-                            _ => {}
-                        }
+                if let ScopeData::Switch { cases, .. } = &mut scope.data {
+                    let case = self.scopes.remove(i);
+                    if let ScopeData::SwitchCase { pattern } = case.data {
+                        cases.push((pattern, case.stmts));
                     }
-                    _ => {}
                 }
                 stmt = Some(scope.make_stmt());
             } else {

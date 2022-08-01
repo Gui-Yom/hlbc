@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use crate::types::{RefEnumConstruct, RefField, RefFun, RefString, RefType, Reg};
-use crate::Bytecode;
+use hlbc::types::{RefEnumConstruct, RefField, RefFun, RefString, RefType, Reg};
+use hlbc::Bytecode;
 
 #[derive(Debug)]
 pub struct SourceFile {
@@ -367,10 +367,8 @@ pub fn visit_expr(stmts: &mut [Statement], visitor: &mut impl FnMut(&mut Expr)) 
         Statement::ExprStatement(e) => {
             v!(e);
         }
-        Statement::Return(opt_e) => {
-            if let Some(e) = opt_e {
-                v!(e);
-            }
+        Statement::Return(Some(e)) => {
+            v!(e);
         }
         Statement::IfElse { cond, .. } => {
             v!(cond);

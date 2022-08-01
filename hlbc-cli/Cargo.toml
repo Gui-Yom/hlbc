@@ -22,6 +22,8 @@ chumsky = { version = "0.8" }
 clap = { version = "3", features = ["derive"] }
 # Core functionnality
 hlbc = { version = "0.4", path = "..", default-features = false }
+# Decompiler
+hlbc-decompiler = { version = "0.4", path = "../hlbc-decompiler" }
 # File system watching
 notify = { version = "4", optional = true }
 # cli colors

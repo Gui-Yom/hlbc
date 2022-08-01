@@ -1,11 +1,9 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use crate::decompiler::ast::{
-    Class, Constant, ConstructorCall, Expr, Method, Operation, Statement,
-};
-use crate::types::{Function, RefField, Type};
-use crate::Bytecode;
+use crate::ast::{Class, Constant, ConstructorCall, Expr, Method, Operation, Statement};
+use hlbc::types::{Function, RefField, Type};
+use hlbc::Bytecode;
 
 #[derive(Clone)]
 pub struct FormatOptions {

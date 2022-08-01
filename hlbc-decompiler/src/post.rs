@@ -1,5 +1,5 @@
-use crate::decompiler::ast::{add, Expr, Statement};
-use crate::Bytecode;
+use crate::ast::{add, Expr, Statement};
+use hlbc::Bytecode;
 
 /// Transforms an if/else statement where both branches assign a value to the same variable to an if/else expression.
 /// ```haxe
@@ -109,7 +109,6 @@ pub(crate) fn itos(code: &Bytecode, expr: &mut Expr) {
                         Expr::FunRef(fun)
                             if fun.name(code).map(|n| n == "itos").unwrap_or(false) =>
                         {
-                            println!("");
                             Some(call.args[0].clone())
                         }
                         _ => None,

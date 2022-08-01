@@ -12,7 +12,7 @@ categories = ["parser-implementations", "visualization", "compilers"]
 include = ["src/**/*", "LICENSE", "README.md"]
 
 [workspace]
-members = ["hlbc-cli", "hlbc-derive"]
+members = ["hlbc-derive", "hlbc-decompiler", "hlbc-cli"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

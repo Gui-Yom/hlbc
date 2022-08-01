@@ -5,14 +5,13 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use clap::Parser as ClapParser;
+use temp_dir::TempDir;
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
+
 use hlbc::analysis::{find_fun_refs, iter_ops};
-use hlbc::decompiler;
-use hlbc::decompiler::fmt::FormatOptions;
 use hlbc::opcodes::Opcode;
 use hlbc::types::{FunPtr, RefFun, RefGlobal, Type};
 use hlbc::*;
-use temp_dir::TempDir;
-use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use crate::command::{commands_parser, Command, ElementRef, FileOrIndex, ParseContext, Parser};
 
@@ -577,8 +576,8 @@ This is the same range notation as Rust and is supported with most commands."#
             if let Some(fun) = RefFun(idx).resolve_as_fn(code) {
                 println!(
                     "{}",
-                    decompiler::decompile_function(code, fun)
-                        .display(code, &FormatOptions::new("  "))
+                    hlbc_decompiler::decompile_function(code, fun)
+                        .display(code, &hlbc_decompiler::fmt::FormatOptions::new("  "))
                 );
             }
         }
@@ -589,8 +588,8 @@ This is the same range notation as Rust and is supported with most commands."#
                     println!("Dumping type@{idx} : {}", ty.display(code));
                     println!(
                         "{}",
-                        decompiler::decompile_class(code, obj)
-                            .display(code, &FormatOptions::new("  "))
+                        hlbc_decompiler::decompile_class(code, obj)
+                            .display(code, &hlbc_decompiler::fmt::FormatOptions::new("  "))
                     );
                 }
                 _ => println!("Type {idx} is not an obj"),

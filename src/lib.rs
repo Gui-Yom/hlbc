@@ -20,8 +20,6 @@ use crate::types::{
 
 /// Analysis functions and callgraph generation
 pub mod analysis;
-/// Decompiler from hashlink instructions to Haxe source code
-pub mod decompiler;
 pub mod deser;
 /// Functions to display bytecode elements
 pub mod fmt;
