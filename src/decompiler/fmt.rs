@@ -120,11 +120,12 @@ impl Operation {
         &'a self,
         indent: &'a FormatOptions,
         code: &'a Bytecode,
+        f: &'a Function,
     ) -> impl Display + 'a {
         use Operation::*;
         macro_rules! disp {
             ($e:ident) => {
-                $e.display(indent, code)
+                $e.display(indent, code, f)
             };
         }
         fmtools::fmt! { move
@@ -159,10 +160,11 @@ impl Expr {
         &'a self,
         indent: &'a FormatOptions,
         code: &'a Bytecode,
+        f: &'a Function,
     ) -> impl Display + 'a {
         macro_rules! disp {
             ($e:expr) => {
-                $e.display(indent, code)
+                $e.display(indent, code, f)
             };
         }
         fmtools::fmt! { move
@@ -174,7 +176,7 @@ impl Expr {
                             .enumerate()
                             .map(|(i, f)| {
                                 fmtools::fmt! { move
-                                    {f.name.resolve(&code.strings)}": "{values.get(&RefField(i)).unwrap().display(indent, code)}
+                                    {f.name.resolve(&code.strings)}": "{disp!(values.get(&RefField(i)).unwrap())}
                                 }
                             })) }"}"
                     }
@@ -210,6 +212,18 @@ impl Expr {
                     {disp!(receiver)}"."{name}
                 }
                 Expr::FunRef(fun) => {{fun.display_call(code).to_string()}},
+                Expr::IfElse { cond, if_, else_ } => {
+                    "if ("{disp!(cond)}") {\n"
+                    let indent2 = indent.inc_nesting();
+                    for stmt in if_ {
+                        {indent2}{stmt.display(&indent2, code, f)}"\n"
+                    }
+                    {indent}"} else {\n"
+                    for stmt in else_ {
+                        {indent2}{stmt.display(&indent2, code, f)}"\n"
+                    }
+                    {indent}"}"
+                }
                 Expr::Op(op) => {{disp!(op)}},
                 Expr::Unknown(msg) => {
                      "["{msg}"]"
@@ -235,7 +249,7 @@ impl Statement {
     ) -> impl Display + 'a {
         macro_rules! disp {
             ($e:expr) => {
-                $e.display(indent, code)
+                $e.display(indent, code, f)
             };
         }
         fmtools::fmt! { move
@@ -253,21 +267,20 @@ impl Statement {
                 Statement::Return(expr) => {
                     "return" if let Some(e) = expr { " "{disp!(e)} } ";"
                 }
-                Statement::If { cond, stmts } => {
+                Statement::IfElse { cond, if_, else_ } => {
                     "if ("{disp!(cond)}") {\n"
                     let indent2 = indent.inc_nesting();
-                    for stmt in stmts {
+                    for stmt in if_ {
                         {indent2}{stmt.display(&indent2, code, f)}"\n"
                     }
                     {indent}"}"
-                }
-                Statement::Else { stmts } => {
-                    "else {\n"
-                    let indent2 = indent.inc_nesting();
-                    for stmt in stmts {
-                        {indent2}{stmt.display(&indent2, code, f)}"\n"
+                    if !else_.is_empty() {
+                        " else {\n"
+                        for stmt in else_ {
+                            {indent2}{stmt.display(&indent2, code, f)}"\n"
+                        }
+                        {indent}"}"
                     }
-                    {indent}"}"
                 }
                 Statement::Switch {arg, default, cases} => {
                     "switch ("{disp!(arg)}") {\n"

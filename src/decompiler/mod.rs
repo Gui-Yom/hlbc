@@ -3,6 +3,7 @@
 //!
 //! The decompiler takes bytecode elements as input and outputs [ast] structures that can be displayed.
 
+use std::borrow::BorrowMut;
 use std::collections::{HashMap, HashSet};
 
 use ast::*;
@@ -16,6 +17,8 @@ use crate::Opcode;
 pub mod ast;
 /// Functions to render the [ast] to a string
 pub mod fmt;
+/// AST post-processing
+mod post;
 /// Scope handling structures
 mod scopes;
 
@@ -728,37 +731,18 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
         }
         scopes.advance();
     }
-    scopes.statements()
-}
+    let mut statements = scopes.statements();
 
-/*
-fn if_expression(stmts: &mut Vec<Statement>) {
-    let mut iter = stmts.iter_mut();
-    while let Some(stmt) = iter.next() {
-        if let Statement::If {
-            stmts: if_stmts, ..
-        } = stmt
-        {
-            if let Some(Statement::Assign { variable: if_v, .. }) = if_stmts.last() {
-                if let Some(Statement::Else {
-                    stmts: else_stmts, ..
-                }) = iter.next()
-                {
-                    if let Some(Statement::Assign {
-                        variable: else_v, ..
-                    }) = else_stmts.last()
-                    {
-                        if if_v == else_v {
-                            // This if/else could be used as an expression
-                        }
-                    }
-                } else {
-                    // This if could be used as en expression
-                }
-            }
-        }
+    // AST post processing step !
+    let passes: [Box<dyn Fn(&mut [Statement])>; 1] =
+        [Box::new(|stmts| visit_if(stmts, &mut post::if_expression))];
+
+    for pass in passes {
+        pass(&mut statements);
     }
-}*/
+
+    statements
+}
 
 /// Decompile a function out of context
 pub fn decompile_function(code: &Bytecode, f: &Function) -> Method {

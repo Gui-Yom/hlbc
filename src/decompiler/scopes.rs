@@ -12,7 +12,10 @@ pub(crate) enum ScopeData {
     If {
         cond: Expr,
     },
-    Else,
+    Else {
+        if_cond: Expr,
+        if_stmts: Vec<Statement>,
+    },
     Switch {
         arg: Expr,
         offsets: Vec<usize>,
@@ -48,11 +51,16 @@ impl Scope {
     /// Finish the scope by creating a statement from it
     pub(crate) fn make_stmt(self) -> Statement {
         match self.data {
-            ScopeData::If { cond } => Statement::If {
+            ScopeData::If { cond } => Statement::IfElse {
                 cond,
-                stmts: self.stmts,
+                if_: self.stmts,
+                else_: Vec::new(),
             },
-            ScopeData::Else => Statement::Else { stmts: self.stmts },
+            ScopeData::Else { if_cond, if_stmts } => Statement::IfElse {
+                cond: if_cond,
+                if_: if_stmts,
+                else_: self.stmts,
+            },
             ScopeData::Switch { arg, cases, .. } => Statement::Switch {
                 arg,
                 default: self.stmts,
@@ -146,8 +154,22 @@ impl Scopes {
     }
 
     pub(crate) fn push_else(&mut self, len: i32) {
-        self.scopes
-            .push(Scope::new(ScopeType::Len(len), ScopeData::Else))
+        let (if_cond, stmts) = self
+            .scopes
+            .pop()
+            .and_then(|s| match s.data {
+                ScopeData::If { cond } => Some((cond, s.stmts)),
+                _ => None,
+            })
+            .expect("Else without If ?");
+
+        self.scopes.push(Scope::new(
+            ScopeType::Len(len),
+            ScopeData::Else {
+                if_cond,
+                if_stmts: stmts,
+            },
+        ));
     }
 
     pub(crate) fn push_switch(&mut self, len: i32, arg: Expr, offsets: Vec<usize>) {

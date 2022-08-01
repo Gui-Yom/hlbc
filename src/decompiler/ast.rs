@@ -137,10 +137,18 @@ pub enum Expr {
     /// Arrow function (...) -> {...}
     Closure(RefFun, Vec<Statement>),
     EnumConstr(RefType, RefEnumConstruct, Vec<Expr>),
-    /// Function reference
-    FunRef(RefFun),
     /// Field access : obj.field
     Field(Box<Expr>, String),
+    /// Function reference
+    FunRef(RefFun),
+    /// If/Else expression, both branches expressions types must unify (https://haxe.org/manual/expression-if.html)
+    IfElse {
+        cond: Box<Expr>,
+        /// Not empty
+        if_: Vec<Statement>,
+        /// Not empty
+        else_: Vec<Statement>,
+    },
     /// Operator
     Op(Operation),
     // For when there should be something, but we don't known what
@@ -273,14 +281,12 @@ pub enum Statement {
     ExprStatement(Expr),
     /// Return an expression or nothing (void)
     Return(Option<Expr>),
-    /// If statement
-    If {
+    /// If/Else statement
+    IfElse {
         cond: Expr,
-        stmts: Vec<Statement>,
-    },
-    /// Else clause for the if statement
-    Else {
-        stmts: Vec<Statement>,
+        if_: Vec<Statement>,
+        /// Else clause if the vec isn't empty
+        else_: Vec<Statement>,
     },
     Switch {
         arg: Expr,
@@ -306,4 +312,39 @@ pub enum Statement {
 /// Create an expression statement
 pub fn stmt(e: Expr) -> Statement {
     Statement::ExprStatement(e)
+}
+
+pub fn visit_if(stmts: &mut [Statement], visitor: &mut impl FnMut(&mut Statement)) {
+    for stmt in stmts {
+        let ok = match stmt {
+            Statement::IfElse { if_, else_, .. } => {
+                visit_if(if_, visitor);
+                visit_if(else_, visitor);
+                Some(stmt)
+            }
+            Statement::Switch { default, cases, .. } => {
+                visit_if(default, visitor);
+                for (_, case) in cases {
+                    visit_if(case, visitor);
+                }
+                None
+            }
+            Statement::While { stmts, .. } => {
+                visit_if(stmts, visitor);
+                None
+            }
+            Statement::Try { stmts } => {
+                visit_if(stmts, visitor);
+                None
+            }
+            Statement::Catch { stmts } => {
+                visit_if(stmts, visitor);
+                None
+            }
+            _ => None,
+        };
+        if let Some(ifelse) = ok {
+            visitor(ifelse);
+        }
+    }
 }
