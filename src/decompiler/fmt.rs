@@ -190,7 +190,7 @@ impl Expr {
                 }
                 Expr::Constant(c) => {{c}},
                 Expr::Constructor(ConstructorCall { ty, args }) => {
-                    "new "{ty.display(code)}"("{fmtools::join(", ", args.iter().map(|e| disp!(e)))}");"
+                    "new "{ty.display(code)}"("{fmtools::join(", ", args.iter().map(|e| disp!(e)))}")"
                 }
                 Expr::Closure(f, stmts) => {
                     let fun = f.resolve_as_fn(code).unwrap();
