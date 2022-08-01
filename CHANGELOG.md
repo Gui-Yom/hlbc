@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/Gui-Yom/hlbc/compare/v0.3.0...HEAD)
 
+### Added
+
+- New (currently hidden) ast post-processing step (AST-PP) to improve the decompiler output
+- New AST_PP : if-expressions
+
 ## [0.3.0](https://github.com/Gui-Yom/hlbc/compare/v0.2.0...v0.3.0) - 2022-07-31
 
 ### Added

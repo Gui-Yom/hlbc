@@ -306,7 +306,7 @@ dependencies = [
 
 [[package]]
 name = "hlbc"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "byteorder",
  "fmtools",
@@ -317,7 +317,7 @@ dependencies = [
 
 [[package]]
 name = "hlbc-cli"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "atty",
