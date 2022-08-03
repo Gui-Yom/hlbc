@@ -1,76 +1,41 @@
-# hlbc ![Crates.io](https://img.shields.io/crates/v/hlbc?label=hlbc) ![Crates.io](https://img.shields.io/crates/v/hlbc-cli?label=hlbc-cli)
-
-[**H**ash**l**ink](https://hashlink.haxe.org/) **b**yte**c**ode disassembler, analyzer, decompiler and assembler.
-
-*This crate is a library, see [hlbc-cli](hlbc-cli) for an actual program to use.*
-
----
-
-## Features
-
-- Parse the whole bytecode file or any bytecode element
-- Display any bytecode element
-- Restore all possible names
-- Link elements between them (with manual references for flexibility)
-- Link elements with their debug information
-- Serialize bytecode back to bytes
-- Decompiler to haxe source code for classes and functions
-- Commandline interface to use the features of this library ([hlbc-cli](hlbc-cli))
-
-## Planned features
-
-- Integrate with the Haxe/Hashlink standard library to restore more names, exclude them from analysis and such
-- Gui to render the callgraph in real time
-- Gui to render instructions and decompiled code
-- C API to integrate with other tools
-- Text search engine to search for strings and names
-- Assemble and inject bytecode or inject haxe source code directly
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md).
-
-## Decompiler
-
-The decompiler is currently incomplete (and will probably always be).
-[See the wiki](https://github.com/Gui-Yom/hlbc/wiki/Decompilation) for examples of decompilation output.
-
-## Wiki
-
-A wiki detailing the specifics of Hashlink bytecode is available [here](https://github.com/Gui-Yom/hlbc/wiki).
-The wiki also details the inner workings of haxe to hashlink compilation and decompilation.
-
-## Macros
-
-There are 98 different bytecode instructions, there is no way I manually write code for it each time. Most of the code
-for these opcodes is generated through a proc macro (see [hlbc-derive](/hlbc-derive)).
-The only time I needed to write 98 different branches was for the formatting used when displaying the
-instructions ([src/fmt.rs](src/fmt.rs)).
+<div align="center">
+    <h1><b>H</b>ash<b>l</b>ink <b>b</b>yte<b>c</b>ode</h1>
+    <a href="https://crates.io/crates/hlbc">
+        <img src="https://img.shields.io/crates/v/hlbc?label=hlbc">
+    </a>
+    <a href="https://crates.io/crates/hlbc-decompiler">
+        <img src="https://img.shields.io/crates/v/hlbc-decompiler?label=hlbc-decompiler">
+    </a>
+    <a href="https://crates.io/crates/hlbc-cli">
+        <img src="https://img.shields.io/crates/v/hlbc-cli?label=hlbc-cli">
+    </a>
+    <br/>
+    This repository contains a collection of Rust crates and cli tools to load, disassemble, decompile and
+    analyze <a href="https://hashlink.haxe.org/">Hashlink</a> bytecode.
+    <br/>
+    <img src="hlbc-cli/screenshot.png">
+</div>
 
 ## Repository structure
 
-- `/` : hlbc (lib)
-- `hlbc-derive/` : hlbc-derive, helper proc macros for hlbc
-- `hlbc-cli/` : CLI using hlbc
-- `data/` : Haxe source files to test the decompiler
+- `data/` : Haxe source files to test the tools
+- `hlbc/` : Core library to load and disassemble bytecode
+- `hlbc-cli/` : CLI frontend for `hlbc`
+- `hlbc-decompiler/` : Decompiler library
+- `hlbc-derive/` : helper proc macros for hlbc
+
+## Wiki
+
+A wiki detailing the specifics of Hashlink bytecode is available [here](https://github.com/Gui-Yom/hlbc/wiki) or by
+using the command `wiki`.
+
+## Planned features
+
+- GUI
+- C API
 
 ## Credits
 
-Development of this crate wouldn't be possible without the [hashlink](https://github.com/HaxeFoundation/hashlink) source
-code. Some algorithms are directly derived from the original C code reading bytecode files.
-
-## Alternatives
-
-This library is made in Rust, a C API is in the works which could permit using this lib in many other projects, but for
-now it is only Rust friendly.
-
-Other alternatives include :
-
-- Tinkering directly with the [hashlink](https://github.com/HaxeFoundation/hashlink) source code in C
-- Using the in-progress [**_*dashlink*_**](https://github.com/Steviegt6/dashlink) made in Haxe but probably compilable
-  to many other languages.
-
-## Notes about using Rust
-
-Rust isn't a very good fit for this project, the whole bytecode is a large graph and self-references do not mix well
-with Rust. Further iterations of this crate could make use of an arena.
+Development of this project would not have been possible without
+the [hashlink](https://github.com/HaxeFoundation/hashlink) source code. Some algorithms are directly derived from the
+original C code reading bytecode files.

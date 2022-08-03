@@ -1,4 +1,4 @@
-name: Release
+name: Build release binaries
 
 on:
   push:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install rust stable
         uses: actions-rs/toolchain@v1
         with:
@@ -24,13 +24,13 @@ jobs:
       - name: Upload release artifact
         uses: softprops/action-gh-release@v1
         with:
-          files: target/release/hlbc-cli
+          files: target/release/hlbc
   release-windows:
     name: Build release (windows)
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Install rust stable
         uses: actions-rs/toolchain@v1
         with:
@@ -43,4 +43,4 @@ jobs:
       - name: Upload release artifact
         uses: softprops/action-gh-release@v1
         with:
-          files: target/release/hlbc-cli.exe
+          files: target/release/hlbc.exe

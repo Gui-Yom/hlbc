@@ -1,10 +1,10 @@
-# hlbc-cli ![Crates.io](https://img.shields.io/crates/v/hlbc-cli?label=hlbc-cli)
+# hlbc-cli [![Crates.io](https://img.shields.io/crates/v/hlbc-cli?label=hlbc-cli)](https://crates.io/crates/hlbc-cli)
 
-A CLI to navigate through [Hashlink](https://hashlink.haxe.org/) bytecode files. This is the command line interface
-for [hlbc](https://github.com/Gui-Yom/hlbc), the **H**ash**l**ink **b**yte**c**ode
-disassembler, analyzer, decompiler and assembler.
+[**H**ash**l**ink](https://hashlink.haxe.org/) **b**yte**c**ode disassembler, decompiler and analyzer command line
+interface.
 
-*This crate is a program, see [hlbc](https://github.com/Gui-Yom/hlbc) for a library to use.*
+*This crate is a program, see [hlbc](https://crates.io/crates/hlbc) for the core bytecode library
+or [hlbc-decompiler](https://crates.io/crates/hlbc-decompiler) for the decompiler library*
 
 ![screenshot](screenshot.png)
 
@@ -12,7 +12,8 @@ disassembler, analyzer, decompiler and assembler.
 
 ## Installation
 
-Download a prebuilt binary from the [releases page](https://github.com/Gui-Yom/hlbc/releases).
+Download a prebuilt binary from the [releases page](https://github.com/Gui-Yom/hlbc/releases) (built from the CI,
+Windows & Linux).
 
 Or build from the latest version :
 
@@ -24,19 +25,19 @@ Or build the crate from the latest sources :
 
 ```shell
 git clone https://github.com/Gui-Yom/hlbc
-cd hlbc/hlbc-cli
+cd hlbc
 cargo build --release
-# The resulting binary can be found in hlbc/target/release
+# The resulting binary can be found in target/release
 ```
 
 ## Usage
 
-`hlbc-cli <file> [-c <command>] [-w <command>]`
+`hlbc <file> [-c <command>] [-w <command>]`
 
 You get access to a prompt where you can enter commands.
 
 You can execute commands on startup with the `-c` switch.
-e.g. Dump all strings from the bytecode then exit : `hlbc-cli main.hl -c "s ..; exit"`.
+e.g. Dump all strings from the bytecode then exit : `hlbc main.hl -c "s ..; exit"`.
 If you omit the `exit` command, the app will simply launch the normal prompt after executing the startup commands.
 
 With `-w`, the given command will execute each time the file changes. The cli won't show a command prompt.
@@ -46,10 +47,12 @@ present in the `PATH`.
 
 ## Commands
 
-- `info` General information about the bytecode
+- `exit` Exit the program
 - `help` Help message
-- `entrypoint` Get the bytecode entrypoint
 - `explain <op>` Get information about an opcode
+- `wiki` Open the bytecode wiki page in a browser
+- `info` General information about the bytecode
+- `entrypoint` Get the bytecode entrypoint
 - `i|int <idx>` Get the int at index
 - `f|float <idx>` Get the float at index
 - `s|string <idx>` Get the string at index
@@ -69,7 +72,7 @@ present in the `PATH`.
 - `saveto <filename>` Serialize the bytecode to a file
 - `callgraph <findex> <depth>` Create a dot call graph from a function and a max depth
 - `decomp <findex>` Decompile a function
-- `decomptype <idx>` Decompile a class
+- `decompt <idx>` Decompile a class
 
 ### Indexes
 
@@ -78,7 +81,7 @@ Where `..10` means '*select the first 10 items*' and `..` means '*display everyt
 
 ## Decompiler
 
-More info about the decompiler [here](https://github.com/Gui-Yom/hlbc/blob/master/README.md#decompiler).
+The decompiler has its own crate ! More info [here](https://github.com/Gui-Yom/hlbc/blob/master/hlbc-decompiler).
 
 ## Changelog
 
@@ -86,7 +89,8 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## Wiki
 
-A wiki detailing the specifics of Hashlink bytecode is available [here](https://github.com/Gui-Yom/hlbc/wiki).
+A wiki detailing the specifics of Hashlink bytecode is available [here](https://github.com/Gui-Yom/hlbc/wiki) or by
+using the command `wiki`.
 
 ## Planned features
 

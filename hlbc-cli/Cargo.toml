@@ -4,12 +4,17 @@ version = "0.4.0"
 authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
 edition = "2021"
 rust-version = "1.56"
-description = "Hashlink bytecode disassembler, analyzer and decompiler"
+description = "Hashlink bytecode disassembler, analyzer and decompiler cli"
 repository = "https://github.com/Gui-Yom/hlbc"
 license = "MIT"
 categories = ["command-line-utilities", "parser-implementations", "visualization", "compilers"]
+include = ["src/**/*", "README.md", "CHANGELOG.md"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "hlbc"
+path = "src/main.rs"
 
 [dependencies]
 # Result type
@@ -21,7 +26,7 @@ chumsky = { version = "0.8" }
 # CLI args
 clap = { version = "3", features = ["derive"] }
 # Core functionnality
-hlbc = { version = "0.4", path = "..", default-features = false }
+hlbc = { version = "0.4", path = "../hlbc", default-features = false }
 # Decompiler
 hlbc-decompiler = { version = "0.4", path = "../hlbc-decompiler" }
 # File system watching
