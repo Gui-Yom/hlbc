@@ -15,4 +15,11 @@ categories = ["visualization", "compilers"]
 [dependencies]
 # Advanced formatting functionalities
 fmtools = "0.1"
-hlbc = {version = "0.4", path = ".."}
+hlbc = { version = "0.4", path = ".." }
+# Graph utilities
+petgraph = { version = "0.6", default-features = false, features = ["graphmap"], optional = true }
+
+[features]
+default = []
+alt = []
+alt-graph = ["alt", "petgraph"]
