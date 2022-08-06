@@ -331,6 +331,17 @@ impl Bytecode {
         }
         Ok(())
     }
+
+    /// Get the entrypoint function.
+    pub fn entrypoint(&self) -> &Function {
+        self.entrypoint.resolve_as_fn(self).unwrap()
+    }
+
+    /// Get the main function.
+    /// This will panic if there is no main function in the bytecode (there should always be one)
+    pub fn main(&self) -> &Function {
+        &self.functions[*self.fnames.get("main").unwrap()]
+    }
 }
 
 pub type Result<T> = core::result::Result<T, Error>;
