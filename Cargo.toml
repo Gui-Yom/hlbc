@@ -1,2 +1,2 @@
 [workspace]
-members = ["hlbc-derive", "hlbc", "hlbc-decompiler", "hlbc-cli"]
+members = ["hlbc-derive", "hlbc", "hlbc-decompiler", "hlbc-cli", "hlbc-gui"]

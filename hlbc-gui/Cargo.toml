@@ -1,0 +1,22 @@
+[package]
+name = "hlbc-gui"
+version = "0.4.0"
+authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
+edition = "2021"
+rust-version = "1.56"
+description = "Hashlink bytecode disassembler, analyzer and decompiler cli"
+repository = "https://github.com/Gui-Yom/hlbc"
+license = "MIT"
+categories = ["command-line-utilities", "parser-implementations", "visualization", "compilers"]
+include = ["src/**/*", "README.md", "CHANGELOG.md"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "hlbcw"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { version = "0.18" }
+egui_dock = { version = "0.1" }
+hlbc = { version = "0.4", path = "../hlbc" }
