@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 use eframe::egui::style::Margin;
-use eframe::egui::{Frame, Id, LayerId, RichText, Rounding, TopBottomPanel, Ui, Vec2, Visuals};
+use eframe::egui::{
+    CentralPanel, Frame, Id, LayerId, RichText, Rounding, TopBottomPanel, Ui, Vec2, Visuals,
+};
 use eframe::{egui, NativeOptions};
 use egui_dock::{NodeIndex, Tab, Tree};
 
@@ -50,17 +52,13 @@ fn main() {
                 se: 0.0,
             };
 
-            let file = PathBuf::from(env::args().skip(1).collect::<String>());
-            let bc = Bytecode::load(&mut BufReader::new(
-                fs::File::open(&file).expect("Can't open file"),
-            ))
-            .ok();
+            let args = env::args().skip(1).collect::<String>();
 
-            Box::new(DockApp {
-                app: App {
-                    file: Some(file),
-                    bc,
-                    selected_fn: None,
+            Box::new(App {
+                app: if args.is_empty() {
+                    None
+                } else {
+                    Some(AppCtx::new_from_file(PathBuf::from(args)))
                 },
                 tree,
                 style,
@@ -69,20 +67,35 @@ fn main() {
     );
 }
 
-struct DockApp {
-    app: App,
+struct App {
+    /// Some when a file is loaded
+    app: Option<AppCtx>,
     // Dock
-    tree: Tree<App>,
+    tree: Tree<AppCtx>,
     style: egui_dock::Style,
 }
 
-struct App {
-    file: Option<PathBuf>,
-    bc: Option<Bytecode>,
+struct AppCtx {
+    file: PathBuf,
+    code: Bytecode,
     selected_fn: Option<RefFun>,
 }
 
-impl eframe::App for DockApp {
+impl AppCtx {
+    fn new_from_file(file: PathBuf) -> Self {
+        let code = Bytecode::load(&mut BufReader::new(
+            fs::File::open(&file).expect("Can't open file"),
+        ))
+        .expect("Can't load bytecode");
+        AppCtx {
+            file,
+            code,
+            selected_fn: None,
+        }
+    }
+}
+
+impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         TopBottomPanel::top("menu bar")
             .frame(Frame::none().outer_margin(Margin::same(4.0)))
@@ -90,10 +103,12 @@ impl eframe::App for DockApp {
                 egui::menu::bar(ui, |ui| {
                     ui.menu_button("File", |ui| {
                         if ui.button("Open").clicked() {
-                            println!("Open file");
+                            if let Some(file) = rfd::FileDialog::new().pick_file() {
+                                self.app = Some(AppCtx::new_from_file(file));
+                            }
                         }
                         if ui.button("Close").clicked() {
-                            println!("Close file");
+                            self.app = None;
                         }
                     });
                     ui.menu_button("Views", |ui| {
@@ -114,18 +129,28 @@ impl eframe::App for DockApp {
                 });
             });
 
-        let layer_id = LayerId::background();
-        let max_rect = ctx.available_rect();
-        let clip_rect = ctx.available_rect();
+        if let Some(appctx) = self.app.as_mut() {
+            let layer_id = LayerId::background();
+            let max_rect = ctx.available_rect();
+            let clip_rect = ctx.available_rect();
 
-        let mut ui = Ui::new(
-            ctx.clone(),
-            layer_id,
-            Id::new("DockApp"),
-            max_rect,
-            clip_rect,
-        );
-        let id = ui.id();
-        egui_dock::show(&mut ui, id, &self.style, &mut self.tree, &mut self.app);
+            let mut ui = Ui::new(
+                ctx.clone(),
+                layer_id,
+                Id::new("Docking space"),
+                max_rect,
+                clip_rect,
+            );
+            let id = ui.id();
+            egui_dock::show(&mut ui, id, &self.style, &mut self.tree, appctx);
+        } else {
+            CentralPanel::default()
+                .frame(Frame::group(ctx.style().as_ref()).outer_margin(Margin::same(4.0)))
+                .show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.label("Load a bytecode file to start");
+                    });
+                });
+        }
     }
 }

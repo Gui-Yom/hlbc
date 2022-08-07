@@ -5,19 +5,19 @@ use egui_dock::Tab;
 
 use hlbc::types::{FunPtr, RefFun, RefFunKnown};
 
-use crate::App;
+use crate::AppCtx;
 
 #[derive(Default)]
 pub struct FunctionsTab {
     include_natives: bool,
 }
 
-impl Tab<App> for FunctionsTab {
+impl Tab<AppCtx> for FunctionsTab {
     fn title(&self) -> &str {
         "ƒ Functions"
     }
 
-    fn ui(&mut self, ui: &mut Ui, ctx: &mut App) {
+    fn ui(&mut self, ui: &mut Ui, ctx: &mut AppCtx) {
         let margin = Margin::same(4.0);
 
         Frame::none().inner_margin(margin).show(ui, |ui| {
@@ -25,33 +25,29 @@ impl Tab<App> for FunctionsTab {
             egui::ScrollArea::vertical()
                 .id_source("functions_scroll_area")
                 .show(ui, |ui| {
-                    if let Some(code) = &ctx.bc {
-                        for f in code.findexes.iter() {
-                            match f.resolve(code) {
-                                FunPtr::Fun(fun) => {
+                    for f in &ctx.code.findexes {
+                        match f.resolve(&ctx.code) {
+                            FunPtr::Fun(fun) => {
+                                let res = ui.selectable_label(
+                                    ctx.selected_fn.map(|s| s == fun.findex).unwrap_or(false),
+                                    fun.display_header(&ctx.code),
+                                );
+                                if res.clicked() {
+                                    ctx.selected_fn.insert(fun.findex);
+                                }
+                            }
+                            FunPtr::Native(n) => {
+                                if self.include_natives {
                                     let res = ui.selectable_label(
-                                        ctx.selected_fn.map(|s| s == fun.findex).unwrap_or(false),
-                                        fun.display_header(code),
+                                        ctx.selected_fn.map(|s| s == n.findex).unwrap_or(false),
+                                        n.display_header(&ctx.code),
                                     );
                                     if res.clicked() {
-                                        ctx.selected_fn.insert(fun.findex);
-                                    }
-                                }
-                                FunPtr::Native(n) => {
-                                    if self.include_natives {
-                                        let res = ui.selectable_label(
-                                            ctx.selected_fn.map(|s| s == n.findex).unwrap_or(false),
-                                            n.display_header(code),
-                                        );
-                                        if res.clicked() {
-                                            ctx.selected_fn.insert(n.findex);
-                                        }
+                                        ctx.selected_fn.insert(n.findex);
                                     }
                                 }
                             }
                         }
-                    } else {
-                        ui.label("No bytecode loaded");
                     }
                 });
         });

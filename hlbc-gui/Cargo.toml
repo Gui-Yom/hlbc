@@ -17,6 +17,11 @@ name = "hlbcw"
 path = "src/main.rs"
 
 [dependencies]
+# AIO GUI framework
 eframe = { version = "0.18" }
+# Docking tabs
 egui_dock = { version = "0.1" }
+# Core library
 hlbc = { version = "0.4", path = "../hlbc" }
+# Open file dialogs
+rfd = "0.10"
