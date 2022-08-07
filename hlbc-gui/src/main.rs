@@ -1,22 +1,29 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use std::io::BufReader;
+use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 use eframe::egui::style::Margin;
-use eframe::egui::{Frame, Id, LayerId, RichText, Ui, Vec2, Visuals};
+use eframe::egui::{Frame, Id, LayerId, RichText, Rounding, TopBottomPanel, Ui, Vec2, Visuals};
 use eframe::{egui, NativeOptions};
 use egui_dock::{NodeIndex, Tab, Tree};
 
 use hlbc::types::{FunPtr, RefFun};
 use hlbc::Bytecode;
 
+use crate::views::disassembly::DisassemblyTab;
+use crate::views::functions::FunctionsTab;
+use crate::views::info::InfoTab;
+
+mod views;
+
 fn main() {
     eframe::run_native(
         "hlbc gui",
         NativeOptions {
             vsync: true,
-            initial_window_size: Some(Vec2::new(1600.0, 900.0)),
+            initial_window_size: Some(Vec2::new(1280.0, 720.0)),
             ..Default::default()
         },
         Box::new(|cc| {
@@ -24,25 +31,39 @@ fn main() {
                 cc.egui_ctx.set_visuals(Visuals::dark());
             }
 
+            // Dock tabs tree
             let mut tree = Tree::new(vec![Box::new(DisassemblyTab::default())]);
 
             tree.split_left(
                 NodeIndex::root(),
-                0.4,
+                0.25,
                 vec![Box::new(FunctionsTab::default())],
             );
 
+            // Dock tabs styling
+            let mut style = egui_dock::Style::from_egui(cc.egui_ctx.style().as_ref());
+            style.tab_outline = style.tab_bar_background;
+            style.tab_rounding = Rounding {
+                nw: 1.0,
+                ne: 1.0,
+                sw: 0.0,
+                se: 0.0,
+            };
+
+            let file = PathBuf::from(env::args().skip(1).collect::<String>());
+            let bc = Bytecode::load(&mut BufReader::new(
+                fs::File::open(&file).expect("Can't open file"),
+            ))
+            .ok();
+
             Box::new(DockApp {
                 app: App {
-                    bc: Bytecode::load(&mut BufReader::new(
-                        fs::File::open(env::args().skip(1).collect::<String>())
-                            .expect("Can't open file"),
-                    ))
-                    .ok(),
-                    selected: None,
+                    file: Some(file),
+                    bc,
+                    selected_fn: None,
                 },
                 tree,
-                style: egui_dock::Style::from_egui(cc.egui_ctx.style().as_ref()),
+                style,
             })
         }),
     );
@@ -56,12 +77,43 @@ struct DockApp {
 }
 
 struct App {
+    file: Option<PathBuf>,
     bc: Option<Bytecode>,
-    selected: Option<RefFun>,
+    selected_fn: Option<RefFun>,
 }
 
 impl eframe::App for DockApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        TopBottomPanel::top("menu bar")
+            .frame(Frame::none().outer_margin(Margin::same(4.0)))
+            .show(ctx, |ui| {
+                egui::menu::bar(ui, |ui| {
+                    ui.menu_button("File", |ui| {
+                        if ui.button("Open").clicked() {
+                            println!("Open file");
+                        }
+                        if ui.button("Close").clicked() {
+                            println!("Close file");
+                        }
+                    });
+                    ui.menu_button("Views", |ui| {
+                        if ui.button("Functions").clicked() {
+                            println!("open functions view");
+                        }
+                        if ui.button("Disassembly").clicked() {
+                            println!("open disassembly view");
+                        }
+                        if ui.button("Info").clicked() {
+                            self.tree.split_right(
+                                NodeIndex::root().left(),
+                                0.8,
+                                vec![Box::new(InfoTab::default())],
+                            );
+                        }
+                    });
+                });
+            });
+
         let layer_id = LayerId::background();
         let max_rect = ctx.available_rect();
         let clip_rect = ctx.available_rect();
@@ -75,68 +127,5 @@ impl eframe::App for DockApp {
         );
         let id = ui.id();
         egui_dock::show(&mut ui, id, &self.style, &mut self.tree, &mut self.app);
-    }
-}
-
-#[derive(Default)]
-struct DisassemblyTab {}
-
-impl Tab<App> for DisassemblyTab {
-    fn title(&self) -> &str {
-        "Disassembly view"
-    }
-
-    fn ui(&mut self, ui: &mut Ui, ctx: &mut App) {
-        let margin = Margin::same(4.0);
-
-        Frame::none().inner_margin(margin).show(ui, |ui| {
-            if let Some(code) = &ctx.bc {
-                if let Some(f) = ctx.selected.map(|f| f.resolve(code)) {
-                    match f {
-                        FunPtr::Fun(fun) => {
-                            ui.label(RichText::new(fun.display(code).to_string()).code());
-                        }
-                        FunPtr::Native(n) => {
-                            ui.label(RichText::new(n.display_header(code).to_string()).code());
-                        }
-                    }
-                } else {
-                    ui.label("Select a function in the Functions view to view its bytecode");
-                }
-            } else {
-                ui.label("No bytecode loaded");
-            }
-        });
-    }
-}
-
-#[derive(Default)]
-struct FunctionsTab {}
-
-impl Tab<App> for FunctionsTab {
-    fn title(&self) -> &str {
-        "Functions"
-    }
-
-    fn ui(&mut self, ui: &mut Ui, ctx: &mut App) {
-        let margin = Margin::same(4.0);
-
-        Frame::none().inner_margin(margin).show(ui, |ui| {
-            egui::ScrollArea::new([false, true]).show(ui, |ui| {
-                if let Some(code) = &ctx.bc {
-                    for f in &code.functions {
-                        let l = ui.selectable_label(
-                            ctx.selected.map(|s| s == f.findex).unwrap_or(false),
-                            f.display_header(code),
-                        );
-                        if l.clicked() {
-                            ctx.selected.insert(f.findex);
-                        }
-                    }
-                } else {
-                    ui.label("No bytecode loaded");
-                }
-            });
-        });
     }
 }
