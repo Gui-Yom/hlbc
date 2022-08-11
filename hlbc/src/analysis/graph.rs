@@ -7,7 +7,6 @@ use std::fmt::{Display, Formatter};
 use petgraph::graphmap::DiGraphMap;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences, IntoNodeReferences, NodeIndexable, NodeRef};
 
-use crate::analysis::{find_last_closure_assign, is_std_fn};
 use crate::types::{FunPtr, Function, RefFun};
 use crate::{Bytecode, Opcode, Type};
 
@@ -32,7 +31,8 @@ pub fn find_calls<'a>(
             let mut tmp = RegCtx::new();
             for (p, arg) in $args.into_iter().enumerate() {
                 if matches!(f.regs[arg.0 as usize].resolve(&code.types), Type::Fun(_)) {
-                    if let Some(value) = find_last_closure_assign(code, f, *arg, $i)
+                    if let Some(value) = f
+                        .find_last_closure_assign(code, *arg, $i)
                         .or_else(|| reg_ctx.get(&(arg.0 as usize)).copied())
                     {
                         tmp.insert(p, value);
@@ -65,7 +65,8 @@ pub fn find_calls<'a>(
             ..
         } => Some((Call::Direct, *fun, build_ctx!(i; [arg0, arg1, arg2, arg3]))),
         Opcode::CallN { fun, args, .. } => Some((Call::Direct, *fun, build_ctx!(i; args))),
-        Opcode::CallClosure { fun, args, .. } => find_last_closure_assign(code, f, *fun, i)
+        Opcode::CallClosure { fun, args, .. } => f
+            .find_last_closure_assign(code, *fun, i)
             .map(|f| (Call::Closure, f, build_ctx!(i; args)))
             .or_else(|| {
                 reg_ctx
@@ -103,7 +104,7 @@ fn build_graph_rec(code: &Bytecode, g: &mut Callgraph, f: &Function, ctx: &RegCt
         return;
     }
     for (call, fun, ctx) in find_calls(code, f, ctx) {
-        if !is_std_fn(code, fun) {
+        if fun.is_from_std(code) {
             match fun.resolve(code) {
                 FunPtr::Fun(fun) => {
                     if !g.contains_node(fun.findex) {
