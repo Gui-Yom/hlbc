@@ -1,22 +1,21 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use std::io::BufReader;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::{env, fs};
 
 use eframe::egui::style::Margin;
-use eframe::egui::{
-    CentralPanel, Frame, Id, LayerId, RichText, Rounding, TopBottomPanel, Ui, Vec2, Visuals,
-};
+use eframe::egui::{CentralPanel, Frame, Id, LayerId, Rounding, TopBottomPanel, Ui, Vec2, Visuals};
 use eframe::{egui, NativeOptions};
-use egui_dock::{NodeIndex, Tab, Tree};
+use egui_dock::{NodeIndex, Tree};
 
-use hlbc::types::{FunPtr, RefFun};
+use hlbc::types::RefFun;
 use hlbc::Bytecode;
 
-use crate::views::disassembly::DisassemblyTab;
-use crate::views::functions::FunctionsTab;
-use crate::views::info::InfoTab;
+use crate::views::CallgraphTab;
+use crate::views::DisassemblyTab;
+use crate::views::FunctionsTab;
+use crate::views::InfoTab;
 
 mod views;
 
@@ -34,7 +33,10 @@ fn main() {
             }
 
             // Dock tabs tree
-            let mut tree = Tree::new(vec![Box::new(DisassemblyTab::default())]);
+            let mut tree = Tree::new(vec![
+                Box::new(DisassemblyTab::default()),
+                Box::new(CallgraphTab::default()),
+            ]);
 
             tree.split_left(
                 NodeIndex::root(),

@@ -18,7 +18,7 @@ pub enum Call {
     Closure,
 }
 
-type Callgraph = DiGraphMap<RefFun, Call>;
+pub type Callgraph = DiGraphMap<RefFun, Call>;
 // Function argument number to function ptr
 type RegCtx = HashMap<usize, RefFun>;
 

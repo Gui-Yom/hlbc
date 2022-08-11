@@ -3,7 +3,7 @@ use eframe::egui::style::Margin;
 use eframe::egui::{Frame, Ui};
 use egui_dock::Tab;
 
-use hlbc::types::{FunPtr, RefFun, RefFunKnown};
+use hlbc::types::FunPtr;
 
 use crate::AppCtx;
 
@@ -25,30 +25,41 @@ impl Tab<AppCtx> for FunctionsTab {
             egui::ScrollArea::vertical()
                 .id_source("functions_scroll_area")
                 .show(ui, |ui| {
-                    for f in &ctx.code.findexes {
-                        match f.resolve(&ctx.code) {
-                            FunPtr::Fun(fun) => {
-                                let res = ui.selectable_label(
-                                    ctx.selected_fn.map(|s| s == fun.findex).unwrap_or(false),
-                                    fun.display_header(&ctx.code),
-                                );
-                                if res.clicked() {
-                                    ctx.selected_fn.insert(fun.findex);
-                                }
-                            }
-                            FunPtr::Native(n) => {
-                                if self.include_natives {
-                                    let res = ui.selectable_label(
-                                        ctx.selected_fn.map(|s| s == n.findex).unwrap_or(false),
-                                        n.display_header(&ctx.code),
-                                    );
-                                    if res.clicked() {
-                                        ctx.selected_fn.insert(n.findex);
+                    egui::Grid::new("fucntions_grid")
+                        .striped(true)
+                        .num_columns(1)
+                        .show(ui, |ui| {
+                            for f in &ctx.code.findexes {
+                                match f.resolve(&ctx.code) {
+                                    FunPtr::Fun(fun) => {
+                                        let res = ui.selectable_label(
+                                            ctx.selected_fn
+                                                .map(|s| s == fun.findex)
+                                                .unwrap_or(false),
+                                            fun.display_header(&ctx.code),
+                                        );
+                                        if res.clicked() {
+                                            ctx.selected_fn.insert(fun.findex);
+                                        }
+                                        ui.end_row();
+                                    }
+                                    FunPtr::Native(n) => {
+                                        if self.include_natives {
+                                            let res = ui.selectable_label(
+                                                ctx.selected_fn
+                                                    .map(|s| s == n.findex)
+                                                    .unwrap_or(false),
+                                                n.display_header(&ctx.code),
+                                            );
+                                            if res.clicked() {
+                                                ctx.selected_fn.insert(n.findex);
+                                            }
+                                            ui.end_row();
+                                        }
                                     }
                                 }
                             }
-                        }
-                    }
+                        });
                 });
         });
     }
