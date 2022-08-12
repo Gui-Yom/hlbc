@@ -1,5 +1,5 @@
 use eframe::egui::style::Margin;
-use eframe::egui::{DragValue, Frame, Ui, Widget};
+use eframe::egui::{Area, DragValue, Frame, Ui, Widget};
 use egui_dock::Tab;
 
 use hlbc::analysis::graph::{call_graph, display_graph, Callgraph};
@@ -46,6 +46,14 @@ impl Tab<AppCtx> for CallgraphTab {
             });
             if let Some(cg) = &self.graph {
                 ui.code(display_graph(cg, &ctx.code).to_string());
+                Frame::canvas(ui.style()).show(ui, |ui| {
+                    for n in cg.nodes() {
+                        Area::new(n)
+                            .default_pos(ui.next_widget_position())
+                            .drag_bounds(ui.max_rect())
+                            .show(ui.ctx(), |ui| ui.label(n.display_header(&ctx.code)));
+                    }
+                });
             } else {
                 ui.label("Select a function in the Functions view to view its bytecode");
             }

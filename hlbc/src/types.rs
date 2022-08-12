@@ -399,6 +399,23 @@ pub enum FunPtr<'a> {
     Native(&'a Native),
 }
 
+impl FunPtr<'_> {
+    pub fn findex(&self) -> RefFun {
+        match self {
+            FunPtr::Fun(fun) => fun.findex,
+            FunPtr::Native(n) => n.findex,
+        }
+    }
+
+    pub fn is_fun(&self) -> bool {
+        matches!(self, FunPtr::Fun(_))
+    }
+
+    pub fn is_native(&self) -> bool {
+        matches!(self, FunPtr::Native(_))
+    }
+}
+
 /// A constant definition
 #[derive(Debug, Clone)]
 pub struct ConstantDef {
