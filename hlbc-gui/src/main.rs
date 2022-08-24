@@ -1,21 +1,22 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
+use std::cell::RefCell;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::{env, fs};
 
 use eframe::egui::style::Margin;
-use eframe::egui::{CentralPanel, Frame, Id, LayerId, Rounding, TopBottomPanel, Ui, Vec2, Visuals};
-use eframe::{egui, NativeOptions};
-use egui_dock::{NodeIndex, Tree};
+use eframe::egui::{CentralPanel, Frame, Rounding, TopBottomPanel, Vec2, Visuals};
+use eframe::{egui, NativeOptions, Theme};
+use egui_dock::{DockSpace, NodeIndex, Tree};
 
 use hlbc::types::RefFun;
 use hlbc::Bytecode;
 
-use crate::views::CallgraphTab;
-use crate::views::DisassemblyTab;
-use crate::views::FunctionsTab;
-use crate::views::InfoTab;
+use crate::views::{
+    AppTab, CallgraphView, DecompilerView, DisassemblyView, FunctionsView, InfoTab,
+};
 
 mod views;
 
@@ -28,25 +29,37 @@ fn main() {
             ..Default::default()
         },
         Box::new(|cc| {
-            if cc.integration_info.prefer_dark_mode.unwrap_or(true) {
+            if cc
+                .integration_info
+                .system_theme
+                .map(|t| matches!(t, Theme::Dark))
+                .unwrap_or(true)
+            {
                 cc.egui_ctx.set_visuals(Visuals::dark());
             }
 
+            let args = env::args().skip(1).collect::<String>();
+            let ctx = Rc::new(RefCell::new(if args.is_empty() {
+                None
+            } else {
+                Some(AppCtx::new_from_file(PathBuf::from(args)))
+            }));
+
             // Dock tabs tree
             let mut tree = Tree::new(vec![
-                Box::new(DisassemblyTab::default()),
-                Box::new(CallgraphTab::default()),
+                InfoTab::default().make_tab(ctx.clone()),
+                DisassemblyView::default().make_tab(ctx.clone()),
             ]);
 
             tree.split_left(
                 NodeIndex::root(),
                 0.25,
-                vec![Box::new(FunctionsTab::default())],
+                vec![FunctionsView::default().make_tab(ctx.clone())],
             );
 
             // Dock tabs styling
             let mut style = egui_dock::Style::from_egui(cc.egui_ctx.style().as_ref());
-            style.tab_outline = style.tab_bar_background;
+            style.tab_outline_color = style.tab_bar_background_color;
             style.tab_rounding = Rounding {
                 nw: 1.0,
                 ne: 1.0,
@@ -54,14 +67,8 @@ fn main() {
                 se: 0.0,
             };
 
-            let args = env::args().skip(1).collect::<String>();
-
             Box::new(App {
-                app: if args.is_empty() {
-                    None
-                } else {
-                    Some(AppCtx::new_from_file(PathBuf::from(args)))
-                },
+                app: ctx,
                 tree,
                 style,
             })
@@ -71,9 +78,9 @@ fn main() {
 
 struct App {
     /// Some when a file is loaded
-    app: Option<AppCtx>,
+    app: Rc<RefCell<Option<AppCtx>>>,
     // Dock
-    tree: Tree<AppCtx>,
+    tree: Tree,
     style: egui_dock::Style,
 }
 
@@ -106,11 +113,11 @@ impl eframe::App for App {
                     ui.menu_button("File", |ui| {
                         if ui.button("Open").clicked() {
                             if let Some(file) = rfd::FileDialog::new().pick_file() {
-                                self.app = Some(AppCtx::new_from_file(file));
+                                *self.app.borrow_mut() = Some(AppCtx::new_from_file(file));
                             }
                         }
                         if ui.button("Close").clicked() {
-                            self.app = None;
+                            *self.app.borrow_mut() = None;
                         }
                     });
                     ui.menu_button("Views", |ui| {
@@ -120,31 +127,26 @@ impl eframe::App for App {
                         if ui.button("Disassembly").clicked() {
                             println!("open disassembly view");
                         }
+                        if ui.button("Decompiler").clicked() {
+                            self.tree[NodeIndex::root().right()]
+                                .append_tab(DecompilerView::default().make_tab(self.app.clone()));
+                        }
                         if ui.button("Info").clicked() {
+                            /*
                             self.tree.split_right(
                                 NodeIndex::root().left(),
                                 0.8,
                                 vec![Box::new(InfoTab::default())],
-                            );
+                            );*/
                         }
                     });
                 });
             });
 
-        if let Some(appctx) = self.app.as_mut() {
-            let layer_id = LayerId::background();
-            let max_rect = ctx.available_rect();
-            let clip_rect = ctx.available_rect();
-
-            let mut ui = Ui::new(
-                ctx.clone(),
-                layer_id,
-                Id::new("Docking space"),
-                max_rect,
-                clip_rect,
-            );
-            let id = ui.id();
-            egui_dock::show(&mut ui, id, &self.style, &mut self.tree, appctx);
+        if self.app.borrow().is_some() {
+            DockSpace::new(&mut self.tree)
+                .style(self.style.clone())
+                .show(ctx);
         } else {
             CentralPanel::default()
                 .frame(Frame::group(ctx.style().as_ref()).outer_margin(Margin::same(4.0)))

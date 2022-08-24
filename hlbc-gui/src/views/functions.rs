@@ -1,23 +1,23 @@
 use eframe::egui;
 use eframe::egui::style::Margin;
-use eframe::egui::{Frame, ScrollArea, TextStyle, Ui};
+use eframe::egui::{Frame, ScrollArea, TextStyle, Ui, WidgetText};
 use egui_dock::Tab;
 
 use hlbc::types::RefFun;
 
-use crate::AppCtx;
+use crate::{AppCtx, AppTab};
 
 #[derive(Default)]
-pub struct FunctionsTab {
+pub struct FunctionsView {
     show_natives: bool,
     show_std: bool,
     cache: Vec<RefFun>,
     cache_valid: bool,
 }
 
-impl Tab<AppCtx> for FunctionsTab {
-    fn title(&self) -> &str {
-        "ƒ Functions"
+impl AppTab for FunctionsView {
+    fn title(&self) -> WidgetText {
+        "ƒ Functions".into()
     }
 
     fn ui(&mut self, ui: &mut Ui, ctx: &mut AppCtx) {
@@ -36,40 +36,36 @@ impl Tab<AppCtx> for FunctionsTab {
             self.cache_valid = true;
         }
 
-        let margin = Margin::same(4.0);
-
-        Frame::none().inner_margin(margin).show(ui, |ui| {
-            ui.horizontal_wrapped(|ui| {
-                if ui
-                    .checkbox(&mut self.show_natives, "Show natives")
-                    .changed()
-                {
-                    self.cache_valid = false;
-                }
-                if ui.checkbox(&mut self.show_std, "Show stdlib").changed() {
-                    self.cache_valid = false;
-                }
-            });
-
-            ScrollArea::vertical()
-                .id_source("functions_scroll_area")
-                .auto_shrink([false, false])
-                .show_rows(
-                    ui,
-                    ui.text_style_height(&TextStyle::Body),
-                    self.cache.len(),
-                    |ui, range| {
-                        for f in range.map(|i| self.cache[i]) {
-                            let res = ui.selectable_label(
-                                ctx.selected_fn.map(|s| s == f).unwrap_or(false),
-                                f.display_header(&ctx.code),
-                            );
-                            if res.clicked() {
-                                ctx.selected_fn = Some(f);
-                            }
-                        }
-                    },
-                );
+        ui.horizontal_wrapped(|ui| {
+            if ui
+                .checkbox(&mut self.show_natives, "Show natives")
+                .changed()
+            {
+                self.cache_valid = false;
+            }
+            if ui.checkbox(&mut self.show_std, "Show stdlib").changed() {
+                self.cache_valid = false;
+            }
         });
+
+        ScrollArea::vertical()
+            .id_source("functions_scroll_area")
+            .auto_shrink([false, false])
+            .show_rows(
+                ui,
+                ui.text_style_height(&TextStyle::Body),
+                self.cache.len(),
+                |ui, range| {
+                    for f in range.map(|i| self.cache[i]) {
+                        let res = ui.selectable_label(
+                            ctx.selected_fn.map(|s| s == f).unwrap_or(false),
+                            f.display_header(&ctx.code),
+                        );
+                        if res.clicked() {
+                            ctx.selected_fn = Some(f);
+                        }
+                    }
+                },
+            );
     }
 }

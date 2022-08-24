@@ -1,23 +1,35 @@
+use std::collections::HashMap;
+
+use eframe::egui;
 use eframe::egui::style::Margin;
-use eframe::egui::{Area, DragValue, Frame, Ui, Widget};
+use eframe::egui::{
+    Area, Color32, DragValue, Frame, Pos2, ScrollArea, Sense, Stroke, Ui, Vec2, Widget, Window,
+};
+use eframe::epaint::CubicBezierShape;
 use egui_dock::Tab;
 
+use hlbc::analysis::graph::petgraph::visit::EdgeRef;
+use hlbc::analysis::graph::petgraph::visit::IntoEdgeReferences;
 use hlbc::analysis::graph::{call_graph, display_graph, Callgraph};
 use hlbc::types::RefFun;
 
+use crate::egui::Rect;
 use crate::AppCtx;
 
 #[derive(Default)]
-pub struct CallgraphTab {
+pub struct CallgraphView {
     max_depth: usize,
     graph: Option<Callgraph>,
 
     // Cache variables
     graph_fun: RefFun,
     graph_depth: usize,
+
+    // Graph area
+    pan: Vec2,
 }
 
-impl Tab<AppCtx> for CallgraphTab {
+impl CallgraphView {
     fn title(&self) -> &str {
         "Callgraph"
     }
@@ -44,19 +56,53 @@ impl Tab<AppCtx> for CallgraphTab {
                     .clamp_range(0..=20)
                     .ui(ui);
             });
+
             if let Some(cg) = &self.graph {
-                ui.code(display_graph(cg, &ctx.code).to_string());
-                Frame::canvas(ui.style()).show(ui, |ui| {
-                    for n in cg.nodes() {
-                        Area::new(n)
-                            .default_pos(ui.next_widget_position())
-                            .drag_bounds(ui.max_rect())
-                            .show(ui.ctx(), |ui| ui.label(n.display_header(&ctx.code)));
-                    }
-                });
+                //ui.code(display_graph(cg, &ctx.code).to_string());
+                let start = ui.next_widget_position().to_vec2();
+                ScrollArea::both()
+                    .id_source("graph_area")
+                    .auto_shrink([false, false])
+                    .show_viewport(ui, |ui, rect| {
+                        let mut nodes_pos = HashMap::new();
+                        for n in cg.nodes() {
+                            let pos = ui.next_widget_position();
+                            nodes_pos.insert(
+                                n,
+                                Area::new(n)
+                                    .default_pos(pos)
+                                    .drag_bounds(rect.translate(start))
+                                    .show(ui.ctx(), |ui| {
+                                        Frame::window(ui.style().as_ref())
+                                            .show(ui, |ui| ui.code(n.display_header(&ctx.code)))
+                                    })
+                                    .response
+                                    .rect,
+                            );
+                        }
+                        for e in cg.edge_references() {
+                            // Paint a nice bezier curve as the link between nodes
+                            let s = nodes_pos.get(&e.source()).unwrap().center_bottom();
+                            let t = nodes_pos.get(&e.target()).unwrap().center_top();
+                            let scale = ((t.x - s.x) / 2.0).max(30.0);
+                            let ctrl1 = s + Vec2::new(0.0, scale);
+                            let ctrl2 = t - Vec2::new(0.0, scale);
+                            let bezier = CubicBezierShape::from_points_stroke(
+                                [s, ctrl1, ctrl2, t],
+                                false,
+                                Color32::TRANSPARENT,
+                                Stroke::new(3.0, Color32::LIGHT_GRAY),
+                            );
+                            ui.painter_at(rect).add(bezier);
+                        }
+                    });
             } else {
                 ui.label("Select a function in the Functions view to view its bytecode");
             }
         });
     }
+}
+
+struct GraphArea {
+    pan: Vec2,
 }
