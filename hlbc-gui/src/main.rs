@@ -11,6 +11,7 @@ use eframe::egui::{CentralPanel, Frame, Rounding, TopBottomPanel, Vec2, Visuals}
 use eframe::{egui, NativeOptions, Theme};
 use egui_dock::{DockSpace, NodeIndex, Tree};
 
+use crate::egui::FontDefinitions;
 use hlbc::types::RefFun;
 use hlbc::Bytecode;
 

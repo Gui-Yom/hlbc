@@ -1,0 +1,635 @@
+%YAML 1.2
+---
+# http://www.sublimetext.com/docs/syntax.html
+# From https://github.com/clemos/haxe-sublime-bundle/blob/4455bd1375d831532b6b43d6ef7d13bbeee26715/Haxe.tmLanguage
+# Converted with sublime text (https://github.com/slimsag/Packages#adding-a-new-language)
+name: Haxe
+file_extensions:
+  - hx
+  - hxsl
+  - hscript
+scope: source.haxe.2
+contexts:
+  main:
+    - include: all
+  all:
+    - include: package
+    - include: import
+    - include: import-using
+    - include: type-abstract
+    - include: type-class
+    - include: type-enum
+    - include: type-interface
+    - include: type-typedef
+    - include: meta-static
+    - include: method
+    - include: variable
+    - include: block
+    - include: block-contents
+  arrays:
+    - match: '(\[)'
+      captures:
+        1: punctuation.definition.array.begin.haxe.2
+      push:
+        - meta_scope: meta.array.haxe.2
+        - match: '(\])'
+          captures:
+            1: punctuation.definition.array.end.haxe.2
+          pop: true
+        - include: block
+        - include: block-contents
+  block:
+    - match: '(\{)'
+      captures:
+        1: punctuation.definition.block.begin.haxe.2
+      push:
+        - match: '(\})'
+          captures:
+            1: punctuation.definition.block.end.haxe.2
+          pop: true
+        - include: block
+        - include: block-contents
+  block-contents:
+    - include: regex
+    - include: arrays
+    - include: parameters
+    - include: constants
+    - include: comments
+    - include: strings
+    - include: macro
+    - include: modifiers
+    - include: keywords
+    - include: keywords-magic
+    - include: keywords-reification
+    - include: conditional-compilation
+    - include: operator-assignment
+    - include: operators
+    - include: punctuation-separator
+    - include: punctuation-terminator
+    - include: punctuation-brackets
+    - include: support-class-name
+  comments:
+    - match: (/\*)
+      captures:
+        1: punctuation.definition.comment.haxe.2
+      push:
+        - meta_scope: comment.block.haxe.2
+        - match: (\*/)
+          captures:
+            1: punctuation.definition.comment.haxe.2
+          pop: true
+    - match: (//).*$\n?
+      scope: comment.line.double-slash.haxe.2
+      captures:
+        1: punctuation.definition.comment.haxe.2
+  conditional-compilation:
+    - match: (#(end|else))
+      scope: keyword.control.directive.conditional.haxe.2
+    - match: '((#(if|elseif))\s+([a-zA-Z0-9_]*)\s)'
+      captures:
+        0: meta.control.directive.conditional.haxe.2
+        2: keyword.control.directive.conditional.haxe.2
+    - match: ((#(if|elseif))\s*?\()
+      captures:
+        0: meta.control.directive.conditional.haxe.2
+        2: keyword.control.directive.conditional.haxe.2
+      push:
+        - meta_scope: meta.control.directive.conditional.haxe.2
+        - match: (\))
+          pop: true
+    - match: '(#([a-zA-Z0-9_]*))\s'
+      scope: meta.control.directive.conditional.haxe.2
+  constants:
+    - match: \b(true|false|null)\b
+      scope: constant.language.haxe.2
+    - match: '\b((0(x|X)[0-9a-fA-F]*)|(([0-9]+\.?[0-9]*)|(\.[0-9]+))((e|E)(\+|-)?[0-9]+)?)\b'
+      scope: constant.numeric.haxe.2
+  entity-name-class:
+    - match: '\b([_A-Za-z]\w*)\b'
+      scope: entity.name.type.class.haxe.2
+  entity-name-function:
+    - match: '([_A-Za-z]\w*)\b(?=\s*[\(])'
+      scope: entity.name.function.haxe.2
+  import:
+    - match: \b(import)\b
+      captures:
+        1: storage.type.import.haxe.2
+      push:
+        - meta_scope: meta.import.haxe.2
+        - match: (;)
+          captures:
+            1: punctuation.terminator.haxe.2
+          pop: true
+        - match: '((\b[a-z]\w*\.)*)((\b[A-Z]\w*\.?|\*)+)(\b[_a-z]\w*|\*)?'
+          captures:
+            1: support.package.haxe.2
+            3: support.class.haxe.2
+  import-using:
+    - match: \b(using)\b
+      captures:
+        1: storage.type.using.haxe.2
+      push:
+        - meta_scope: meta.using.haxe.2
+        - match: (;)
+          captures:
+            1: punctuation.terminator.haxe.2
+          pop: true
+        - match: '(([a-z]\w*\.)*)(([A-Z]\w*\.?)+)'
+          captures:
+            1: support.package.haxe.2
+            3: support.class.haxe.2
+  keywords:
+    - match: \b(try|catch|throw)\b
+      scope: keyword.control.catch-exception.haxe.2
+    - match: \b(if|return|while|for|return|break|case|default|continue|do|while|for|switch|if|else)\b
+      scope: keyword.control.haxe.flow-control.2
+    - match: (\.\.\.)
+      scope: keyword.control.directive.haxe.2
+    - match: \b(cast|untyped)\b
+      scope: keyword.other.untyped.haxe.2
+    - match: \btrace\b
+      scope: keyword.other.trace.haxe.2
+    - match: \b(this|super)\b
+      scope: variable.language.haxe.2
+    - match: \bnew\b
+      scope: keyword.control.new.haxe.2
+    - match: \bvar\b
+      scope: storage.type.variable.haxe.2
+    - match: \bfunction\b
+      scope: storage.type.function.haxe.2
+    - match: \b(abstract|class|enum|interface|typedef)\b
+      scope: storage.type.class.haxe.2
+  keywords-abstract:
+    - match: \b(from|to)\b
+      scope: keyword.other.haxe.2
+  keywords-accessor:
+    - match: \b(default|get|set|dynamic|never|null)\b
+      scope: keyword.other.haxe.2
+  keywords-magic:
+    - match: \b__\w*__\b
+      scope: support.function.magic.haxe.2
+    - match: \bprototype\b
+      scope: support.variable.magic.haxe.2
+  keywords-reification:
+    - match: '(\$)([iea])\('
+      captures:
+        1: punctuation.definition.variable.haxe.2
+        2: support.reification.haxe.2
+    - match: '((\$)([a-zA-Z.]*))'
+      captures:
+        2: punctuation.definition.variable.haxe.2
+        3: support.reification.haxe.2
+  macro:
+    - match: ((@:)(require|final|hack|native|coreApi|fakeEnum|macro|build|keep|keepSub|overload|extern|optional|feature|noCompletion|noUsing|allow|access|generic|publicFields|expose|defineFeature|runtime|initPackage|bind|bitmap|file|font|sound|ns|protected|getter|setter|meta|debug|noDebug|headerCode|headerClassCode|cppFileCode|functionCode|functionTailCode|buildXml|cppNamespaceCode|headerNamespaceCode|noStack|depend|include|internal|volatile|transient|functionBody|classContents|remove)\b)
+      captures:
+        2: punctuation.definition.variable.haxe.2
+        3: storage.modifier.macro.haxe.2
+    - match: '((@:?)([a-zA-Z_]*))'
+      captures:
+        2: punctuation.definition.variable.haxe.2
+        3: support.macro.haxe.2
+  meta-static:
+    - match: (static)
+      captures:
+        1: storage.modifier.haxe.2
+      push:
+        - meta_scope: meta.static.haxe.2
+        - match: '(?<=[\};])'
+          pop: true
+        - include: modifiers
+        - include: method
+        - include: variable
+        - include: punctuation-terminator
+  method:
+    - match: (?=function)
+      push:
+        - meta_scope: meta.method.haxe.2
+        - match: '(?<=[\};])'
+          pop: true
+        - include: method-name
+        - include: method-name-post
+        - include: method-block
+  method-block:
+    - match: '(?<=\{)'
+      captures:
+        1: punctuation.definition.block.begin.haxe.2
+      push:
+        - meta_scope: meta.method.block.haxe.2
+        - match: '(\})'
+          captures:
+            1: punctuation.definition.block.end.haxe.2
+          pop: true
+        - include: block
+        - include: block-contents
+  method-name:
+    - match: \b(function)\b
+      captures:
+        1: storage.type.function.haxe.2
+      push:
+        - meta_scope: meta.method.name.haxe.2
+        - match: '([_A-Za-z]\w*)'
+          captures:
+            1: entity.name.function.haxe.2
+          pop: true
+  method-name-post:
+    - match: (?<=\w)
+      push:
+        - match: '(\{)|(;)'
+          captures:
+            1: punctuation.definition.block.begin.haxe.2
+            2: punctuation.terminator.haxe.2
+          pop: true
+        - include: block
+        - include: block-contents
+  modifiers:
+    - match: \b(public|private|static|dynamic|inline|macro|extern|override)\b
+      scope: storage.modifier.haxe.2
+  modifiers-inheritance:
+    - match: \b(implements|extends)\b
+      scope: storage.modifier.haxe.2
+  operator-assignment:
+    - match: (=)
+      scope: keyword.operator.assignment.haxe.2
+  operator-optional:
+    - match: (\?)(?!\s)
+      scope: punctuation.definition.variable.haxe.2
+  operators:
+    - match: (!|&&|\|\|)
+      scope: keyword.operator.logical.haxe.2
+    - match: (~|&|\||\^|<<|>>|>>>)
+      scope: keyword.operator.bitwise.haxe.2
+    - match: (==|!=|<=|>=|<>|<|>)
+      scope: keyword.operator.comparison.haxe.2
+    - match: (\-\-|\+\+)
+      scope: keyword.operator.increment-decrement.haxe.2
+    - match: (\-|\+|\*|\/|%)
+      scope: keyword.operator.arithmetic.haxe.2
+  package:
+    - match: '\b(package)(\s+([\w.*]*))?\s*(;)'
+      scope: meta.package.haxe.2
+      captures:
+        1: storage.type.package.haxe.2
+        2: support.package.haxe.2
+        4: punctuation.terminator.haxe.2
+  parameters:
+    - match: (\()
+      captures:
+        1: punctuation.definition.parameters.begin.haxe.2
+      push:
+        - meta_scope: meta.parameters.haxe.2
+        - match: (\))
+          captures:
+            1: punctuation.definition.parameters.end.haxe.2
+          pop: true
+        - include: operator-optional
+        - include: block
+        - include: block-contents
+  punctuation-brackets:
+    - match: '([\(\<\)\>])'
+      scope: punctuation.definition.other.haxe.2
+  punctuation-separator:
+    - match: '([,:.?])'
+      scope: punctuation.separator.haxe.2
+  punctuation-terminator:
+    - match: ;
+      scope: punctuation.terminator.haxe.2
+  regex:
+    - match: ~/
+      captures:
+        1: string.regexp.begin.haxe.2
+      push:
+        - meta_scope: string.regexp.haxe.2
+        - match: '(/[gimsu]*)|(\n$)'
+          captures:
+            1: string.regexp.end.haxe.2
+            2: invalid.illegal.haxe.2
+          pop: true
+        - match: \\.
+          scope: constant.character.escape.haxe.2
+  strings:
+    - match: '"'
+      captures:
+        0: punctuation.definition.string.begin.haxe.2
+      push:
+        - meta_scope: string.quoted.double.haxe.2
+        - match: '"'
+          captures:
+            0: punctuation.definition.string.end.haxe.2
+          pop: true
+        - match: \\.
+          scope: constant.character.escape.haxe.2
+    - match: "'"
+      captures:
+        0: punctuation.definition.string.begin.haxe.2
+      push:
+        - meta_scope: string.quoted.single.haxe.2
+        - match: "'"
+          captures:
+            0: punctuation.definition.string.end.haxe.2
+          pop: true
+        - match: \\.
+          scope: constant.character.escape.haxe.2
+        - match: \$\$
+          scope: constant.character.escape.haxe.2
+        - match: '(\$)(\{)([^}]*)(\})'
+          comment: 'String interpolation : "${test.ole}"'
+          captures:
+            1: variable.other.haxe.2
+            2: variable.other.haxe.2
+            3: variable.other.haxe.2
+            4: variable.other.haxe.2
+        - match: '(\$)([\w]*)'
+          comment: 'String interpolation : "$test"'
+          captures:
+            1: variable.other.haxe.2
+            2: variable.other.haxe.2
+  support-class-name:
+    - match: '\b(([a-z][a-zA-Z0-9]*\.)*)(([A-Z]\w*\.?)+)\b'
+      captures:
+        1: support.package.haxe.2
+        3: support.class.haxe.2
+  type-abstract:
+    - match: (?=abstract)
+      push:
+        - meta_scope: meta.type.abstract.haxe.2
+        - match: '(?<=\})|(;)'
+          captures:
+            1: punctuation.terminator.haxe.2
+          pop: true
+        - include: type-abstract-name
+        - include: type-abstract-name-post
+        - include: type-abstract-block
+  type-abstract-block:
+    - match: '(?<=\{)'
+      push:
+        - meta_scope: meta.type.block.haxe.2
+        - match: '(\})'
+          captures:
+            1: punctuation.definition.block.end.haxe.2
+          pop: true
+        - include: meta-static
+        - include: method
+        - include: modifiers
+        - include: variable
+        - include: block
+        - include: block-contents
+  type-abstract-name:
+    - match: \b(abstract)\b
+      captures:
+        1: storage.type.class.haxe.2
+      push:
+        - meta_scope: meta.type.name.haxe.2
+        - match: '([_A-Za-z]\w*)'
+          captures:
+            1: entity.name.type.class.haxe.2
+          pop: true
+  type-abstract-name-post:
+    - match: (?<=\w)
+      push:
+        - match: '([\{;])'
+          captures:
+            1: punctuation.definition.block.begin.haxe.2
+          pop: true
+        - include: parameters
+        - include: keywords-abstract
+        - include: punctuation-brackets
+        - include: punctuation-separator
+        - include: support-class-name
+  type-class:
+    - match: (?=class)
+      push:
+        - meta_scope: meta.type.class.haxe.2
+        - match: '(?<=\})|(;)'
+          captures:
+            1: punctuation.terminator.haxe.2
+          pop: true
+        - include: type-class-name
+        - include: type-class-name-post
+        - include: type-class-block
+  type-class-block:
+    - match: '(?<=\{)'
+      push:
+        - meta_scope: meta.type.block.haxe.2
+        - match: '(\})'
+          captures:
+            1: punctuation.definition.block.end.haxe.2
+          pop: true
+        - include: meta-static
+        - include: method
+        - include: modifiers
+        - include: variable
+        - include: block
+        - include: block-contents
+  type-class-name:
+    - match: \b(class)\b
+      captures:
+        1: storage.type.class.haxe.2
+      push:
+        - meta_scope: meta.type.name.haxe.2
+        - match: '([_A-Za-z]\w*)'
+          captures:
+            1: entity.name.type.class.haxe.2
+          pop: true
+  type-class-name-post:
+    - match: (?<=\w)
+      push:
+        - match: '([\{;])'
+          captures:
+            1: punctuation.definition.block.begin.haxe.2
+          pop: true
+        - include: type-parameters
+        - include: modifiers-inheritance
+        - include: punctuation-brackets
+        - include: punctuation-separator
+        - include: support-class-name
+  type-enum:
+    - match: (?=enum)
+      push:
+        - meta_scope: meta.type.enum.haxe.2
+        - match: '(?<=\})|(;)'
+          captures:
+            1: punctuation.terminator.haxe.2
+          pop: true
+        - include: type-enum-name
+        - include: type-enum-name-post
+        - include: type-enum-block
+  type-enum-block:
+    - match: '(?<=\{)'
+      push:
+        - meta_scope: meta.type.block.haxe.2
+        - match: '(\})'
+          captures:
+            1: punctuation.definition.block.end.haxe.2
+          pop: true
+        - include: type-parameters
+        - include: block
+        - include: block-contents
+  type-enum-name:
+    - match: \b(enum)\b
+      captures:
+        1: storage.type.class.haxe.2
+      push:
+        - meta_scope: meta.type.name.haxe.2
+        - match: '([_A-Za-z]\w*)'
+          captures:
+            1: entity.name.type.class.haxe.2
+          pop: true
+  type-enum-name-post:
+    - match: (?<=\w)
+      push:
+        - match: '([\{;])'
+          captures:
+            1: punctuation.definition.block.begin.haxe.2
+          pop: true
+        - include: type-parameters
+        - include: punctuation-brackets
+        - include: punctuation-separator
+        - include: support-class-name
+  type-interface:
+    - match: (?=interface)
+      push:
+        - meta_scope: meta.type.interface.haxe.2
+        - match: '(?<=\})|(;)'
+          captures:
+            1: punctuation.terminator.haxe.2
+          pop: true
+        - include: type-interface-name
+        - include: type-interface-name-post
+        - include: type-interface-block
+  type-interface-block:
+    - match: '(?<=\{)'
+      push:
+        - meta_scope: meta.type.block.haxe.2
+        - match: '(\})'
+          captures:
+            1: punctuation.definition.block.end.haxe.2
+          pop: true
+        - include: method
+        - include: variable
+        - include: block
+        - include: block-contents
+  type-interface-name:
+    - match: \b(interface)\b
+      captures:
+        1: storage.type.class.haxe.2
+      push:
+        - meta_scope: meta.type.name.haxe.2
+        - match: '([_A-Za-z]\w*)'
+          captures:
+            1: entity.name.type.class.haxe.2
+          pop: true
+  type-interface-name-post:
+    - match: (?<=\w)
+      push:
+        - match: '([\{;])'
+          captures:
+            1: punctuation.definition.block.begin.haxe.2
+          pop: true
+        - include: modifiers-inheritance
+        - include: punctuation-brackets
+        - include: punctuation-separator
+        - include: support-class-name
+  type-parameters:
+    - match: (\<)
+      captures:
+        1: punctuation.definition.parameters.begin.haxe.2
+      push:
+        - meta_scope: meta.type.parameters.haxe.2
+        - match: (\>)
+          captures:
+            1: punctuation.definition.parameters.end.haxe.2
+          pop: true
+        - include: block
+        - include: block-contents
+  type-typedef:
+    - match: (?=typedef)
+      push:
+        - meta_scope: meta.type.typedef.haxe.2
+        - match: '(?<=\})|(;)'
+          captures:
+            1: punctuation.terminator.haxe.2
+          pop: true
+        - include: type-typedef-name
+        - include: type-typedef-name-post
+        - include: type-typedef-block
+  type-typedef-block:
+    - match: '(?<=\{)'
+      push:
+        - meta_scope: meta.type.block.haxe.2
+        - match: '(\})'
+          captures:
+            1: punctuation.definition.block.end.haxe.2
+          pop: true
+        - include: block
+        - include: block-contents
+  type-typedef-name:
+    - match: \b(typedef)\b
+      captures:
+        1: storage.type.class.haxe.2
+      push:
+        - meta_scope: meta.type.name.haxe.2
+        - match: '([_A-Za-z]\w*)'
+          captures:
+            1: entity.name.type.class.haxe.2
+          pop: true
+  type-typedef-name-post:
+    - match: (?<=\w)
+      push:
+        - match: '(\{)|(?=;)'
+          captures:
+            1: punctuation.definition.block.begin.haxe.2
+          pop: true
+        - include: punctuation-brackets
+        - include: punctuation-separator
+        - include: operator-assignment
+        - include: support-class-name
+  variable:
+    - match: (?=var)
+      push:
+        - meta_scope: meta.variable.haxe.2
+        - match: (;)
+          captures:
+            1: punctuation.terminator.haxe.2
+          pop: true
+        - include: variable-name
+        - include: variable-assign
+        - include: variable-name-post
+  variable-accessors:
+    - match: (\()
+      captures:
+        1: punctuation.definition.parameters.begin.haxe.2
+      push:
+        - meta_scope: meta.parameters.haxe.2
+        - match: (\))
+          captures:
+            1: punctuation.definition.parameters.end.haxe.2
+          pop: true
+        - include: operator-optional
+        - include: keywords-accessor
+        - include: punctuation-separator
+  variable-assign:
+    - match: (=)
+      captures:
+        1: keyword.operator.assignment.haxe.2
+      push:
+        - match: (?=;)
+          pop: true
+        - include: block
+        - include: block-contents
+  variable-name:
+    - match: \b(var)\b
+      captures:
+        1: storage.type.variable.haxe.2
+      push:
+        - meta_scope: meta.variable.name.haxe.2
+        - match: '([_a-zA-Z]\w*)'
+          captures:
+            1: entity.name.variable.haxe.2
+          pop: true
+  variable-name-post:
+    - match: (?<=\w)
+      push:
+        - match: (?=;)|(?==)
+          pop: true
+        - include: variable-accessors
+        - include: block-contents
