@@ -123,6 +123,12 @@ impl eframe::App for App {
                     if ui.button("Options").clicked() {
                         self.options_window_open = !self.options_window_open;
                     }
+                    ui.menu_button("Help", |ui| {
+                        if ui.button("Wiki").clicked() {
+                            webbrowser::open("https://github.com/Gui-Yom/hlbc/wiki")
+                                .expect("Failed to open web browser");
+                        }
+                    });
                     if ui.button("About").clicked() {
                         self.about_window_open = !self.about_window_open;
                     }
@@ -186,8 +192,12 @@ impl AppCtxHandle {
         self.0.borrow_mut()
     }
 
+    fn file(&self) -> Ref<PathBuf> {
+        Ref::map(self.lock(), |app| &app.file)
+    }
+
     fn code(&self) -> Ref<Bytecode> {
-        Ref::map(RefCell::borrow(self.0.as_ref()), |app| &app.code)
+        Ref::map(self.lock(), |app| &app.code)
     }
 
     fn open_tab(&self, tab: impl AppTab) {

@@ -49,6 +49,8 @@ pub struct Bytecode {
     /// String constant pool
     pub strings: Vec<String>,
     /// Bytes constant pool
+    ///
+    /// *Since bytecode v5*
     pub bytes: Option<(Vec<u8>, Vec<usize>)>,
     /// *Debug* file names constant pool
     pub debug_files: Option<Vec<String>>,
@@ -61,6 +63,8 @@ pub struct Bytecode {
     /// Code functions pool
     pub functions: Vec<Function>,
     /// Constants, initializers for globals
+    ///
+    /// *Since bytecode v4*
     pub constants: Option<Vec<ConstantDef>>,
 
     // Fields below are not part of the data.
