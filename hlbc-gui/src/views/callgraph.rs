@@ -1,20 +1,16 @@
 use std::collections::HashMap;
+use std::ops::Deref;
 
-use eframe::egui;
 use eframe::egui::style::Margin;
-use eframe::egui::{
-    Area, Color32, DragValue, Frame, Pos2, ScrollArea, Sense, Stroke, Ui, Vec2, Widget, Window,
-};
+use eframe::egui::{Area, Color32, DragValue, Frame, ScrollArea, Stroke, Ui, Vec2, Widget};
 use eframe::epaint::CubicBezierShape;
-use egui_dock::Tab;
 
 use hlbc::analysis::graph::petgraph::visit::EdgeRef;
 use hlbc::analysis::graph::petgraph::visit::IntoEdgeReferences;
-use hlbc::analysis::graph::{call_graph, display_graph, Callgraph};
+use hlbc::analysis::graph::{call_graph, Callgraph};
 use hlbc::types::RefFun;
 
-use crate::egui::Rect;
-use crate::AppCtx;
+use crate::AppCtxHandle;
 
 #[derive(Default)]
 pub struct CallgraphView {
@@ -34,11 +30,11 @@ impl CallgraphView {
         "Callgraph"
     }
 
-    fn ui(&mut self, ui: &mut Ui, ctx: &mut AppCtx) {
+    fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
         // Update cached graph
-        if let Some(sel) = ctx.selected_fn {
+        if let Some(sel) = ctx.selected_fn() {
             if sel != self.graph_fun || self.graph_depth != self.max_depth {
-                self.graph = Some(call_graph(&ctx.code, sel, self.max_depth));
+                self.graph = Some(call_graph(ctx.code().deref(), sel, self.max_depth));
                 self.graph_fun = sel;
                 self.graph_depth = self.max_depth;
             }
@@ -73,8 +69,9 @@ impl CallgraphView {
                                     .default_pos(pos)
                                     .drag_bounds(rect.translate(start))
                                     .show(ui.ctx(), |ui| {
-                                        Frame::window(ui.style().as_ref())
-                                            .show(ui, |ui| ui.code(n.display_header(&ctx.code)))
+                                        Frame::window(ui.style().as_ref()).show(ui, |ui| {
+                                            ui.code(n.display_header(ctx.code().deref()))
+                                        })
                                     })
                                     .response
                                     .rect,
@@ -101,8 +98,4 @@ impl CallgraphView {
             }
         });
     }
-}
-
-struct GraphArea {
-    pan: Vec2,
 }

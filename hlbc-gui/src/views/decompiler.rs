@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{FontStyle, ThemeSet};
 use syntect::parsing::{SyntaxDefinition, SyntaxSet, SyntaxSetBuilder};
@@ -10,7 +12,7 @@ use hlbc_decompiler::fmt::FormatOptions;
 use crate::egui::text::{LayoutJob, LayoutSection};
 use crate::egui::util::cache::{ComputerMut, FrameCache};
 use crate::egui::{Color32, FontId, Stroke, TextEdit, TextFormat, Ui, WidgetText};
-use crate::{AppCtx, AppTab};
+use crate::{AppCtxHandle, AppTab};
 
 #[derive(Default)]
 pub(crate) struct DecompilerView {
@@ -24,18 +26,18 @@ impl AppTab for DecompilerView {
         "Decompilation output".into()
     }
 
-    fn ui(&mut self, ui: &mut Ui, ctx: &mut AppCtx) {
-        if ctx.selected_fn != self.cache_selected {
-            self.output = match ctx.selected_fn {
-                Some(ptr) => match ptr.resolve(&ctx.code) {
-                    FunPtr::Fun(func) => decompile_function(&ctx.code, func)
-                        .display(&ctx.code, &FormatOptions::new("  "))
+    fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
+        if ctx.selected_fn() != self.cache_selected {
+            self.output = match ctx.selected_fn() {
+                Some(ptr) => match ptr.resolve(ctx.code().deref()) {
+                    FunPtr::Fun(func) => decompile_function(ctx.code().deref(), func)
+                        .display(ctx.code().deref(), &FormatOptions::new("  "))
                         .to_string(),
-                    FunPtr::Native(n) => n.display_header(&ctx.code),
+                    FunPtr::Native(n) => n.display_header(ctx.code().deref()),
                 },
                 None => String::new(),
             };
-            self.cache_selected = ctx.selected_fn;
+            self.cache_selected = ctx.selected_fn();
         }
 
         // TextEdit will show us text we can edit (we don't want that)

@@ -3,17 +3,17 @@ use eframe::egui::Ui;
 
 use crate::egui::WidgetText;
 use crate::views::AppTab;
-use crate::AppCtx;
+use crate::AppCtxHandle;
 
 #[derive(Default)]
-pub struct InfoTab;
+pub(crate) struct InfoTab;
 
 impl AppTab for InfoTab {
     fn title(&self) -> WidgetText {
         "🛈 Info".into()
     }
 
-    fn ui(&mut self, ui: &mut Ui, ctx: &mut AppCtx) {
+    fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
         egui::ScrollArea::vertical()
             .id_source("info_scroll_area")
             .show(ui, |ui| {
@@ -22,10 +22,10 @@ impl AppTab for InfoTab {
                     .num_columns(2)
                     .show(ui, |ui| {
                         ui.label("File");
-                        ui.label(ctx.file.to_str().unwrap());
+                        //ui.label(ctx.file.to_str().unwrap());
                         ui.end_row();
                         ui.label("Bytecode version");
-                        ui.label(ctx.code.version.to_string());
+                        ui.label(ctx.code().version.to_string());
                         ui.end_row();
                     });
             });
