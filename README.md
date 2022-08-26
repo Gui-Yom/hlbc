@@ -1,5 +1,5 @@
 <div align="center">
-    <h1><b>H</b>ash<b>l</b>ink <b>b</b>yte<b>c</b>ode</h1>
+    <h1><b>H</b>ash<b>l</b>ink <b>b</b>yte<b>c</b>ode tools</h1>
     <a href="https://crates.io/crates/hlbc">
         <img src="https://img.shields.io/crates/v/hlbc?label=hlbc">
     </a>
@@ -23,15 +23,15 @@
 - `hlbc-cli/` : CLI frontend for `hlbc`
 - `hlbc-decompiler/` : Decompiler library
 - `hlbc-derive/` : helper proc macros for hlbc
+- `hlbc-gui/` : Experimental GUI to explore bytecode visually
 
 ## Wiki
 
 A wiki detailing the specifics of Hashlink bytecode is available [here](https://github.com/Gui-Yom/hlbc/wiki) or by
-using the command `wiki`.
+using the command `wiki` in the CLI.
 
-## Planned features
+## Planned
 
-- GUI
 - C API
 
 ## Credits
