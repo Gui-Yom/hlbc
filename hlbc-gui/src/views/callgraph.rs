@@ -32,7 +32,8 @@ impl CallgraphView {
 
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
         // Update cached graph
-        if let Some(sel) = ctx.selected_fn() {
+        /*
+        if let Some(sel) = ctx.selected() {
             if sel != self.graph_fun || self.graph_depth != self.max_depth {
                 self.graph = Some(call_graph(ctx.code().deref(), sel, self.max_depth));
                 self.graph_fun = sel;
@@ -41,7 +42,7 @@ impl CallgraphView {
         } else {
             self.graph = None;
             self.graph_fun = RefFun(0);
-        }
+        }*/
 
         let margin = Margin::same(4.0);
 

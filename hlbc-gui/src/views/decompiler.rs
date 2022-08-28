@@ -1,61 +1,77 @@
 use std::ops::Deref;
 
+use eframe::egui::text::{LayoutJob, LayoutSection};
+use eframe::egui::util::cache::{ComputerMut, FrameCache};
+use eframe::egui::{
+    Color32, FontId, RichText, ScrollArea, Stroke, TextEdit, TextFormat, Ui, WidgetText,
+};
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{FontStyle, ThemeSet};
 use syntect::parsing::{SyntaxDefinition, SyntaxSet, SyntaxSetBuilder};
 use syntect::util::LinesWithEndings;
 
 use hlbc::types::{FunPtr, RefFun};
-use hlbc_decompiler::decompile_function;
 use hlbc_decompiler::fmt::FormatOptions;
+use hlbc_decompiler::{decompile_class, decompile_function};
 
-use crate::egui::text::{LayoutJob, LayoutSection};
-use crate::egui::util::cache::{ComputerMut, FrameCache};
-use crate::egui::{Color32, FontId, Stroke, TextEdit, TextFormat, Ui, WidgetText};
-use crate::{AppCtxHandle, AppTab};
+use crate::{AppCtxHandle, AppTab, ItemSelection};
 
 #[derive(Default)]
 pub(crate) struct DecompilerView {
     output: String,
     // Cache key for decompilation
-    cache_selected: Option<RefFun>,
+    cache_selected: ItemSelection,
 }
 
 impl AppTab for DecompilerView {
     fn title(&self) -> WidgetText {
-        "Decompilation output".into()
+        RichText::new("Decompilation output")
+            .color(Color32::WHITE)
+            .into()
     }
 
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
-        if ctx.selected_fn() != self.cache_selected {
-            self.output = match ctx.selected_fn() {
-                Some(ptr) => match ptr.resolve(ctx.code().deref()) {
-                    FunPtr::Fun(func) => decompile_function(ctx.code().deref(), func)
-                        .display(ctx.code().deref(), &FormatOptions::new("  "))
+        if ctx.selected() != self.cache_selected {
+            let code = ctx.code();
+            let code = code.deref();
+
+            self.output = match ctx.selected() {
+                ItemSelection::Fun(fun) => match fun.resolve(code) {
+                    FunPtr::Fun(func) => decompile_function(code, func)
+                        .display(code, &FormatOptions::new("  "))
                         .to_string(),
-                    FunPtr::Native(n) => n.display_header(ctx.code().deref()),
+                    FunPtr::Native(n) => n.display_header(code),
                 },
-                None => String::new(),
+                ItemSelection::Class(t) => {
+                    decompile_class(code, t.resolve_as_obj(&code.types).unwrap())
+                        .display(code, &FormatOptions::new("  "))
+                        .to_string()
+                }
+                ItemSelection::None => String::new(),
             };
-            self.cache_selected = ctx.selected_fn();
+            self.cache_selected = ctx.selected();
         }
 
-        // TextEdit will show us text we can edit (we don't want that)
-        // We need to pass a mut reference to an immutable str
-        ui.add(
-            TextEdit::multiline(&mut self.output.as_ref())
-                .code_editor()
-                .lock_focus(false)
-                .layouter(&mut |ui, code, _wrap| {
-                    let job = {
-                        let mut memory = ui.memory();
-                        let highlight_cache =
-                            memory.caches.cache::<FrameCache<LayoutJob, Highlighter>>();
-                        highlight_cache.get(("base16-mocha.dark", code, "hx"))
-                    };
-                    ui.fonts().layout_job(job)
-                }),
-        );
+        ScrollArea::both()
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                // TextEdit will show us text we can edit (we don't want that)
+                // We need to pass a mut reference to an immutable str
+                ui.add(
+                    TextEdit::multiline(&mut self.output.as_ref())
+                        .code_editor()
+                        .lock_focus(false)
+                        .layouter(&mut |ui, code, _wrap| {
+                            let job = {
+                                let mut memory = ui.memory();
+                                let highlight_cache =
+                                    memory.caches.cache::<FrameCache<LayoutJob, Highlighter>>();
+                                highlight_cache.get(("base16-mocha.dark", code, "hx"))
+                            };
+                            ui.fonts().layout_job(job)
+                        }),
+                );
+            });
     }
 }
 

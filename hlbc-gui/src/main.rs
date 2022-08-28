@@ -9,12 +9,12 @@ use std::{env, fs};
 use eframe::egui::style::Margin;
 use eframe::egui::{CentralPanel, Frame, Rounding, TopBottomPanel, Vec2, Visuals};
 use eframe::{egui, NativeOptions, Theme};
-use egui_dock::{DockSpace, NodeIndex, Tab, Tree};
+use egui_dock::{DockArea, NodeIndex, Tab, Tree};
 
-use hlbc::types::RefFun;
+use hlbc::types::{RefFun, RefType};
 use hlbc::Bytecode;
 
-use crate::views::{AppTab, FunctionsView, InfoTab};
+use crate::views::{AppTab, ClassesView, FunctionsView, InfoTab};
 
 mod views;
 
@@ -157,7 +157,7 @@ impl eframe::App for App {
             });
 
         if self.ctx.is_some() {
-            DockSpace::new(&mut self.tree)
+            DockArea::new(&mut self.tree)
                 .style(self.style.clone())
                 .show(ctx);
         } else {
@@ -174,7 +174,7 @@ impl eframe::App for App {
 
 /// Cheaply cloneable, for single threaded usage.
 ///
-/// Usage warning ! The methods 'lock' the inner RefCell immutably and mutably.
+/// Usage warning ! The methods 'lock' the inner RefCell immutably and mutably (RW lock).
 /// Be careful of guards (Ref<> and RefMut<>) lifetimes.
 #[derive(Clone)]
 struct AppCtxHandle(Rc<RefCell<AppCtx>>);
@@ -188,6 +188,7 @@ impl AppCtxHandle {
         self.0.borrow()
     }
 
+    /// mut lock
     fn lock_mut(&self) -> RefMut<AppCtx> {
         self.0.borrow_mut()
     }
@@ -200,30 +201,33 @@ impl AppCtxHandle {
         Ref::map(self.lock(), |app| &app.code)
     }
 
+    /// mut lock
     fn open_tab(&self, tab: impl AppTab) {
-        self.0.borrow_mut().new_tab = Some(tab.make_tab(self.clone()));
+        self.lock_mut().new_tab = Some(tab.make_tab(self.clone()));
     }
 
-    fn new_tab(&self) -> Option<Tab> {
-        self.0.borrow_mut().new_tab.take()
+    /// mut lock
+    fn new_tab(&self) -> Option<Box<dyn Tab>> {
+        self.lock_mut().new_tab.take()
     }
 
-    fn selected_fn(&self) -> Option<RefFun> {
-        self.lock().selected_fn.clone()
+    fn selected(&self) -> ItemSelection {
+        self.lock().selected.clone()
     }
 
-    fn set_selected_fn(&self, fun: RefFun) {
-        self.0.borrow_mut().selected_fn = Some(fun);
+    /// mut lock
+    fn set_selected(&self, s: ItemSelection) {
+        self.lock_mut().selected = s;
     }
 }
 
 struct AppCtx {
     file: PathBuf,
     code: Bytecode,
-    selected_fn: Option<RefFun>,
+    selected: ItemSelection,
     /// To open a tab from another tab.
     /// This can't be done directly because this would need a mutable reference to a tree and the tree owns the tab.
-    new_tab: Option<Tab>,
+    new_tab: Option<Box<dyn Tab>>,
 }
 
 impl AppCtx {
@@ -235,7 +239,7 @@ impl AppCtx {
         AppCtx {
             file,
             code,
-            selected_fn: None,
+            selected: ItemSelection::None,
             new_tab: None,
         }
     }
@@ -249,5 +253,19 @@ fn default_tabs_ui(ctx: AppCtxHandle) -> Tree {
         0.20,
         vec![FunctionsView::default().make_tab(ctx.clone())],
     );
+    tree.split_below(
+        NodeIndex::root().right(),
+        0.5,
+        vec![ClassesView::default().make_tab(ctx.clone())],
+    );
+
     tree
+}
+
+#[derive(Clone, Default, Copy, Eq, PartialEq)]
+enum ItemSelection {
+    Fun(RefFun),
+    Class(RefType),
+    #[default]
+    None,
 }
