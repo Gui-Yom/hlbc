@@ -5,7 +5,7 @@ use eframe::egui::{Color32, Frame, RichText, ScrollArea, TextStyle, Ui, WidgetTe
 
 use hlbc::types::RefFun;
 
-use crate::views::{DecompilerView, DisassemblyView};
+use crate::views::{DecompilerView, InspectorView};
 use crate::{AppCtxHandle, AppTab, ItemSelection};
 
 #[derive(Default)]
@@ -69,7 +69,7 @@ impl AppTab for FunctionsView {
                                 };
                                 let btn = ui.selectable_label(selected, text).context_menu(|ui| {
                                     if ui.small_button("View disassembly").clicked() {
-                                        ctx.open_tab(DisassemblyView::default());
+                                        ctx.open_tab(InspectorView::default());
                                     }
                                     if ui.small_button("Decompile").clicked() {
                                         ctx.open_tab(DecompilerView::default());

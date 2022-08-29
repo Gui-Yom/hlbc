@@ -20,8 +20,8 @@ path = "src/main.rs"
 # AIO GUI framework
 eframe = { version = "0.19" }
 # Docking tabs
-#egui_dock = { version = "0.1", git = "https://github.com/Adanos020/egui_dock" }
-egui_dock = { version = "0.1", path = "../../egui_dock" }
+egui_dock = { version = "0.1", git = "https://github.com/Adanos020/egui_dock" }
+#egui_dock = { version = "0.1", path = "../../egui_dock" }
 # Core library
 hlbc = { version = "0.4", path = "../hlbc", default-features = false }
 # Decompiler

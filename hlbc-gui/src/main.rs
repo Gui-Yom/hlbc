@@ -11,10 +11,10 @@ use eframe::egui::{CentralPanel, Frame, Rounding, TopBottomPanel, Vec2, Visuals}
 use eframe::{egui, NativeOptions, Theme};
 use egui_dock::{DockArea, NodeIndex, Tab, Tree};
 
-use hlbc::types::{RefFun, RefType};
+use hlbc::types::{RefFun, RefGlobal, RefType};
 use hlbc::Bytecode;
 
-use crate::views::{AppTab, ClassesView, FunctionsView, InfoTab};
+use crate::views::{AppTab, ClassesView, FunctionsView, GlobalsView, InfoView, InspectorView};
 
 mod views;
 
@@ -116,7 +116,7 @@ impl eframe::App for App {
                             }
                             if ui.button("Info").clicked() {
                                 self.tree[NodeIndex::root().left()]
-                                    .append_tab(InfoTab::default().make_tab(appctx.clone()));
+                                    .append_tab(InfoView::default().make_tab(appctx.clone()));
                             }
                         });
                     }
@@ -246,12 +246,18 @@ impl AppCtx {
 }
 
 fn default_tabs_ui(ctx: AppCtxHandle) -> Tree {
-    let mut tree = Tree::new(vec![InfoTab::default().make_tab(ctx.clone())]);
+    let mut tree = Tree::new(vec![
+        InfoView::default().make_tab(ctx.clone()),
+        InspectorView::default().make_tab(ctx.clone()),
+    ]);
 
     tree.split_left(
         NodeIndex::root(),
         0.20,
-        vec![FunctionsView::default().make_tab(ctx.clone())],
+        vec![
+            FunctionsView::default().make_tab(ctx.clone()),
+            GlobalsView::default().make_tab(ctx.clone()),
+        ],
     );
     tree.split_below(
         NodeIndex::root().right(),
@@ -266,6 +272,7 @@ fn default_tabs_ui(ctx: AppCtxHandle) -> Tree {
 enum ItemSelection {
     Fun(RefFun),
     Class(RefType),
+    Global(RefGlobal),
     #[default]
     None,
 }

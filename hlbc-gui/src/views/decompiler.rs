@@ -47,7 +47,7 @@ impl AppTab for DecompilerView {
                         .display(code, &FormatOptions::new("  "))
                         .to_string()
                 }
-                ItemSelection::None => String::new(),
+                _ => String::new(),
             };
             self.cache_selected = ctx.selected();
         }

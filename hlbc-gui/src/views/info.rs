@@ -7,9 +7,9 @@ use crate::views::AppTab;
 use crate::AppCtxHandle;
 
 #[derive(Default)]
-pub(crate) struct InfoTab;
+pub(crate) struct InfoView;
 
-impl AppTab for InfoTab {
+impl AppTab for InfoView {
     fn title(&self) -> WidgetText {
         RichText::new("🛈 Info").color(Color32::WHITE).into()
     }

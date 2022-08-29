@@ -9,9 +9,10 @@ use egui_dock::Tab;
 pub(crate) use callgraph::*;
 pub(crate) use classes::*;
 pub(crate) use decompiler::*;
-pub(crate) use disassembly::*;
 pub(crate) use functions::*;
+pub(crate) use globals::*;
 pub(crate) use info::*;
+pub(crate) use inspector::*;
 
 use crate::AppCtxHandle;
 
@@ -19,9 +20,10 @@ use crate::AppCtxHandle;
 mod callgraph;
 mod classes;
 mod decompiler;
-mod disassembly;
 mod functions;
+mod globals;
 mod info;
+mod inspector;
 
 pub(crate) trait AppTab: Sized + 'static {
     fn title(&self) -> WidgetText;
@@ -40,9 +42,9 @@ pub(crate) trait AppTab: Sized + 'static {
     }
 }
 
-pub struct BuiltTab {
-    title: Box<dyn Fn() -> WidgetText>,
-    ui: Box<dyn FnMut(&mut Ui)>,
+pub(crate) struct BuiltTab {
+    pub(crate) title: Box<dyn Fn() -> WidgetText>,
+    pub(crate) ui: Box<dyn FnMut(&mut Ui)>,
 }
 
 impl Tab for BuiltTab {
