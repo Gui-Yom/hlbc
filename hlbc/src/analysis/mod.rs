@@ -1,7 +1,7 @@
 use std::iter::repeat;
 
 use crate::types::{FunPtr, Reg};
-use crate::{Bytecode, Function, Native, Opcode, RefFun};
+use crate::{Bytecode, Function, Native, Opcode, RefFun, RefType, Type, TypeObj};
 
 #[cfg(feature = "graph")]
 pub mod graph;
@@ -15,10 +15,14 @@ impl Bytecode {
     }
 }
 
-impl RefFun {
-    /// Returns true if the function or native comes from the standard library.
+pub trait IsFromStd {
+    /// Returns true if the object comes from the standard library.
     /// Requires debug info to be present as it's looking at file names.
-    pub fn is_from_std(&self, code: &Bytecode) -> bool {
+    fn is_from_std(&self, code: &Bytecode) -> bool;
+}
+
+impl IsFromStd for RefFun {
+    fn is_from_std(&self, code: &Bytecode) -> bool {
         match self.resolve(code) {
             FunPtr::Fun(fun) => fun.is_from_std(code),
             FunPtr::Native(n) => n.is_from_std(code),
@@ -26,10 +30,8 @@ impl RefFun {
     }
 }
 
-impl Function {
-    /// Returns true if the function comes from the standard library.
-    /// Requires debug info to be present as it's looking at file names.
-    pub fn is_from_std(&self, code: &Bytecode) -> bool {
+impl IsFromStd for Function {
+    fn is_from_std(&self, code: &Bytecode) -> bool {
         if let Some(debug_info) = &self.debug_info {
             // We look at the Ret opcode which is probably not from inlined code.
             let (file, _) = debug_info[self.ops.len() - 1];
@@ -39,7 +41,9 @@ impl Function {
             false
         }
     }
+}
 
+impl Function {
     /// Find any outbound references to other functions in a function
     pub fn find_fun_refs(&self) -> impl Iterator<Item = (usize, &Opcode, RefFun)> + '_ {
         self.ops.iter().enumerate().filter_map(|(i, o)| match o {
@@ -78,10 +82,40 @@ impl Function {
     }
 }
 
-impl Native {
-    /// Returns true if the native comes from the standard library.
-    /// Requires debug info to be present as it's looking at file names.
-    pub fn is_from_std(&self, code: &Bytecode) -> bool {
+impl IsFromStd for Native {
+    fn is_from_std(&self, code: &Bytecode) -> bool {
         self.lib.resolve(&code.strings) == "std"
+    }
+}
+
+impl IsFromStd for RefType {
+    fn is_from_std(&self, code: &Bytecode) -> bool {
+        self.resolve(&code.types).is_from_std(code)
+    }
+}
+
+impl IsFromStd for Type {
+    fn is_from_std(&self, code: &Bytecode) -> bool {
+        match self {
+            Type::Obj(obj) => obj.is_from_std(code),
+            _ => true,
+        }
+    }
+}
+
+impl IsFromStd for TypeObj {
+    fn is_from_std(&self, code: &Bytecode) -> bool {
+        if let [first, ..] = &self.protos[..] {
+            first.findex.is_from_std(code)
+        } else if let Some(&fun) = self.bindings.values().nth(0) {
+            fun.is_from_std(code)
+        } else {
+            let name = self.name.resolve(&code.strings);
+            name.starts_with("hl")
+                || name.starts_with("haxe")
+                || name == "Std"
+                || name == "Sys"
+                || name == "Type"
+        }
     }
 }
