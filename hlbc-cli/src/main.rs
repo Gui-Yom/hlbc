@@ -8,7 +8,6 @@ use clap::Parser as ClapParser;
 use temp_dir::TempDir;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
-use hlbc::analysis::{find_fun_refs, iter_ops};
 use hlbc::opcodes::Opcode;
 use hlbc::types::{FunPtr, RefFun, RefGlobal, Type};
 use hlbc::*;
@@ -513,7 +512,7 @@ This is the same range notation as Rust and is supported with most commands."#
                                 "constant@{i} expanding to global@{} (now also searching for global)",
                                 c.global.0
                             );
-                            iter_ops(code).for_each(|(f, (i, o))| match o {
+                            code.ops().for_each(|(f, (i, o))| match o {
                                 Opcode::GetGlobal { global, .. } => {
                                     if *global == c.global {
                                         println!("in {} at {i}: GetGlobal", f.display_header(code));
@@ -525,7 +524,7 @@ This is the same range notation as Rust and is supported with most commands."#
                         }
                     }
                 }
-                iter_ops(code).for_each(|(f, (i, o))| match o {
+                code.ops().for_each(|(f, (i, o))| match o {
                     Opcode::String { ptr, .. } => {
                         if ptr.0 == idx {
                             println!("{} at {i}: String", f.display_header(code));
@@ -548,7 +547,7 @@ This is the same range notation as Rust and is supported with most commands."#
                 }
                 println!();
 
-                iter_ops(code).for_each(|(f, (i, o))| match o {
+                code.ops().for_each(|(f, (i, o))| match o {
                     Opcode::GetGlobal { global, .. } | Opcode::SetGlobal { global, .. } => {
                         if global.0 == idx {
                             println!("{} at {i}: {}", f.display_header(code), o.name());
@@ -564,7 +563,7 @@ This is the same range notation as Rust and is supported with most commands."#
                 );
                 code.functions
                     .iter()
-                    .flat_map(|f| repeat(f).zip(find_fun_refs(f)))
+                    .flat_map(|f| repeat(f).zip(f.find_fun_refs()))
                     .for_each(|(f, (i, o, fun))| {
                         if fun.0 == idx {
                             println!("{} at {i}: {}", f.display_header(code), o.name());
