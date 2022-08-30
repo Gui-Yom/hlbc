@@ -2,11 +2,11 @@ use std::ops::Deref;
 
 use eframe::egui::style::Margin;
 use eframe::egui::{Color32, Frame, RichText, ScrollArea, TextStyle, Ui, WidgetText};
-use hlbc::analysis::IsFromStd;
 
+use hlbc::analysis::IsFromStd;
 use hlbc::types::RefFun;
 
-use crate::views::{DecompilerView, InspectorView};
+use crate::views::{DecompilerView, InspectorView, SyncInspectorView};
 use crate::{AppCtxHandle, AppTab, ItemSelection};
 
 #[derive(Default)]
@@ -71,8 +71,12 @@ impl AppTab for FunctionsView {
                                     _ => false,
                                 };
                                 let btn = ui.selectable_label(selected, text).context_menu(|ui| {
-                                    if ui.small_button("View disassembly").clicked() {
-                                        ctx.open_tab(InspectorView::default());
+                                    if ui.small_button("Open in inspector").clicked() {
+                                        let tab = InspectorView::new(
+                                            ItemSelection::Fun(f),
+                                            ctx.code().deref(),
+                                        );
+                                        ctx.open_tab(tab);
                                     }
                                     if ui.small_button("Decompile").clicked() {
                                         ctx.open_tab(DecompilerView::default());

@@ -4,10 +4,11 @@ use eframe::egui::style::Margin;
 use eframe::egui::{
     Button, Color32, Frame, Grid, RichText, ScrollArea, SelectableLabel, TextStyle, Ui, WidgetText,
 };
-use hlbc::analysis::IsFromStd;
 
+use hlbc::analysis::IsFromStd;
 use hlbc::types::{RefField, RefType, Type};
 
+use crate::views::{DecompilerView, InspectorView};
 use crate::{AppCtxHandle, AppTab, ItemSelection};
 
 #[derive(Default)]
@@ -63,7 +64,22 @@ impl AppTab for ClassesView {
                                 ItemSelection::Class(r2) => *r == r2,
                                 _ => false,
                             };
-                            if ui.selectable_label(checked, name).clicked() {
+                            if ui
+                                .selectable_label(checked, name)
+                                .context_menu(|ui| {
+                                    if ui.small_button("Open in inspector").clicked() {
+                                        let tab = InspectorView::new(
+                                            ItemSelection::Class(*r),
+                                            ctx.code().deref(),
+                                        );
+                                        ctx.open_tab(tab);
+                                    }
+                                    if ui.small_button("Decompile").clicked() {
+                                        ctx.open_tab(DecompilerView::default());
+                                    }
+                                })
+                                .clicked()
+                            {
                                 ctx.set_selected(ItemSelection::Class(*r));
                             }
                         }

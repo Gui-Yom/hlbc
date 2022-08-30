@@ -7,52 +7,93 @@ use eframe::egui::{
     Color32, Frame, Grid, Label, RichText, ScrollArea, TextEdit, TextStyle, Ui, Widget, WidgetText,
 };
 
-use hlbc::types::{FunPtr, RefFun, RefGlobal, RefString, RefType};
+use hlbc::types::{FunPtr, RefField, RefFun, RefGlobal, RefString, RefType};
 use hlbc::Bytecode;
 
 use crate::{AppCtxHandle, AppTab, ItemSelection};
 
 /// View detailed information about a bytecode element.
-#[derive(Default)]
-pub(crate) struct InspectorView;
+pub(crate) struct SyncInspectorView {
+    name: RichText,
+}
 
-impl AppTab for InspectorView {
+impl Default for SyncInspectorView {
+    fn default() -> Self {
+        Self {
+            name: RichText::new("Inspector (sync)").color(Color32::WHITE),
+        }
+    }
+}
+
+impl AppTab for SyncInspectorView {
     fn title(&self) -> WidgetText {
-        RichText::new("Inspector (sync)")
-            .color(Color32::WHITE)
-            .into()
+        self.name.clone().into()
     }
 
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
-        Frame::none()
-            .inner_margin(Margin::same(4.0))
-            .show(ui, |ui| {
-                ScrollArea::vertical()
-                    .id_source("functions_scroll_area")
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        let code = ctx.code();
-                        let code = code.deref();
-                        match ctx.selected() {
-                            ItemSelection::Fun(fun) => {
-                                function_inspector(ui, fun, code);
-                            }
-                            ItemSelection::Class(t) => {
-                                class_inspector(ui, t, code);
-                            }
-                            ItemSelection::Global(g) => {
-                                global_inspector(ui, g, code);
-                            }
-                            ItemSelection::String(s) => {
-                                string_inspector(ui, s, code);
-                            }
-                            _ => {
-                                ui.label("Select a function or a class.");
-                            }
-                        }
-                    });
-            });
+        let selected = ctx.selected();
+        self.name = RichText::new(format!(
+            "Inspector (sync) : {}",
+            selected.name(ctx.code().deref())
+        ))
+        .color(Color32::WHITE);
+        inspector_ui(ui, ctx, selected)
     }
+}
+
+pub(crate) struct InspectorView {
+    item: ItemSelection,
+    name: RichText,
+}
+
+impl InspectorView {
+    pub(crate) fn new(item: ItemSelection, code: &Bytecode) -> Self {
+        Self {
+            item,
+            name: RichText::new(item.name(code)).color(Color32::WHITE),
+        }
+    }
+}
+
+impl AppTab for InspectorView {
+    fn title(&self) -> WidgetText {
+        self.name.clone().into()
+    }
+
+    fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
+        inspector_ui(ui, ctx, self.item);
+    }
+}
+
+fn inspector_ui(ui: &mut Ui, ctx: AppCtxHandle, item: ItemSelection) {
+    Frame::none()
+        .inner_margin(Margin::same(4.0))
+        .show(ui, |ui| {
+            ScrollArea::vertical()
+                .id_source("functions_scroll_area")
+                .auto_shrink([false, false])
+                .show(ui, |ui| {
+                    let code = ctx.code();
+                    let code = code.deref();
+                    match item {
+                        ItemSelection::Fun(fun) => {
+                            function_inspector(ui, fun, code);
+                        }
+                        ItemSelection::Class(t) => {
+                            class_inspector(ui, t, code);
+                        }
+                        ItemSelection::Global(g) => {
+                            global_inspector(ui, g, code);
+                        }
+                        ItemSelection::String(s) => {
+                            string_inspector(ui, s, code);
+                        }
+                        _ => {
+                            ui.label("Select a function or a class.");
+                        }
+                    }
+                });
+        });
 }
 
 fn function_inspector(ui: &mut Ui, fun: RefFun, code: &Bytecode) {
@@ -109,44 +150,49 @@ fn class_inspector(ui: &mut Ui, t: RefType, code: &Bytecode) {
             ui.label(format!("initialized by global {}", obj.global.0 - 1));
         }
 
-        ui.add_space(8.0);
-        ui.label("Fields");
-        Grid::new("inspector::class::fields")
-            .striped(true)
-            .num_columns(2)
-            .show(ui, |ui| {
-                for f in &obj.own_fields {
-                    ui.label(f.name.resolve(&code.strings));
-                    ui.label(f.t.display(code));
-                    ui.end_row();
-                }
+        if obj.own_fields.is_empty() {
+            ui.label("No fields");
+        } else {
+            ui.add_space(6.0);
+            ui.collapsing("Fields", |ui| {
+                Grid::new("inspector::class::fields")
+                    .striped(true)
+                    .num_columns(3)
+                    .show(ui, |ui| {
+                        for (i, f) in obj.own_fields.iter().enumerate() {
+                            ui.label(f.name.resolve(&code.strings));
+                            ui.label(f.t.display(code));
+                            if let Some(binding) = obj
+                                .bindings
+                                .get(&RefField(i + obj.fields.len() - obj.own_fields.len()))
+                            {
+                                ui.monospace(format!("bound to {}", binding.display_call(code)));
+                            } else {
+                                ui.monospace("variable");
+                            }
+                            ui.end_row();
+                        }
+                    });
             });
+        }
 
-        ui.add_space(8.0);
-        ui.label("Methods");
-        Grid::new("inspector::class::methods")
-            .striped(true)
-            .num_columns(2)
-            .show(ui, |ui| {
-                for f in &obj.protos {
-                    ui.label(f.name.resolve(&code.strings));
-                    ui.label(f.findex.display_call(code).to_string());
-                    ui.end_row();
-                }
+        if obj.protos.is_empty() {
+            ui.label("No methods");
+        } else {
+            ui.add_space(6.0);
+            ui.collapsing("Methods", |ui| {
+                Grid::new("inspector::class::methods")
+                    .striped(true)
+                    .num_columns(2)
+                    .show(ui, |ui| {
+                        for f in &obj.protos {
+                            ui.label(f.name.resolve(&code.strings));
+                            ui.label(f.findex.display_call(code).to_string());
+                            ui.end_row();
+                        }
+                    });
             });
-
-        ui.add_space(8.0);
-        ui.label("Bindings");
-        Grid::new("inspector::class::bindings")
-            .striped(true)
-            .num_columns(2)
-            .show(ui, |ui| {
-                for (&fi, &fun) in &obj.bindings {
-                    ui.label(obj.fields[fi.0].name.resolve(&code.strings));
-                    ui.label(fun.display_call(code).to_string());
-                    ui.end_row();
-                }
-            });
+        }
     } else {
         ui.label("Invalid type");
     }

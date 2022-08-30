@@ -2,6 +2,7 @@
 
 use std::cell::{Ref, RefCell, RefMut};
 use std::io::BufReader;
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::{env, fs};
@@ -15,7 +16,7 @@ use hlbc::types::{RefFun, RefGlobal, RefString, RefType};
 use hlbc::Bytecode;
 
 use crate::views::{
-    AppTab, ClassesView, FunctionsView, GlobalsView, InfoView, InspectorView, StringsView,
+    AppTab, ClassesView, FunctionsView, GlobalsView, InfoView, StringsView, SyncInspectorView,
 };
 
 mod views;
@@ -250,7 +251,7 @@ impl AppCtx {
 fn default_tabs_ui(ctx: AppCtxHandle) -> Tree {
     let mut tree = Tree::new(vec![
         InfoView::default().make_tab(ctx.clone()),
-        InspectorView::default().make_tab(ctx.clone()),
+        SyncInspectorView::default().make_tab(ctx.clone()),
     ]);
 
     tree.split_left(
@@ -279,4 +280,18 @@ enum ItemSelection {
     String(RefString),
     #[default]
     None,
+}
+
+impl ItemSelection {
+    pub(crate) fn name(&self, code: &Bytecode) -> String {
+        match self {
+            ItemSelection::Fun(fun) => fun.display_call(code).to_string(),
+            ItemSelection::Class(t) => t.display(code),
+            ItemSelection::Global(g) => format!("global@{}", g.0),
+            ItemSelection::String(s) => {
+                format!("string@{} : {}", s.0, s.resolve(&code.strings))
+            }
+            _ => String::new(),
+        }
+    }
 }
