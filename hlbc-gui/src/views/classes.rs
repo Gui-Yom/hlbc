@@ -4,14 +4,17 @@ use eframe::egui::style::Margin;
 use eframe::egui::{
     Button, Color32, Frame, Grid, RichText, ScrollArea, SelectableLabel, TextStyle, Ui, WidgetText,
 };
+use hlbc::analysis::IsFromStd;
 
-use hlbc::types::{RefType, Type};
+use hlbc::types::{RefField, RefType, Type};
 
 use crate::{AppCtxHandle, AppTab, ItemSelection};
 
 #[derive(Default)]
 pub(crate) struct ClassesView {
+    show_std: bool,
     cache: Vec<(RefType, String)>,
+    cache_valid: bool,
 }
 
 impl AppTab for ClassesView {
@@ -20,26 +23,36 @@ impl AppTab for ClassesView {
     }
 
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
-        {
+        if !self.cache_valid {
             let code = ctx.code();
             let code = code.deref();
 
-            if self.cache.is_empty() {
-                for (i, t) in code.types.iter().enumerate() {
-                    match t {
-                        Type::Obj(obj) => {
+            self.cache = Vec::new();
+            for (i, t) in code.types.iter().enumerate() {
+                match t {
+                    Type::Obj(obj) => {
+                        let should_show = self.show_std || !obj.is_from_std(code);
+                        if should_show {
                             self.cache
                                 .push((RefType(i), obj.name.resolve(&code.strings).to_string()));
                         }
-                        _ => {}
                     }
+                    _ => {}
                 }
             }
+
+            self.cache_valid = true;
         }
 
         Frame::none()
             .inner_margin(Margin::same(4.0))
             .show(ui, |ui| {
+                if ui.checkbox(&mut self.show_std, "Show stdlib").changed() {
+                    self.cache_valid = false;
+                }
+
+                ui.add_space(4.0);
+
                 ScrollArea::both().auto_shrink([false, false]).show_rows(
                     ui,
                     ui.text_style_height(&TextStyle::Body),

@@ -7,7 +7,7 @@ use eframe::egui::{
     Color32, Frame, Grid, Label, RichText, ScrollArea, TextEdit, TextStyle, Ui, Widget, WidgetText,
 };
 
-use hlbc::types::{FunPtr, RefFun, RefGlobal, RefType};
+use hlbc::types::{FunPtr, RefFun, RefGlobal, RefString, RefType};
 use hlbc::Bytecode;
 
 use crate::{AppCtxHandle, AppTab, ItemSelection};
@@ -43,7 +43,10 @@ impl AppTab for InspectorView {
                             ItemSelection::Global(g) => {
                                 global_inspector(ui, g, code);
                             }
-                            ItemSelection::None => {
+                            ItemSelection::String(s) => {
+                                string_inspector(ui, s, code);
+                            }
+                            _ => {
                                 ui.label("Select a function or a class.");
                             }
                         }
@@ -105,7 +108,8 @@ fn class_inspector(ui: &mut Ui, t: RefType, code: &Bytecode) {
         if obj.global.0 >= 1 {
             ui.label(format!("initialized by global {}", obj.global.0 - 1));
         }
-        ui.add_space(10.0);
+
+        ui.add_space(8.0);
         ui.label("Fields");
         Grid::new("inspector::class::fields")
             .striped(true)
@@ -118,7 +122,7 @@ fn class_inspector(ui: &mut Ui, t: RefType, code: &Bytecode) {
                 }
             });
 
-        ui.add_space(10.0);
+        ui.add_space(8.0);
         ui.label("Methods");
         Grid::new("inspector::class::methods")
             .striped(true)
@@ -130,6 +134,19 @@ fn class_inspector(ui: &mut Ui, t: RefType, code: &Bytecode) {
                     ui.end_row();
                 }
             });
+
+        ui.add_space(8.0);
+        ui.label("Bindings");
+        Grid::new("inspector::class::bindings")
+            .striped(true)
+            .num_columns(2)
+            .show(ui, |ui| {
+                for (&fi, &fun) in &obj.bindings {
+                    ui.label(obj.fields[fi.0].name.resolve(&code.strings));
+                    ui.label(fun.display_call(code).to_string());
+                    ui.end_row();
+                }
+            });
     } else {
         ui.label("Invalid type");
     }
@@ -138,4 +155,16 @@ fn class_inspector(ui: &mut Ui, t: RefType, code: &Bytecode) {
 fn global_inspector(ui: &mut Ui, g: RefGlobal, code: &Bytecode) {
     ui.heading(format!("Global@{}", g.0));
     ui.label(format!("Type : {}", code.globals[g.0].display(code)));
+
+    if let (Some(&cst), Some(constants)) = (code.globals_initializers.get(&g), &code.constants) {
+        let def = &constants[cst];
+        ui.label(format!("{:?}", def.fields));
+    } else {
+        ui.label("This global is initialized with code");
+    }
+}
+
+fn string_inspector(ui: &mut Ui, s: RefString, code: &Bytecode) {
+    ui.heading(format!("String@{}", s.0));
+    ui.label(RichText::new(s.resolve(&code.strings)).monospace());
 }

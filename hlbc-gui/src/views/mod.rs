@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -13,6 +12,7 @@ pub(crate) use functions::*;
 pub(crate) use globals::*;
 pub(crate) use info::*;
 pub(crate) use inspector::*;
+pub(crate) use strings::*;
 
 use crate::AppCtxHandle;
 
@@ -24,13 +24,14 @@ mod functions;
 mod globals;
 mod info;
 mod inspector;
+mod strings;
 
 pub(crate) trait AppTab: Sized + 'static {
     fn title(&self) -> WidgetText;
 
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle);
 
-    fn make_tab(mut self, ctx: AppCtxHandle) -> Box<dyn Tab> {
+    fn make_tab(self, ctx: AppCtxHandle) -> Box<dyn Tab> {
         let tab = Rc::new(RefCell::new(self));
         let tabc = tab.clone();
         Box::new(BuiltTab {

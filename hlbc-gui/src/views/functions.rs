@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 use eframe::egui::style::Margin;
 use eframe::egui::{Color32, Frame, RichText, ScrollArea, TextStyle, Ui, WidgetText};
+use hlbc::analysis::IsFromStd;
 
 use hlbc::types::RefFun;
 
@@ -52,6 +53,8 @@ impl AppTab for FunctionsView {
                         self.cache_valid = false;
                     }
                 });
+
+                ui.add_space(4.0);
 
                 ScrollArea::vertical()
                     .id_source("functions_scroll_area")

@@ -11,10 +11,12 @@ use eframe::egui::{CentralPanel, Frame, Rounding, TopBottomPanel, Vec2, Visuals}
 use eframe::{egui, NativeOptions, Theme};
 use egui_dock::{DockArea, NodeIndex, Tab, Tree};
 
-use hlbc::types::{RefFun, RefGlobal, RefType};
+use hlbc::types::{RefFun, RefGlobal, RefString, RefType};
 use hlbc::Bytecode;
 
-use crate::views::{AppTab, ClassesView, FunctionsView, GlobalsView, InfoView, InspectorView};
+use crate::views::{
+    AppTab, ClassesView, FunctionsView, GlobalsView, InfoView, InspectorView, StringsView,
+};
 
 mod views;
 
@@ -257,6 +259,7 @@ fn default_tabs_ui(ctx: AppCtxHandle) -> Tree {
         vec![
             FunctionsView::default().make_tab(ctx.clone()),
             GlobalsView::default().make_tab(ctx.clone()),
+            StringsView::default().make_tab(ctx.clone()),
         ],
     );
     tree.split_below(
@@ -273,6 +276,7 @@ enum ItemSelection {
     Fun(RefFun),
     Class(RefType),
     Global(RefGlobal),
+    String(RefString),
     #[default]
     None,
 }
