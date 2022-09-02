@@ -118,13 +118,16 @@ fn main() -> anyhow::Result<()> {
 
     #[cfg(feature = "watch")]
     if let Some(watch) = args.watch {
-        use notify::{watcher, DebouncedEvent, RecursiveMode, Watcher};
+        use notify::RecursiveMode;
+        use notify_debouncer_mini::new_debouncer;
         use std::sync::mpsc;
 
         let (tx, rx) = mpsc::channel();
-        let mut watcher = watcher(tx, Duration::from_millis(200)).expect("Can't init watcher");
 
-        watcher
+        let mut debouncer = new_debouncer(Duration::from_millis(200), None, tx)?;
+
+        debouncer
+            .watcher()
             .watch(&args.file, RecursiveMode::NonRecursive)
             .expect("Can't watch file");
 
@@ -136,19 +139,20 @@ fn main() -> anyhow::Result<()> {
 
         'watch: loop {
             match rx.recv() {
-                Ok(DebouncedEvent::Write(_)) => {
-                    if is_source {
-                        compile(&args.file, &file)?;
+                Ok(events) => {
+                    for e in events {
+                        if is_source {
+                            compile(&args.file, &file)?;
+                        }
+
+                        let code = {
+                            let mut r = BufReader::new(fs::File::open(&file)?);
+                            Bytecode::load(&mut r)?
+                        };
+
+                        execute_commands!(&code, commands.clone(); break 'watch);
                     }
-
-                    let code = {
-                        let mut r = BufReader::new(fs::File::open(&file)?);
-                        Bytecode::load(&mut r)?
-                    };
-
-                    execute_commands!(&code, commands.clone(); break 'watch);
                 }
-                Ok(_) => {}
                 Err(e) => {
                     println!("Error while watching : {e}");
                     break;

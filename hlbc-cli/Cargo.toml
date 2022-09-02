@@ -30,7 +30,8 @@ hlbc = { version = "0.4", path = "../hlbc", default-features = false }
 # Decompiler
 hlbc-decompiler = { version = "0.4", path = "../hlbc-decompiler" }
 # File system watching
-notify = { version = "4", optional = true }
+notify = { version = "5", optional = true, default-features = false, features = ["macos_fsevent"] }
+notify-debouncer-mini = { version = "0.2", optional = true, default-features = false }
 # cli colors
 termcolor = "1"
 # Temporary directory for compilation
@@ -42,4 +43,4 @@ default = ["graph", "watch"]
 # Generate a callgraph
 graph = ["hlbc/graph"]
 # Watch for file changes
-watch = ["notify"]
+watch = ["notify", "notify-debouncer-mini"]
