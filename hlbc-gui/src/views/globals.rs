@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use eframe::egui::style::Margin;
 use eframe::egui::{Color32, Frame, RichText, ScrollArea, TextStyle, Ui, WidgetText};
 

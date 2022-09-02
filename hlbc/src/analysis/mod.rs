@@ -107,7 +107,7 @@ impl IsFromStd for TypeObj {
     fn is_from_std(&self, code: &Bytecode) -> bool {
         if let [first, ..] = &self.protos[..] {
             first.findex.is_from_std(code)
-        } else if let Some(&fun) = self.bindings.values().nth(0) {
+        } else if let Some(&fun) = self.bindings.values().next() {
             fun.is_from_std(code)
         } else {
             let name = self.name.resolve(&code.strings);

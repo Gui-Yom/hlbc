@@ -2,7 +2,6 @@
 
 use std::cell::{Ref, RefCell, RefMut};
 use std::io::BufReader;
-use std::ops::Deref;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::{env, fs};
@@ -10,7 +9,7 @@ use std::{env, fs};
 use eframe::egui::style::Margin;
 use eframe::egui::{CentralPanel, Frame, Rounding, TopBottomPanel, Vec2, Visuals};
 use eframe::{egui, NativeOptions, Theme};
-use egui_dock::{DockArea, NodeIndex, Tab, Tree};
+use egui_dock::{DockArea, DynamicTabViewer, DynamicTree, NodeIndex, Tab, Tree};
 
 use hlbc::types::{RefFun, RefGlobal, RefString, RefType};
 use hlbc::Bytecode;
@@ -80,7 +79,7 @@ struct App {
     /// Some when a file is loaded
     ctx: Option<AppCtxHandle>,
     // Dock
-    tree: Tree,
+    tree: DynamicTree,
     style: egui_dock::Style,
     options_window_open: bool,
     about_window_open: bool,
@@ -141,11 +140,11 @@ impl eframe::App for App {
         egui::Window::new("Options")
             .open(&mut self.options_window_open)
             .show(ctx, |ui| {
-                ui.collapsing("Display", |ui| {
+                ui.collapsing("Display", |_ui| {
                     // TODO max fps
                     // TODO ui theme
                 });
-                ui.collapsing("Code display", |ui| {
+                ui.collapsing("Code display", |_ui| {
                     // TODO code font
                     // TODO code font size
                     // TODO code theme
@@ -162,7 +161,7 @@ impl eframe::App for App {
         if self.ctx.is_some() {
             DockArea::new(&mut self.tree)
                 .style(self.style.clone())
-                .show(ctx);
+                .show(ctx, &mut DynamicTabViewer::default());
         } else {
             CentralPanel::default()
                 .frame(Frame::group(ctx.style().as_ref()).outer_margin(Margin::same(4.0)))
@@ -215,7 +214,7 @@ impl AppCtxHandle {
     }
 
     fn selected(&self) -> ItemSelection {
-        self.lock().selected.clone()
+        self.lock().selected
     }
 
     /// mut lock
@@ -248,7 +247,7 @@ impl AppCtx {
     }
 }
 
-fn default_tabs_ui(ctx: AppCtxHandle) -> Tree {
+fn default_tabs_ui(ctx: AppCtxHandle) -> DynamicTree {
     let mut tree = Tree::new(vec![
         InfoView::default().make_tab(ctx.clone()),
         SyncInspectorView::default().make_tab(ctx.clone()),
@@ -266,7 +265,7 @@ fn default_tabs_ui(ctx: AppCtxHandle) -> Tree {
     tree.split_below(
         NodeIndex::root().right(),
         0.5,
-        vec![ClassesView::default().make_tab(ctx.clone())],
+        vec![ClassesView::default().make_tab(ctx)],
     );
 
     tree

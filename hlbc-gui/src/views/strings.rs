@@ -1,11 +1,8 @@
+use std::ops::Deref;
+
 use eframe::egui::style::Margin;
 use eframe::egui::text::LayoutJob;
-use eframe::egui::{
-    Color32, FontId, Frame, Galley, RichText, ScrollArea, SelectableLabel, TextStyle, Ui,
-    WidgetText,
-};
-use eframe::epaint::text::TextWrapping;
-use std::ops::Deref;
+use eframe::egui::{Color32, Frame, RichText, ScrollArea, TextStyle, Ui, WidgetText};
 
 use hlbc::types::RefString;
 
@@ -35,7 +32,7 @@ impl AppTab for StringsView {
                                 ItemSelection::String(s2) => s == s2,
                                 _ => false,
                             };
-                            let mut job = LayoutJob::simple_singleline(
+                            let job = LayoutJob::simple_singleline(
                                 s.display(ctx.code().deref()),
                                 TextStyle::Body.resolve(ui.style().as_ref()),
                                 Color32::WHITE,

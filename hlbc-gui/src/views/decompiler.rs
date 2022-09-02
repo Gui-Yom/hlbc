@@ -10,7 +10,7 @@ use syntect::highlighting::{FontStyle, ThemeSet};
 use syntect::parsing::{SyntaxDefinition, SyntaxSet, SyntaxSetBuilder};
 use syntect::util::LinesWithEndings;
 
-use hlbc::types::{FunPtr, RefFun};
+use hlbc::types::FunPtr;
 use hlbc_decompiler::fmt::FormatOptions;
 use hlbc_decompiler::{decompile_class, decompile_function};
 

@@ -49,7 +49,7 @@ pub struct ValBool(pub bool);
 pub struct RefGlobal(pub usize);
 
 /// An object field definition
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ObjField {
     /// Field name
     pub name: RefString,
@@ -62,7 +62,7 @@ pub struct ObjField {
 pub struct RefField(pub usize);
 
 /// An object method definition
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ObjProto {
     /// Method name
     pub name: RefString,
@@ -73,7 +73,7 @@ pub struct ObjProto {
 }
 
 /// An enum variant definition
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnumConstruct {
     /// Variant name, can be null (pointing to 0)
     // TODO wrap this in an option
@@ -83,18 +83,18 @@ pub struct EnumConstruct {
 }
 
 /// A reference to an enum variant
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct RefEnumConstruct(pub usize);
 
 /// Common type for [Type::Fun] and [Type::Method]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypeFun {
     pub args: Vec<RefType>,
     pub ret: RefType,
 }
 
 /// Common type for [Type::Obj] and [Type::Struct]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TypeObj {
     pub name: RefString,
     pub super_: Option<RefType>,

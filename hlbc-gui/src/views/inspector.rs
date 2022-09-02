@@ -1,11 +1,7 @@
-use std::fmt::format;
 use std::ops::Deref;
 
 use eframe::egui::style::Margin;
-use eframe::egui::text::LayoutJob;
-use eframe::egui::{
-    Color32, Frame, Grid, Label, RichText, ScrollArea, TextEdit, TextStyle, Ui, Widget, WidgetText,
-};
+use eframe::egui::{Color32, Frame, Grid, RichText, ScrollArea, TextStyle, Ui, WidgetText};
 
 use hlbc::types::{FunPtr, RefField, RefFun, RefGlobal, RefString, RefType};
 use hlbc::Bytecode;
@@ -113,22 +109,40 @@ fn function_inspector(ui: &mut Ui, fun: RefFun, code: &Bytecode) {
                 ui.label("Probably a closure.");
             }
             ui.separator();
-            Grid::new("inspector::function::registers")
-                .striped(true)
-                .num_columns(2)
-                .show(ui, |ui| {
-                    for (i, reg) in f.regs.iter().enumerate() {
-                        ui.label(format!("reg{i}"));
-                        ui.label(reg.display(code));
-                        ui.end_row();
-                    }
-                });
+            ui.collapsing("Registers", |ui| {
+                Grid::new("inspector::function::registers")
+                    .striped(true)
+                    .num_columns(2)
+                    .show(ui, |ui| {
+                        for (i, reg) in f.regs.iter().enumerate() {
+                            ui.label(format!("reg{i}"));
+                            ui.label(reg.display(code));
+                            ui.end_row();
+                        }
+                    });
+            });
 
-            let text = "Mov reg0 = reg1";
-            TextEdit::multiline(&mut text.as_ref())
-                .code_editor()
-                .lock_focus(false)
-                .show(ui);
+            ui.add_space(6.0);
+            ScrollArea::vertical()
+                .id_source("inspector::function::instructions")
+                .auto_shrink([false, false])
+                .show_rows(
+                    ui,
+                    ui.text_style_height(&TextStyle::Monospace),
+                    f.ops.len(),
+                    |ui, range| {
+                        for (i, o) in f
+                            .ops
+                            .iter()
+                            .enumerate()
+                            .skip(range.start)
+                            .take(range.end - range.start)
+                        {
+                            // TODO syntax highlighting here
+                            ui.monospace(format!("{i:>3}: {}", o.display(code, f, i as i32, 11)));
+                        }
+                    },
+                );
         }
         FunPtr::Native(n) => {
             ui.heading("Native function");

@@ -6,7 +6,7 @@ use eframe::egui::{Color32, Frame, RichText, ScrollArea, TextStyle, Ui, WidgetTe
 use hlbc::analysis::IsFromStd;
 use hlbc::types::RefFun;
 
-use crate::views::{DecompilerView, InspectorView, SyncInspectorView};
+use crate::views::{DecompilerView, InspectorView};
 use crate::{AppCtxHandle, AppTab, ItemSelection};
 
 #[derive(Default)]
