@@ -759,15 +759,17 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
     let mut statements = scopes.statements();
 
     // AST post processing step !
-    let passes: [Box<dyn Fn(&mut [Statement])>; 3] = [
-        Box::new(|stmts| visit_stmt(stmts, &mut post::if_expression)),
-        Box::new(|stmts| visit_expr(stmts, &mut |e| post::string_concat(code, e))),
-        Box::new(|stmts| visit_expr(stmts, &mut |e| post::itos(code, e))),
-    ];
-
-    for pass in passes {
-        pass(&mut statements);
-    }
+    // It makes a single pass for all visitors
+    post::visit(
+        code,
+        &mut statements,
+        &mut [
+            Box::new(post::IfExpressions),
+            Box::new(post::StringConcat),
+            Box::new(post::Itos),
+            Box::new(post::Trace),
+        ],
+    );
 
     statements
 }

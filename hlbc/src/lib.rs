@@ -346,6 +346,11 @@ impl Bytecode {
     pub fn main(&self) -> &Function {
         &self.functions[*self.fnames.get("main").unwrap()]
     }
+
+    /// Get a function by its name.
+    pub fn function_by_name(&self, name: &str) -> Option<&Function> {
+        self.fnames.get(name).map(|&i| &self.functions[i])
+    }
 }
 
 pub type Result<T> = core::result::Result<T, Error>;
