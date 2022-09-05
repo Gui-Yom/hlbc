@@ -78,7 +78,7 @@ impl Method {
         let fun = self.fun.resolve_as_fn(ctx).unwrap();
         fmtools::fmt! { move
             {opts} if self.static_ { "static " } if self.dynamic { "dynamic " }
-            "function "{fun.name(ctx).unwrap()}"("
+            "function "{fun.name_default(ctx)}"("
             {fmtools::join(", ", fun.args(ctx).iter().enumerate().skip(if self.static_ { 0 } else { 1 })
                 .map(move |(i, arg)| fmtools::fmt! {move
                     {fun.arg_name(ctx, i).unwrap_or("_")}": "{to_haxe_type(arg.resolve(&ctx.types), ctx)}
@@ -209,7 +209,7 @@ impl Expr {
                 Expr::Field(receiver, name) => {
                     {disp!(receiver)}"."{name}
                 }
-                Expr::FunRef(fun) => {{fun.display_call(code).to_string()}},
+                Expr::FunRef(fun) => {{fun.name_default(code)}},
                 Expr::IfElse { cond, if_, else_ } => {
                     "if ("{disp!(cond)}") {\n"
                     let indent2 = indent.inc_nesting();

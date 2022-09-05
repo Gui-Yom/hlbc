@@ -65,7 +65,7 @@ impl AppTab for FunctionsView {
                         self.cache.len(),
                         |ui, range| {
                             for f in range.map(|i| self.cache[i]) {
-                                let text = { f.display_header(ctx.code().deref()) };
+                                let text = { f.display_header(ctx.code().deref()).to_string() };
                                 let selected = match ctx.selected() {
                                     ItemSelection::Fun(f2) => f == f2,
                                     _ => false,

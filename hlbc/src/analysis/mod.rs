@@ -70,10 +70,10 @@ impl Function {
             .iter()
             .rev()
             .skip(self.ops.len() - pos)
-            .find_map(|o| match o {
-                &Opcode::StaticClosure { dst, fun } if dst == reg => Some(fun),
-                &Opcode::InstanceClosure { dst, fun, .. } if dst == reg => Some(fun),
-                &Opcode::Field { dst, obj, field } if dst == reg => self
+            .find_map(|o| match *o {
+                Opcode::StaticClosure { dst, fun } if dst == reg => Some(fun),
+                Opcode::InstanceClosure { dst, fun, .. } if dst == reg => Some(fun),
+                Opcode::Field { dst, obj, field } if dst == reg => self
                     .regtype(obj)
                     .resolve_as_obj(&code.types)
                     .and_then(|o| o.bindings.get(&field).copied()),

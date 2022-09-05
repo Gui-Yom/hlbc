@@ -123,6 +123,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     expr_ctx.pop();
                 }
             } else {
+                push_stmt!(comment($fun.display_id(code).to_string()));
                 match $fun.resolve(code) {
                     FunPtr::Fun(func) => {
                         let call = if func.is_method() {
@@ -420,6 +421,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         );
                     }
                 } else {
+                    push_stmt!(comment(fun.display_id(code).to_string()));
                     let call = call_fun(*fun, args.iter().map(|x| expr!(x)).collect::<Vec<_>>());
                     if fun.ty(code).ret.is_void() {
                         push_stmt!(stmt(call));
@@ -483,6 +485,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
             //region CLOSURES
             &Opcode::StaticClosure { dst, fun } => {
+                push_stmt!(comment(format!("closure : {}", fun.display_id(code))));
                 push_expr!(
                     i,
                     dst,
@@ -490,6 +493,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 );
             }
             &Opcode::InstanceClosure { dst, obj, fun } => {
+                push_stmt!(comment(format!("closure : {}", fun.display_id(code))));
                 match f.regtype(obj).resolve(&code.types) {
                     // This is an anonymous enum holding the capture for the closure
                     Type::Enum { .. } => {

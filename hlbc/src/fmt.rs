@@ -7,11 +7,6 @@ use crate::types::{
 };
 use crate::{Bytecode, RefFun};
 
-/*
-pub trait CodeDisplay {
-    fn display<T: fmt::Display>(&self, ctx: &HlCode) -> T;
-}*/
-
 impl Display for Reg {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "reg{}", self.0)
@@ -166,41 +161,44 @@ impl Type {
 }
 
 impl RefFun {
-    pub fn display_header(&self, ctx: &Bytecode) -> String {
-        self.resolve(ctx).display_header(ctx)
+    pub fn display_header<'a>(&'a self, ctx: &'a Bytecode) -> impl Display + 'a {
+        fmtools::fmt!({ self.resolve(ctx).display_header(ctx) })
     }
 
-    pub fn display_call(&self, ctx: &Bytecode) -> impl Display {
-        self.resolve(ctx).display_call(ctx)
+    /// Display something like `{name}@{findex}` for functions and `{lib}/{name}@{findex}` for natives.
+    pub fn display_id<'a>(&'a self, ctx: &'a Bytecode) -> impl Display + 'a {
+        fmtools::fmt!({ self.resolve(ctx).display_id(ctx) })
     }
 }
 
 impl<'a> FunPtr<'a> {
-    pub fn display_header(&'a self, ctx: &Bytecode) -> String {
-        match self {
-            FunPtr::Fun(fun) => fun.display_header(ctx),
-            FunPtr::Native(n) => n.display_header(ctx),
+    pub fn display_header(&'a self, ctx: &'a Bytecode) -> impl Display + 'a {
+        fmtools::fmt! { move
+            match self {
+                FunPtr::Fun(fun) => {{fun.display_header(ctx)}},
+                FunPtr::Native(n) => {{n.display_header(ctx)}},
+            }
         }
     }
 
-    pub fn display_call(&'a self, ctx: &Bytecode) -> impl Display {
-        match self {
-            FunPtr::Fun(fun) => fun.display_call(ctx),
-            FunPtr::Native(n) => n.display_call(ctx),
+    /// Display something like `{name}@{findex}` for functions and `{lib}/{name}@{findex}` for natives.
+    pub fn display_id(&'a self, ctx: &'a Bytecode) -> impl Display + 'a {
+        fmtools::fmt! { move
+            match self {
+                FunPtr::Fun(fun) => {{fun.display_id(ctx)}},
+                FunPtr::Native(n) => {{n.display_id(ctx)}},
+            }
         }
     }
 }
 
 impl Native {
-    pub fn display_header(&self, ctx: &Bytecode) -> String {
-        format!(
-            "fn:native {} {}",
-            self.display_call(ctx),
-            self.t.display(ctx)
-        )
+    pub fn display_header(&self, ctx: &Bytecode) -> impl Display {
+        format!("fn:native {} {}", self.display_id(ctx), self.t.display(ctx))
     }
 
-    pub fn display_call(&self, ctx: &Bytecode) -> String {
+    /// Display something like `{lib}/{name}@{findex}`
+    pub fn display_id(&self, ctx: &Bytecode) -> impl Display {
         format!(
             "{}/{}@{}",
             self.lib.resolve(&ctx.strings),
@@ -249,21 +247,21 @@ impl Opcode {
             Opcode::Not { dst, src } => op!("{dst} = !{src}"),
             Opcode::Incr { dst } => op!("{dst}++"),
             Opcode::Decr { dst } => op!("{dst}--"),
-            Opcode::Call0 { dst, fun } => op!("{dst} = {}()", fun.display_call(ctx)),
-            Opcode::Call1 { dst, fun, arg0 } => op!("{dst} = {}({arg0})", fun.display_call(ctx)),
+            Opcode::Call0 { dst, fun } => op!("{dst} = {}()", fun.display_id(ctx)),
+            Opcode::Call1 { dst, fun, arg0 } => op!("{dst} = {}({arg0})", fun.display_id(ctx)),
             Opcode::Call2 {
                 dst,
                 fun,
                 arg0,
                 arg1,
-            } => op!("{dst} = {}({arg0}, {arg1})", fun.display_call(ctx)),
+            } => op!("{dst} = {}({arg0}, {arg1})", fun.display_id(ctx)),
             Opcode::Call3 {
                 dst,
                 fun,
                 arg0,
                 arg1,
                 arg2,
-            } => op!("{dst} = {}({arg0}, {arg1}, {arg2})", fun.display_call(ctx)),
+            } => op!("{dst} = {}({arg0}, {arg1}, {arg2})", fun.display_id(ctx)),
             Opcode::Call4 {
                 dst,
                 fun,
@@ -273,11 +271,11 @@ impl Opcode {
                 arg3,
             } => op!(
                 "{dst} = {}({arg0}, {arg1},{arg2}, {arg3})",
-                fun.display_call(ctx)
+                fun.display_id(ctx)
             ),
             Opcode::CallN { dst, fun, args } => {
                 let args: Vec<String> = args.iter().map(|r| format!("{}", r)).collect();
-                op!("{dst} = {}({})", fun.display_call(ctx), args.join(", "))
+                op!("{dst} = {}({})", fun.display_id(ctx), args.join(", "))
             }
             Opcode::CallMethod { dst, field, args } => {
                 let mut args = args.iter();
@@ -483,16 +481,13 @@ impl Opcode {
 }
 
 impl Function {
-    pub fn display_header(&self, ctx: &Bytecode) -> String {
-        format!("fn {} {}", self.display_call(ctx), self.t.display(ctx))
+    pub fn display_header<'a>(&'a self, ctx: &'a Bytecode) -> impl Display + 'a {
+        fmtools::fmt!("fn "{self.display_id(ctx)}" "{self.t.display(ctx)})
     }
 
-    pub fn display_call(&self, ctx: &Bytecode) -> String {
-        format!(
-            "{}@{}",
-            self.name.map(|r| r.resolve(&ctx.strings)).unwrap_or("_"),
-            self.findex.0
-        )
+    /// Display something like `{name}@{findex}`
+    pub fn display_id<'a>(&'a self, ctx: &'a Bytecode) -> impl Display + 'a {
+        fmtools::fmt!({self.name_default(ctx)}"@"{self.findex.0})
     }
 
     pub fn display<'a>(&'a self, ctx: &'a Bytecode) -> impl Display + 'a {

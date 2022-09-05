@@ -284,11 +284,11 @@ enum ItemSelection {
 impl ItemSelection {
     pub(crate) fn name(&self, code: &Bytecode) -> String {
         match self {
-            ItemSelection::Fun(fun) => fun.display_call(code).to_string(),
+            ItemSelection::Fun(fun) => fun.display_id(code).to_string(),
             ItemSelection::Class(t) => t.display(code),
             ItemSelection::Global(g) => format!("global@{}", g.0),
             ItemSelection::String(s) => {
-                format!("string@{} : {}", s.0, s.resolve(&code.strings))
+                format!("string@{}", s.0)
             }
             _ => String::new(),
         }

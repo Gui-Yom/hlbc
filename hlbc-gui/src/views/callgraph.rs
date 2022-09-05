@@ -71,7 +71,9 @@ impl CallgraphView {
                                     .drag_bounds(rect.translate(start))
                                     .show(ui.ctx(), |ui| {
                                         Frame::window(ui.style().as_ref()).show(ui, |ui| {
-                                            ui.code(n.display_header(ctx.code().deref()))
+                                            ui.code(
+                                                n.display_header(ctx.code().deref()).to_string(),
+                                            )
                                         })
                                     })
                                     .response

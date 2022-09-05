@@ -40,7 +40,7 @@ impl AppTab for DecompilerView {
                     FunPtr::Fun(func) => decompile_function(code, func)
                         .display(code, &FormatOptions::new("  "))
                         .to_string(),
-                    FunPtr::Native(n) => n.display_header(code),
+                    FunPtr::Native(n) => n.display_header(code).to_string(),
                 },
                 ItemSelection::Class(t) => {
                     decompile_class(code, t.resolve_as_obj(&code.types).unwrap())

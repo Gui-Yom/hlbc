@@ -180,7 +180,7 @@ fn class_inspector(ui: &mut Ui, t: RefType, code: &Bytecode) {
                                 .bindings
                                 .get(&RefField(i + obj.fields.len() - obj.own_fields.len()))
                             {
-                                ui.monospace(format!("bound to {}", binding.display_call(code)));
+                                ui.monospace(format!("bound to {}", binding.display_id(code)));
                             } else {
                                 ui.monospace("variable");
                             }
@@ -201,7 +201,7 @@ fn class_inspector(ui: &mut Ui, t: RefType, code: &Bytecode) {
                     .show(ui, |ui| {
                         for f in &obj.protos {
                             ui.label(f.name.resolve(&code.strings));
-                            ui.label(f.findex.display_call(code).to_string());
+                            ui.label(f.findex.display_id(code).to_string());
                             ui.end_row();
                         }
                     });
@@ -226,5 +226,7 @@ fn global_inspector(ui: &mut Ui, g: RefGlobal, code: &Bytecode) {
 
 fn string_inspector(ui: &mut Ui, s: RefString, code: &Bytecode) {
     ui.heading(format!("String@{}", s.0));
+    ui.separator();
+    ui.add_space(4.0);
     ui.label(RichText::new(s.resolve(&code.strings)).monospace());
 }

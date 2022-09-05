@@ -123,7 +123,7 @@ impl TypeObj {
 }
 
 /// Type available in the hashlink type system. Every type is one of those.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     Void,
     UI8,
@@ -277,8 +277,14 @@ impl Function {
         self.regs[reg.0 as usize]
     }
 
+    /// Convenience method to resolve the function name
     pub fn name<'a>(&self, code: &'a Bytecode) -> Option<&'a str> {
         self.name.map(|n| n.resolve(&code.strings))
+    }
+
+    /// Convenience method to get the function name or "_"
+    pub fn name_default<'a>(&self, code: &'a Bytecode) -> &'a str {
+        self.name(code).unwrap_or("_")
     }
 
     /// Get the function signature type
@@ -287,10 +293,12 @@ impl Function {
         self.t.resolve_as_fun(&code.types).expect("Unknown type ?")
     }
 
+    /// Convenience method to resolve the function args
     pub fn args<'a>(&self, code: &'a Bytecode) -> &'a [RefType] {
         &self.ty(code).args
     }
 
+    /// Convenience method to resolve the function return type
     pub fn ret<'a>(&self, code: &'a Bytecode) -> &'a Type {
         self.ty(code).ret.resolve(&code.types)
     }
@@ -332,7 +340,7 @@ impl Function {
     }
 }
 
-/// Reference to a function or a native in the pool (findex)
+/// Index reference to a function or a native in the pool (findex)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Default)]
 pub struct RefFun(pub usize);
 
@@ -353,6 +361,13 @@ impl RefFun {
         }
     }
 
+    pub fn name_default<'a>(&self, code: &'a Bytecode) -> &'a str {
+        match self.resolve(code) {
+            FunPtr::Fun(fun) => fun.name_default(code),
+            FunPtr::Native(n) => n.name(code),
+        }
+    }
+
     pub fn ty<'a>(&self, code: &'a Bytecode) -> &'a TypeFun {
         match self.resolve(code) {
             FunPtr::Fun(fun) => fun.ty(code),
@@ -369,7 +384,7 @@ impl RefFun {
     }
 }
 
-// Reference to a function or a native in the pool, but we know what is is.
+// Index reference to either a function or a native.
 #[derive(Debug, Copy, Clone)]
 pub enum RefFunKnown {
     Fun(usize),
@@ -392,7 +407,7 @@ impl RefFunKnown {
     }
 }
 
-/// The possible values behind a function reference
+/// Reference to a function or a native object
 #[derive(Debug, Copy, Clone)]
 pub enum FunPtr<'a> {
     Fun(&'a Function),

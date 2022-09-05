@@ -315,6 +315,6 @@ pub fn stmt(e: Expr) -> Statement {
     Statement::ExprStatement(e)
 }
 
-pub fn comment(comment: &str) -> Statement {
-    Statement::Comment(comment.to_owned())
+pub fn comment(comment: impl Into<String>) -> Statement {
+    Statement::Comment(comment.into())
 }
