@@ -33,6 +33,10 @@ impl RefString {
 
 impl RefType {
     pub fn display(&self, ctx: &Bytecode) -> String {
+        self.resolve(&ctx.types).display(ctx)
+    }
+
+    pub fn display_id(&self, ctx: &Bytecode) -> String {
         format!("{}@{}", self.resolve(&ctx.types).display(ctx), self.0)
     }
 
@@ -194,7 +198,11 @@ impl<'a> FunPtr<'a> {
 
 impl Native {
     pub fn display_header(&self, ctx: &Bytecode) -> impl Display {
-        format!("fn:native {} {}", self.display_id(ctx), self.t.display(ctx))
+        format!(
+            "fn:native {} {}",
+            self.display_id(ctx),
+            self.t.display_id(ctx)
+        )
     }
 
     /// Display something like `{lib}/{name}@{findex}`
@@ -425,13 +433,16 @@ impl Opcode {
                 op!("{array}[{index}] = {src}")
             }
             Opcode::New { dst } => {
-                op!("{dst} = new {}", parent.regs[dst.0 as usize].display(ctx))
+                op!(
+                    "{dst} = new {}",
+                    parent.regs[dst.0 as usize].display_id(ctx)
+                )
             }
             Opcode::ArraySize { dst, array } => {
                 op!("{dst} = {array}.length")
             }
             Opcode::Type { dst, ty } => {
-                op!("{dst} = {}", ty.display(ctx))
+                op!("{dst} = {}", ty.display_id(ctx))
             }
             Opcode::Ref { dst, src } => {
                 op!("{dst} = &{src}")
@@ -482,7 +493,7 @@ impl Opcode {
 
 impl Function {
     pub fn display_header<'a>(&'a self, ctx: &'a Bytecode) -> impl Display + 'a {
-        fmtools::fmt!("fn "{self.display_id(ctx)}" "{self.t.display(ctx)})
+        fmtools::fmt!("fn "{self.display_id(ctx)}" "{self.t.display_id(ctx)})
     }
 
     /// Display something like `{name}@{findex}`
@@ -494,7 +505,7 @@ impl Function {
         fmtools::fmt! {
             {self.display_header(ctx)}" ("{self.regs.len()}" regs, "{self.ops.len()}" ops)\n"
             for (i, reg) in self.regs.iter().enumerate() {
-                "    reg"{i:<2}" "{reg.display(ctx)}"\n"
+                "    reg"{i:<2}" "{reg.display_id(ctx)}"\n"
             }
             if let Some(debug) = &self.debug_info {
                 for ((i, o), (file, line)) in self.ops

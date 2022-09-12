@@ -232,7 +232,7 @@ impl Scopes {
 
     //region QUERIES
     /// Returns a mutable reference to the loop condition if the current scope is a loop
-    pub(crate) fn update_last_loop_cond(&mut self) -> Option<&mut Expr> {
+    pub(crate) fn last_loop_cond_mut(&mut self) -> Option<&mut Expr> {
         self.scopes.last_mut().and_then(|s| match &mut s.data {
             ScopeData::Loop { cond, .. } => Some(cond),
             _ => None,

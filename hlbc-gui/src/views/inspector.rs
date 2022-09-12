@@ -103,7 +103,7 @@ fn function_inspector(ui: &mut Ui, fun: RefFun, code: &Bytecode) {
             if let Some(parent) = f.parent {
                 ui.label(format!(
                     "static/instance method of {}",
-                    parent.display(code)
+                    parent.display_id(code)
                 ));
             } else {
                 ui.label("Probably a closure.");
@@ -116,7 +116,7 @@ fn function_inspector(ui: &mut Ui, fun: RefFun, code: &Bytecode) {
                     .show(ui, |ui| {
                         for (i, reg) in f.regs.iter().enumerate() {
                             ui.label(format!("reg{i}"));
-                            ui.label(reg.display(code));
+                            ui.label(reg.display_id(code));
                             ui.end_row();
                         }
                     });
@@ -155,10 +155,10 @@ fn function_inspector(ui: &mut Ui, fun: RefFun, code: &Bytecode) {
 }
 
 fn class_inspector(ui: &mut Ui, t: RefType, code: &Bytecode) {
-    ui.heading(format!("Class : {}", t.display(code)));
+    ui.heading(format!("Class : {}", t.display_id(code)));
     if let Some(obj) = t.resolve_as_obj(&code.types) {
         if let Some(super_) = obj.super_ {
-            ui.label(format!("extends {}", super_.display(code)));
+            ui.label(format!("extends {}", super_.display_id(code)));
         }
         if obj.global.0 >= 1 {
             ui.label(format!("initialized by global {}", obj.global.0 - 1));
@@ -175,7 +175,7 @@ fn class_inspector(ui: &mut Ui, t: RefType, code: &Bytecode) {
                     .show(ui, |ui| {
                         for (i, f) in obj.own_fields.iter().enumerate() {
                             ui.label(f.name.resolve(&code.strings));
-                            ui.label(f.t.display(code));
+                            ui.label(f.t.display_id(code));
                             if let Some(binding) = obj
                                 .bindings
                                 .get(&RefField(i + obj.fields.len() - obj.own_fields.len()))
@@ -214,7 +214,7 @@ fn class_inspector(ui: &mut Ui, t: RefType, code: &Bytecode) {
 
 fn global_inspector(ui: &mut Ui, g: RefGlobal, code: &Bytecode) {
     ui.heading(format!("Global@{}", g.0));
-    ui.label(format!("Type : {}", code.globals[g.0].display(code)));
+    ui.label(format!("Type : {}", code.globals[g.0].display_id(code)));
 
     if let (Some(&cst), Some(constants)) = (code.globals_initializers.get(&g), &code.constants) {
         let def = &constants[cst];

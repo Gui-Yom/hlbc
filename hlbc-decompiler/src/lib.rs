@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use ast::*;
 use hlbc::opcodes::Opcode;
-use hlbc::types::{FunPtr, Function, RefField, Reg, Type, TypeObj};
+use hlbc::types::{Function, RefField, RefFun, Reg, Type, TypeObj};
 use hlbc::Bytecode;
 use scopes::*;
 
@@ -34,146 +34,161 @@ enum ExprCtx {
     },
 }
 
-/// Decompile a function code to a list of [Statement]s.
-/// This works by analyzing each opcodes in order while trying to reconstruct scopes, contexts and intents.
-pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
+struct DecompilerState<'c> {
     // Scope stack, holds the statements
-    let mut scopes = Scopes::new();
-    // Current iteration statement, to be pushed onto the finished statements or the nesting
-    //let mut statement = None;
+    scopes: Scopes,
     // Expression values for each registers
-    let mut reg_state = HashMap::with_capacity(f.regs.len());
+    reg_state: HashMap<Reg, Expr>,
     // For parsing statements made of multiple instructions like constructor calls and anonymous structures
     // TODO move this to another pass on the generated ast
-    let mut expr_ctx = Vec::new();
+    expr_ctx: Vec<ExprCtx>,
     // Variable names we already declared
-    let mut seen = HashSet::new();
+    seen: HashSet<String>,
+    f: &'c Function,
+    code: &'c Bytecode,
+}
 
-    let mut start = 0;
-    // First argument / First register is 'this'
-    if f.is_method()
-        || f.name
-            .map(|n| n.resolve(&code.strings) == "__constructor__")
-            .unwrap_or(false)
-    {
-        reg_state.insert(Reg(0), cst_this());
-        start = 1;
-    }
+impl<'c> DecompilerState<'c> {
+    fn new(code: &'c Bytecode, f: &'c Function) -> DecompilerState<'c> {
+        let scopes = Scopes::new();
+        let mut reg_state = HashMap::with_capacity(f.regs.len());
+        let expr_ctx = Vec::new();
+        let mut seen = HashSet::new();
 
-    // Initialize register state with the function arguments
-    for i in start..f.ty(code).args.len() {
-        let name = f.arg_name(code, i - start).map(ToOwned::to_owned);
-        reg_state.insert(Reg(i as u32), Expr::Variable(Reg(i as u32), name.clone()));
-        if let Some(name) = name {
-            seen.insert(name);
+        let mut start = 0;
+        // First argument / First register is 'this'
+        if f.is_method()
+            || f.name
+                .map(|n| n.resolve(&code.strings) == "__constructor__")
+                .unwrap_or(false)
+        {
+            reg_state.insert(Reg(0), cst_this());
+            start = 1;
+        }
+
+        // Initialize register state with the function arguments
+        for i in start..f.ty(code).args.len() {
+            let name = f.arg_name(code, i - start).map(ToOwned::to_owned);
+            reg_state.insert(Reg(i as u32), Expr::Variable(Reg(i as u32), name.clone()));
+            if let Some(name) = name {
+                seen.insert(name);
+            }
+        }
+
+        Self {
+            scopes,
+            reg_state,
+            expr_ctx,
+            seen,
+            f,
+            code,
         }
     }
 
-    macro_rules! push_stmt {
-        ($stmt:expr) => {
-            //statement = Some($stmt);
-            scopes.push_stmt($stmt);
-        };
+    fn push_stmt(&mut self, stmt: Statement) {
+        self.scopes.push_stmt(stmt);
     }
 
     // Update the register state and create a statement depending on inline rules
-    macro_rules! push_expr {
-        ($i:expr, $dst:expr, $e:expr) => {
-            let name = f.var_name(code, $i);
-            let expr = $e;
-            // Inline check
-            if name.is_none() {
-                reg_state.insert($dst, expr);
-            } else {
-                reg_state.insert($dst, Expr::Variable($dst, name.clone()));
-                push_stmt!(Statement::Assign {
-                    declaration: seen.insert(name.clone().unwrap()),
-                    variable: Expr::Variable($dst, name),
-                    assign: expr,
-                });
-            }
-        };
+    fn push_expr(&mut self, i: usize, dst: Reg, expr: Expr) {
+        let name = self.f.var_name(self.code, i);
+        // Inline check
+        if name.is_none() {
+            self.reg_state.insert(dst, expr);
+        } else {
+            self.reg_state
+                .insert(dst, Expr::Variable(dst, name.clone()));
+            let declaration = self.seen.insert(name.clone().unwrap());
+            self.push_stmt(Statement::Assign {
+                declaration,
+                variable: Expr::Variable(dst, name),
+                assign: expr,
+            });
+        }
     }
-
-    let missing_expr = || Expr::Unknown("missing expr".to_owned());
 
     // Get the expr for a register
-    macro_rules! expr {
-        ($reg:expr) => {
-            reg_state.get(&$reg).cloned().unwrap_or_else(missing_expr)
-        };
+    fn expr(&self, reg: Reg) -> Expr {
+        self.reg_state
+            .get(&reg)
+            .cloned()
+            .unwrap_or_else(|| Expr::Unknown("missing expr".to_owned()))
     }
 
-    // Crate a Vec<Expression> for a list of args
-    macro_rules! make_args {
-        ($($arg:expr),* $(,)?) => {
-            vec![$(expr!($arg)),*]
+    /// Expands the expression of many registers
+    fn args_expr(&self, args: &[Reg]) -> Vec<Expr> {
+        args.into_iter().map(|&r| self.expr(r)).collect()
+    }
+
+    /// Push a call to a function, which might be a constructor call.
+    fn push_call(&mut self, i: usize, dst: Reg, fun: RefFun, args: &[Reg]) {
+        if let Some(&ExprCtx::Constructor { reg, pos }) = self.expr_ctx.last() {
+            if reg == args[0] {
+                self.push_expr(
+                    pos,
+                    reg,
+                    Expr::Constructor(ConstructorCall::new(
+                        self.f.regtype(reg),
+                        self.args_expr(&args[1..]),
+                    )),
+                );
+                self.expr_ctx.pop();
+            }
+        } else {
+            self.push_stmt(comment(fun.display_id(self.code).to_string()));
+            let call = if let Some((func, true)) = fun
+                .resolve_as_fn(self.code)
+                .map(|func| (func, func.is_method()))
+            {
+                call(
+                    Expr::Field(
+                        Box::new(self.expr(args[0])),
+                        func.name
+                            .clone()
+                            .unwrap()
+                            .resolve(&self.code.strings)
+                            .to_owned(),
+                    ),
+                    self.args_expr(&args[1..]),
+                )
+            } else {
+                call_fun(fun, self.args_expr(&args))
+            };
+            if fun.ty(self.code).ret.is_void() {
+                self.push_stmt(stmt(call));
+            } else {
+                self.push_expr(i, dst, call);
+            }
         }
     }
 
-    macro_rules! push_call {
-        ($i:ident, $dst:ident, $fun:ident, $arg0:expr $(, $args:expr)*) => {
-            if let Some(&ExprCtx::Constructor { reg, pos }) = expr_ctx.last() {
-                if reg == $arg0 {
-                    push_expr!(
-                        pos,
-                        reg,
-                        Expr::Constructor(ConstructorCall::new(f.regtype(reg), make_args!($($args),*)))
-                    );
-                    expr_ctx.pop();
-                }
-            } else {
-                push_stmt!(comment($fun.display_id(code).to_string()));
-                match $fun.resolve(code) {
-                    FunPtr::Fun(func) => {
-                        let call = if func.is_method() {
-                            call(Expr::Field(Box::new(expr!($arg0)), func.name.clone().unwrap().resolve(&code.strings).to_owned()), make_args!($($args),*))
-                        } else {
-                            call_fun($fun, make_args!($arg0 $(, $args)*))
-                        };
-                        if func.ty(code).ret.is_void() {
-                            push_stmt!(stmt(call));
-                        } else {
-                            push_expr!($i, $dst, call);
-                        }
-                    }
-                    FunPtr::Native(n) => {
-                        let call = call_fun($fun, make_args!($arg0 $(, $args)*));
-                        if n.ty(code).ret.is_void() {
-                            push_stmt!(stmt(call));
-                        } else {
-                            push_expr!($i, $dst, call);
-                        }
-                    }
-                }
-            }
-        };
-    }
-
-    // Process a jmp instruction, might be the exit condition of a loop or an if
-    macro_rules! push_jmp {
-        ($i:ident, $offset:ident, $cond:expr) => {
-            if $offset > 0 {
-                let cond = $cond;
-                // It's a loop
-                if matches!(f.ops[$i + $offset as usize], Opcode::JAlways { offset } if offset < 0) {
-                    if let Some(loop_cond) = scopes.update_last_loop_cond() {
-                        if matches!(loop_cond, Expr::Unknown(_)) {
-                            println!("old loop cond : {:?}", loop_cond);
-                            *loop_cond = cond;
-                        } else {
-                            scopes.push_if($offset + 1, cond);
-                        }
+    /// Process a jmp instruction, might be the exit condition of a loop or an if
+    fn push_jmp(&mut self, i: usize, offset: i32, cond: Expr) {
+        if offset > 0 {
+            // It's a loop
+            if matches!(self.f.ops[i + offset as usize], Opcode::JAlways { offset } if offset < 0) {
+                if let Some(loop_cond) = self.scopes.last_loop_cond_mut() {
+                    if matches!(loop_cond, Expr::Unknown(_)) {
+                        println!("old loop cond : {:?}", loop_cond);
+                        *loop_cond = cond;
                     } else {
-                        scopes.push_if($offset + 1, cond);
+                        self.scopes.push_if(offset + 1, cond);
                     }
                 } else {
-                    // It's an if
-                    scopes.push_if($offset + 1, cond);
+                    self.scopes.push_if(offset + 1, cond);
                 }
+            } else {
+                // It's an if
+                self.scopes.push_if(offset + 1, cond);
             }
         }
     }
+}
+
+/// Decompile a function code to a list of [Statement]s.
+/// This works by analyzing each opcodes in order while trying to reconstruct scopes, contexts and intents.
+pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
+    let mut state = DecompilerState::new(code, f);
 
     let iter = f.ops.iter().enumerate();
     for (i, o) in iter {
@@ -181,41 +196,38 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
         // Control flow first because they are the most important
         match o {
             //region CONTROL FLOW
-            &Opcode::JTrue { cond, offset } => {
-                push_jmp!(i, offset, not(expr!(cond)))
-            }
-            &Opcode::JFalse { cond, offset } => {
-                push_jmp!(i, offset, expr!(cond))
-            }
+            &Opcode::JTrue { cond, offset } => state.push_jmp(i, offset, not(state.expr(cond))),
+            &Opcode::JFalse { cond, offset } => state.push_jmp(i, offset, state.expr(cond)),
             &Opcode::JNull { reg, offset } => {
-                push_jmp!(i, offset, noteq(expr!(reg), cst_null()))
+                state.push_jmp(i, offset, noteq(state.expr(reg), cst_null()))
             }
             &Opcode::JNotNull { reg, offset } => {
-                push_jmp!(i, offset, eq(expr!(reg), cst_null()))
+                state.push_jmp(i, offset, eq(state.expr(reg), cst_null()))
             }
             &Opcode::JSGte { a, b, offset } | &Opcode::JUGte { a, b, offset } => {
-                push_jmp!(i, offset, gt(expr!(b), expr!(a)))
+                state.push_jmp(i, offset, gt(state.expr(b), state.expr(a)))
             }
             &Opcode::JSGt { a, b, offset } => {
-                push_jmp!(i, offset, gte(expr!(b), expr!(a)))
+                state.push_jmp(i, offset, gte(state.expr(b), state.expr(a)))
             }
             &Opcode::JSLte { a, b, offset } => {
-                push_jmp!(i, offset, lt(expr!(b), expr!(a)))
+                state.push_jmp(i, offset, lt(state.expr(b), state.expr(a)))
             }
             &Opcode::JSLt { a, b, offset } | &Opcode::JULt { a, b, offset } => {
-                push_jmp!(i, offset, lte(expr!(b), expr!(a)))
+                state.push_jmp(i, offset, lte(state.expr(b), state.expr(a)))
             }
             &Opcode::JEq { a, b, offset } => {
-                push_jmp!(i, offset, noteq(expr!(a), expr!(b)))
+                state.push_jmp(i, offset, noteq(state.expr(a), state.expr(b)))
             }
             &Opcode::JNotEq { a, b, offset } => {
-                push_jmp!(i, offset, eq(expr!(a), expr!(b)))
+                state.push_jmp(i, offset, eq(state.expr(a), state.expr(b)))
             }
             // Unconditional jumps can actually mean a lot of things
             &Opcode::JAlways { offset } => {
                 if offset < 0 {
                     // It's either the jump backward of a loop or a continue statement
-                    let loop_start = scopes
+                    let loop_start = state
+                        .scopes
                         .last_loop_start()
                         .expect("Backward jump but we aren't in a loop ?");
 
@@ -229,72 +241,72 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         }
                     }).unwrap_or(false) {
                         // If this jump is not the last jump backward for the current loop, so it's definitely a continue; statement
-                        push_stmt!(Statement::Continue);
+                        state.push_stmt(Statement::Continue);
                     } else {
                         // It's the last jump backward of the loop, which means the end of the loop
                         // we generate the loop statement
-                        if let Some(stmt) = scopes.end_last_loop() {
-                            push_stmt!(stmt);
+                        if let Some(stmt) = state.scopes.end_last_loop() {
+                            state.push_stmt(stmt);
                         } else {
                             panic!("Last scope is not a loop !");
                         }
                     }
                 } else {
-                    if let Some(offsets) = scopes.last_is_switch_ctx() {
+                    if let Some(offsets) = state.scopes.last_is_switch_ctx() {
                         if let Some(pos) = offsets.iter().position(|o| *o == i) {
-                            scopes.push_switch_case(pos);
+                            state.scopes.push_switch_case(pos);
                         } else {
                             panic!("no matching offset for switch case ({i})");
                         }
-                    } else if scopes.last_loop_start().is_some() {
+                    } else if state.scopes.last_loop_start().is_some() {
                         // Check the instruction just before the jump target
                         // If it's a jump backward of a loop
                         if matches!(f.ops[(i as i32 + offset) as usize], Opcode::JAlways {offset} if offset < 0)
                         {
                             // It's a break condition
-                            push_stmt!(Statement::Break);
+                            state.push_stmt(Statement::Break);
                         }
-                    } else if scopes.last_is_if() {
+                    } else if state.scopes.last_is_if() {
                         // It's the jump over of an else clause
-                        scopes.push_else(offset + 1);
+                        state.scopes.push_else(offset + 1);
                     } else {
                         eprintln!(
                             "{i}: JAlways has no matching scope (last: {:?})",
-                            scopes.scopes.last()
+                            state.scopes.scopes.last()
                         );
                     }
                 }
             }
             Opcode::Switch { reg, offsets, end } => {
                 // Convert to absolute positions
-                scopes.push_switch(
+                state.scopes.push_switch(
                     *end + 1,
-                    expr!(reg),
+                    state.expr(*reg),
                     offsets.iter().map(|o| i + *o as usize).collect(),
                 );
                 // The default switch case is implicit
             }
-            &Opcode::Label => scopes.push_loop(i),
+            &Opcode::Label => state.scopes.push_loop(i),
             &Opcode::Ret { ret } => {
                 // Do not display return void; only in case of an early return
-                if scopes.has_scopes() {
-                    push_stmt!(Statement::Return(if f.regtype(ret).is_void() {
+                if state.scopes.has_scopes() {
+                    state.push_stmt(Statement::Return(if f.regtype(ret).is_void() {
                         None
                     } else {
-                        Some(expr!(ret))
+                        Some(state.expr(ret))
                     }));
                 } else if !f.regtype(ret).is_void() {
-                    push_stmt!(Statement::Return(Some(expr!(ret))));
+                    state.push_stmt(Statement::Return(Some(state.expr(ret))));
                 }
             }
             //endregion
 
             //region EXCEPTIONS
             &Opcode::Throw { exc } | &Opcode::Rethrow { exc } => {
-                push_stmt!(Statement::Throw(expr!(exc)));
+                state.push_stmt(Statement::Throw(state.expr(exc)));
             }
             &Opcode::Trap { exc, offset } => {
-                scopes.push_try(offset + 1);
+                state.scopes.push_try(offset + 1);
             }
             &Opcode::EndTrap { exc } => {
                 // TODO try catch
@@ -303,83 +315,85 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
             //region CONSTANTS
             &Opcode::Int { dst, ptr } => {
-                push_expr!(i, dst, cst_int(ptr.resolve(&code.ints)));
+                state.push_expr(i, dst, cst_int(ptr.resolve(&code.ints)));
             }
             &Opcode::Float { dst, ptr } => {
-                push_expr!(i, dst, cst_float(ptr.resolve(&code.floats)));
+                state.push_expr(i, dst, cst_float(ptr.resolve(&code.floats)));
             }
             &Opcode::Bool { dst, value } => {
-                push_expr!(i, dst, cst_bool(value.0));
+                state.push_expr(i, dst, cst_bool(value.0));
             }
             &Opcode::String { dst, ptr } => {
-                push_expr!(i, dst, cst_refstring(ptr, code));
+                state.push_expr(i, dst, cst_refstring(ptr, code));
             }
             &Opcode::Null { dst } => {
-                push_expr!(i, dst, cst_null());
+                state.push_expr(i, dst, cst_null());
             }
             //endregion
 
             //region OPERATORS
             &Opcode::Mov { dst, src } => {
-                push_expr!(i, dst, expr!(src));
+                state.push_expr(i, dst, state.expr(src));
                 // Workaround for when the instructions after this one use dst and src interchangeably.
-                reg_state.insert(src, Expr::Variable(dst, f.var_name(code, i)));
+                state
+                    .reg_state
+                    .insert(src, Expr::Variable(dst, f.var_name(code, i)));
             }
             &Opcode::Add { dst, a, b } => {
-                push_expr!(i, dst, add(expr!(a), expr!(b)));
+                state.push_expr(i, dst, add(state.expr(a), state.expr(b)));
             }
             &Opcode::Sub { dst, a, b } => {
-                push_expr!(i, dst, sub(expr!(a), expr!(b)));
+                state.push_expr(i, dst, sub(state.expr(a), state.expr(b)));
             }
             &Opcode::Mul { dst, a, b } => {
-                push_expr!(i, dst, mul(expr!(a), expr!(b)));
+                state.push_expr(i, dst, mul(state.expr(a), state.expr(b)));
             }
             &Opcode::SDiv { dst, a, b } | &Opcode::UDiv { dst, a, b } => {
-                push_expr!(i, dst, div(expr!(a), expr!(b)));
+                state.push_expr(i, dst, div(state.expr(a), state.expr(b)));
             }
             &Opcode::SMod { dst, a, b } | &Opcode::UMod { dst, a, b } => {
-                push_expr!(i, dst, modulo(expr!(a), expr!(b)));
+                state.push_expr(i, dst, modulo(state.expr(a), state.expr(b)));
             }
             &Opcode::Shl { dst, a, b } => {
-                push_expr!(i, dst, shl(expr!(a), expr!(b)));
+                state.push_expr(i, dst, shl(state.expr(a), state.expr(b)));
             }
             &Opcode::SShr { dst, a, b } | &Opcode::UShr { dst, a, b } => {
-                push_expr!(i, dst, shr(expr!(a), expr!(b)));
+                state.push_expr(i, dst, shr(state.expr(a), state.expr(b)));
             }
             &Opcode::And { dst, a, b } => {
-                push_expr!(i, dst, and(expr!(a), expr!(b)));
+                state.push_expr(i, dst, and(state.expr(a), state.expr(b)));
             }
             &Opcode::Or { dst, a, b } => {
-                push_expr!(i, dst, or(expr!(a), expr!(b)));
+                state.push_expr(i, dst, or(state.expr(a), state.expr(b)));
             }
             &Opcode::Xor { dst, a, b } => {
-                push_expr!(i, dst, xor(expr!(a), expr!(b)));
+                state.push_expr(i, dst, xor(state.expr(a), state.expr(b)));
             }
             &Opcode::Neg { dst, src } => {
-                push_expr!(i, dst, neg(expr!(src)));
+                state.push_expr(i, dst, neg(state.expr(src)));
             }
             &Opcode::Not { dst, src } => {
-                push_expr!(i, dst, not(expr!(src)));
+                state.push_expr(i, dst, not(state.expr(src)));
             }
             &Opcode::Incr { dst } => {
                 // FIXME sometimes it should be an expression
-                push_stmt!(stmt(incr(expr!(dst))));
+                state.push_stmt(stmt(incr(state.expr(dst))));
             }
             &Opcode::Decr { dst } => {
-                push_stmt!(stmt(decr(expr!(dst))));
+                state.push_stmt(stmt(decr(state.expr(dst))));
             }
             //endregion
 
             //region CALLS
             &Opcode::Call0 { dst, fun } => {
                 if fun.ty(code).ret.is_void() {
-                    push_stmt!(stmt(call_fun(fun, Vec::new())));
+                    state.push_stmt(stmt(call_fun(fun, Vec::new())));
                 } else {
-                    push_expr!(i, dst, call_fun(fun, Vec::new()));
+                    state.push_expr(i, dst, call_fun(fun, Vec::new()));
                 }
             }
             &Opcode::Call1 { dst, fun, arg0 } => {
-                push_call!(i, dst, fun, arg0)
+                state.push_call(i, dst, fun, &[arg0]);
             }
             &Opcode::Call2 {
                 dst,
@@ -387,7 +401,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 arg0,
                 arg1,
             } => {
-                push_call!(i, dst, fun, arg0, arg1)
+                state.push_call(i, dst, fun, &[arg0, arg1]);
             }
             &Opcode::Call3 {
                 dst,
@@ -396,7 +410,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 arg1,
                 arg2,
             } => {
-                push_call!(i, dst, fun, arg0, arg1, arg2)
+                state.push_call(i, dst, fun, &[arg0, arg1, arg2]);
             }
             &Opcode::Call4 {
                 dst,
@@ -406,34 +420,34 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 arg2,
                 arg3,
             } => {
-                push_call!(i, dst, fun, arg0, arg1, arg2, arg3)
+                state.push_call(i, dst, fun, &[arg0, arg1, arg2, arg3]);
             }
             Opcode::CallN { dst, fun, args } => {
-                if let Some(&ExprCtx::Constructor { reg, pos }) = expr_ctx.last() {
+                if let Some(&ExprCtx::Constructor { reg, pos }) = state.expr_ctx.last() {
                     if reg == args[0] {
-                        push_expr!(
+                        state.push_expr(
                             pos,
                             reg,
                             Expr::Constructor(ConstructorCall::new(
                                 f.regtype(reg),
-                                args[1..].iter().map(|x| expr!(x)).collect::<Vec<_>>()
-                            ))
+                                state.args_expr(&args[1..]),
+                            )),
                         );
                     }
                 } else {
-                    push_stmt!(comment(fun.display_id(code).to_string()));
-                    let call = call_fun(*fun, args.iter().map(|x| expr!(x)).collect::<Vec<_>>());
+                    state.push_stmt(comment(fun.display_id(code).to_string()));
+                    let call = call_fun(*fun, state.args_expr(args));
                     if fun.ty(code).ret.is_void() {
-                        push_stmt!(stmt(call));
+                        state.push_stmt(stmt(call));
                     } else {
-                        push_expr!(i, *dst, call);
+                        state.push_expr(i, *dst, call);
                     }
                 }
             }
             Opcode::CallMethod { dst, field, args } => {
                 let call = call(
-                    ast::field(expr!(args[0]), f.regtype(args[0]), *field, code),
-                    args.iter().skip(1).map(|x| expr!(x)).collect::<Vec<_>>(),
+                    ast::field(state.expr(args[0]), f.regtype(args[0]), *field, code),
+                    state.args_expr(&args[1..]),
                 );
                 if f.regtype(args[0])
                     .method(field.0, code)
@@ -441,9 +455,9 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     .map(|fun| fun.ty(code).ret.is_void())
                     .unwrap_or(false)
                 {
-                    push_stmt!(stmt(call));
+                    state.push_stmt(stmt(call));
                 } else {
-                    push_expr!(i, *dst, call);
+                    state.push_expr(i, *dst, call);
                 }
             }
             Opcode::CallThis { dst, field, args } => {
@@ -453,7 +467,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         Box::new(cst_this()),
                         method.name.resolve(&code.strings).to_owned(),
                     ),
-                    args.iter().map(|x| expr!(x)).collect::<Vec<_>>(),
+                    state.args_expr(args),
                 );
                 if method
                     .findex
@@ -461,63 +475,60 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     .map(|fun| fun.ty(code).ret.is_void())
                     .unwrap_or(false)
                 {
-                    push_stmt!(stmt(call));
+                    state.push_stmt(stmt(call));
                 } else {
-                    push_expr!(i, *dst, call);
+                    state.push_expr(i, *dst, call);
                 }
             }
             Opcode::CallClosure { dst, fun, args } => {
-                let call = call(
-                    expr!(*fun),
-                    args.iter().map(|x| expr!(x)).collect::<Vec<_>>(),
-                );
+                let call = call(state.expr(*fun), state.args_expr(args));
                 if f.regtype(*fun)
                     .resolve_as_fun(&code.types)
                     .map(|ty| ty.ret.is_void())
                     .unwrap_or(false)
                 {
-                    push_stmt!(stmt(call));
+                    state.push_stmt(stmt(call));
                 } else {
-                    push_expr!(i, *dst, call);
+                    state.push_expr(i, *dst, call);
                 }
             }
             //endregion
 
             //region CLOSURES
             &Opcode::StaticClosure { dst, fun } => {
-                push_stmt!(comment(format!("closure : {}", fun.display_id(code))));
-                push_expr!(
+                state.push_stmt(comment(format!("closure : {}", fun.display_id(code))));
+                state.push_expr(
                     i,
                     dst,
-                    Expr::Closure(fun, decompile_code(code, fun.resolve_as_fn(code).unwrap()))
+                    Expr::Closure(fun, decompile_code(code, fun.resolve_as_fn(code).unwrap())),
                 );
             }
             &Opcode::InstanceClosure { dst, obj, fun } => {
-                push_stmt!(comment(format!("closure : {}", fun.display_id(code))));
+                state.push_stmt(comment(format!("closure : {}", fun.display_id(code))));
                 match f.regtype(obj).resolve(&code.types) {
                     // This is an anonymous enum holding the capture for the closure
                     Type::Enum { .. } => {
-                        push_expr!(
+                        state.push_expr(
                             i,
                             dst,
                             Expr::Closure(
                                 fun,
-                                decompile_code(code, fun.resolve_as_fn(code).unwrap())
-                            )
+                                decompile_code(code, fun.resolve_as_fn(code).unwrap()),
+                            ),
                         );
                     }
                     _ => {
-                        push_expr!(
+                        state.push_expr(
                             i,
                             dst,
                             Expr::Field(
-                                Box::new(expr!(obj)),
+                                Box::new(state.expr(obj)),
                                 fun.resolve_as_fn(code)
                                     .unwrap()
                                     .name(code)
                                     .unwrap_or("_")
                                     .to_owned(),
-                            )
+                            ),
                         );
                     }
                 }
@@ -528,7 +539,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
             &Opcode::GetGlobal { dst, global } => {
                 // Is a string
                 if f.regtype(dst).0 == 13 {
-                    push_expr!(
+                    state.push_expr(
                         i,
                         dst,
                         cst_string(
@@ -539,26 +550,38 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                                         code.strings[constants[x].fields[0]].to_owned()
                                     })
                                 })
-                                .unwrap()
-                        )
+                                .unwrap(),
+                        ),
                     );
                 } else {
                     match f.regtype(dst).resolve(&code.types) {
                         Type::Obj(obj) | Type::Struct(obj) => {
-                            push_expr!(i, dst, Expr::Variable(dst, Some(obj.name.display(code))));
+                            state.push_expr(
+                                i,
+                                dst,
+                                Expr::Variable(dst, Some(obj.name.display(code))),
+                            );
                         }
                         Type::Enum { .. } => {
-                            push_expr!(i, dst, Expr::Unknown("unknown enum variant".to_owned()));
+                            state.push_expr(
+                                i,
+                                dst,
+                                Expr::Unknown("unknown enum variant".to_owned()),
+                            );
                         }
                         _ => {}
                     }
                 }
             }
             &Opcode::Field { dst, obj, field } => {
-                push_expr!(i, dst, ast::field(expr!(obj), f.regtype(obj), field, code));
+                state.push_expr(
+                    i,
+                    dst,
+                    ast::field(state.expr(obj), f.regtype(obj), field, code),
+                );
             }
             &Opcode::SetField { obj, field, src } => {
-                let ctx = expr_ctx.pop();
+                let ctx = state.expr_ctx.pop();
                 // Might be a SetField for an anonymous structure
                 if let Some(ExprCtx::Anonymous {
                     pos,
@@ -566,47 +589,47 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     mut remaining,
                 }) = ctx
                 {
-                    fields.insert(field, expr!(src));
+                    fields.insert(field, state.expr(src));
                     remaining -= 1;
                     // If we filled all the structure fields, we emit an expr
                     if remaining == 0 {
-                        push_expr!(pos, obj, Expr::Anonymous(f.regtype(obj), fields));
+                        state.push_expr(pos, obj, Expr::Anonymous(f.regtype(obj), fields));
                     } else {
-                        expr_ctx.push(ExprCtx::Anonymous {
+                        state.expr_ctx.push(ExprCtx::Anonymous {
                             pos,
                             fields,
                             remaining,
                         });
                     }
                 } else if let Some(ctx) = ctx {
-                    expr_ctx.push(ctx);
+                    state.expr_ctx.push(ctx);
                 } else {
                     // Otherwise this is just a normal field set
-                    push_stmt!(Statement::Assign {
+                    state.push_stmt(Statement::Assign {
                         declaration: false,
-                        variable: ast::field(expr!(obj), f.regtype(obj), field, code),
-                        assign: expr!(src),
+                        variable: ast::field(state.expr(obj), f.regtype(obj), field, code),
+                        assign: state.expr(src),
                     });
                 }
             }
             &Opcode::GetThis { dst, field } => {
-                push_expr!(i, dst, ast::field(cst_this(), f.regs[0], field, code));
+                state.push_expr(i, dst, ast::field(cst_this(), f.regs[0], field, code));
             }
             &Opcode::SetThis { field, src } => {
-                push_stmt!(Statement::Assign {
+                state.push_stmt(Statement::Assign {
                     declaration: false,
                     variable: ast::field(cst_this(), f.regs[0], field, code),
-                    assign: expr!(src),
+                    assign: state.expr(src),
                 });
             }
             &Opcode::DynGet { dst, obj, field } => {
-                push_expr!(i, dst, array(expr!(obj), cst_refstring(field, code)));
+                state.push_expr(i, dst, array(state.expr(obj), cst_refstring(field, code)));
             }
             &Opcode::DynSet { obj, field, src } => {
-                push_stmt!(Statement::Assign {
+                state.push_stmt(Statement::Assign {
                     declaration: false,
-                    variable: array(expr!(obj), cst_refstring(field, code)),
-                    assign: expr!(src)
+                    variable: array(state.expr(obj), cst_refstring(field, code)),
+                    assign: state.expr(src),
                 });
             }
             //endregion
@@ -619,43 +642,45 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
             | &Opcode::SafeCast { dst, src }
             | &Opcode::UnsafeCast { dst, src }
             | &Opcode::ToVirtual { dst, src } => {
-                push_expr!(i, dst, expr!(src));
+                state.push_expr(i, dst, state.expr(src));
             }
             &Opcode::Ref { dst, src } => {
-                push_expr!(i, dst, expr!(src));
+                state.push_expr(i, dst, state.expr(src));
             }
             &Opcode::Unref { dst, src } => {
-                push_expr!(i, dst, expr!(src));
+                state.push_expr(i, dst, state.expr(src));
             }
             &Opcode::Setref { dst, value } => {
-                push_stmt!(Statement::Assign {
+                state.push_stmt(Statement::Assign {
                     declaration: false,
-                    variable: expr!(dst),
-                    assign: expr!(value)
+                    variable: state.expr(dst),
+                    assign: state.expr(value),
                 });
             }
             &Opcode::RefData { dst, src } => {
-                push_expr!(i, dst, expr!(src));
+                state.push_expr(i, dst, state.expr(src));
             }
             &Opcode::New { dst } => {
                 // Constructor analysis
                 let ty = f.regtype(dst).resolve(&code.types);
                 match ty {
                     Type::Obj(_) | Type::Struct(_) => {
-                        expr_ctx.push(ExprCtx::Constructor { reg: dst, pos: i });
+                        state
+                            .expr_ctx
+                            .push(ExprCtx::Constructor { reg: dst, pos: i });
                     }
                     Type::Virtual { fields } => {
-                        expr_ctx.push(ExprCtx::Anonymous {
+                        state.expr_ctx.push(ExprCtx::Anonymous {
                             pos: i,
                             fields: HashMap::with_capacity(fields.len()),
                             remaining: fields.len(),
                         });
                     }
                     _ => {
-                        push_expr!(
+                        state.push_expr(
                             i,
                             dst,
-                            Expr::Constructor(ConstructorCall::new(f.regtype(dst), Vec::new()))
+                            Expr::Constructor(ConstructorCall::new(f.regtype(dst), Vec::new())),
                         );
                     }
                 }
@@ -664,10 +689,10 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
             //region ENUMS
             &Opcode::EnumAlloc { dst, construct } => {
-                push_expr!(
+                state.push_expr(
                     i,
                     dst,
-                    Expr::EnumConstr(f.regtype(dst), construct, Vec::new())
+                    Expr::EnumConstr(f.regtype(dst), construct, Vec::new()),
                 );
             }
             Opcode::MakeEnum {
@@ -675,23 +700,19 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 construct,
                 args,
             } => {
-                push_expr!(
+                state.push_expr(
                     i,
                     *dst,
-                    Expr::EnumConstr(
-                        f.regtype(*dst),
-                        *construct,
-                        args.iter().map(|x| expr!(x)).collect()
-                    )
+                    Expr::EnumConstr(f.regtype(*dst), *construct, state.args_expr(&args)),
                 );
             }
             &Opcode::EnumIndex { dst, value } => {
-                push_expr!(
+                state.push_expr(
                     i,
                     dst,
-                    Expr::Field(Box::new(expr!(value)), "constructorIndex".to_owned())
+                    Expr::Field(Box::new(state.expr(value)), "constructorIndex".to_owned()),
                 );
-                //push_expr!(i, dst, expr!(value));
+                //state.push_expr(i, dst, state.expr(value));
             }
             &Opcode::EnumField {
                 dst,
@@ -699,26 +720,26 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 construct,
                 field,
             } => {
-                push_expr!(
+                state.push_expr(
                     i,
                     dst,
-                    Expr::Field(Box::new(expr!(value)), field.0.to_string())
+                    Expr::Field(Box::new(state.expr(value)), field.0.to_string()),
                 );
             }
-            &Opcode::SetEnumField { value, field, src } => match expr!(value) {
+            &Opcode::SetEnumField { value, field, src } => match state.expr(value) {
                 Expr::Variable(r, name) => {
-                    push_stmt!(Statement::Assign {
+                    state.push_stmt(Statement::Assign {
                         declaration: false,
-                        variable: Expr::Field(Box::new(expr!(value)), field.0.to_string()),
-                        assign: expr!(src)
+                        variable: Expr::Field(Box::new(state.expr(value)), field.0.to_string()),
+                        assign: state.expr(src),
                     });
                 }
                 _ => {
-                    push_stmt!(comment("closure capture"));
-                    push_stmt!(Statement::Assign {
+                    state.push_stmt(comment("closure capture"));
+                    state.push_stmt(Statement::Assign {
                         declaration: false,
-                        variable: Expr::Field(Box::new(expr!(value)), field.0.to_string()),
-                        assign: expr!(src)
+                        variable: Expr::Field(Box::new(state.expr(value)), field.0.to_string()),
+                        assign: state.expr(src),
                     });
                 }
             },
@@ -726,41 +747,41 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
             //region ARRAYS
             &Opcode::ArraySize { dst, array } => {
-                push_expr!(
+                state.push_expr(
                     i,
                     dst,
-                    Expr::Field(Box::new(expr!(array)), "length".to_owned())
+                    Expr::Field(Box::new(state.expr(array)), "length".to_owned()),
                 );
             }
             &Opcode::GetArray { dst, array, index } => {
-                push_expr!(i, dst, ast::array(expr!(array), expr!(index)));
+                state.push_expr(i, dst, ast::array(state.expr(array), state.expr(index)));
             }
             &Opcode::SetArray { array, index, src } => {
-                push_stmt!(Statement::Assign {
+                state.push_stmt(Statement::Assign {
                     declaration: false,
-                    variable: ast::array(expr!(array), expr!(index)),
-                    assign: expr!(src)
+                    variable: ast::array(state.expr(array), state.expr(index)),
+                    assign: state.expr(src),
                 });
             }
             //endregion
 
             //region MEM
             &Opcode::GetMem { dst, bytes, index } => {
-                push_expr!(i, dst, array(expr!(bytes), expr!(index)));
+                state.push_expr(i, dst, array(state.expr(bytes), state.expr(index)));
             }
             &Opcode::SetMem { bytes, index, src } => {
-                push_stmt!(Statement::Assign {
+                state.push_stmt(Statement::Assign {
                     declaration: false,
-                    variable: array(expr!(bytes), expr!(index)),
-                    assign: expr!(src)
+                    variable: array(state.expr(bytes), state.expr(index)),
+                    assign: state.expr(src),
                 });
             }
             //endregion
             _ => {}
         }
-        scopes.advance();
+        state.scopes.advance();
     }
-    let mut statements = scopes.statements();
+    let mut statements = state.scopes.statements();
 
     // AST post processing step !
     // It makes a single pass for all visitors

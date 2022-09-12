@@ -285,7 +285,7 @@ impl ItemSelection {
     pub(crate) fn name(&self, code: &Bytecode) -> String {
         match self {
             ItemSelection::Fun(fun) => fun.display_id(code).to_string(),
-            ItemSelection::Class(t) => t.display(code),
+            ItemSelection::Class(t) => t.display_id(code),
             ItemSelection::Global(g) => format!("global@{}", g.0),
             ItemSelection::String(s) => {
                 format!("string@{}", s.0)

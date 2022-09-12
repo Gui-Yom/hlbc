@@ -320,12 +320,12 @@ This is the same range notation as Rust and is supported with most commands."#
                     match t {
                         Type::Obj(obj) => {
                             if let Some(sup) = obj.super_ {
-                                println!("extends {}", sup.display(code));
+                                println!("extends {}", sup.display_id(code));
                             }
                             println!("global: {}", obj.global.0);
                             println!("fields:");
                             for f in &obj.own_fields {
-                                println!("  {}: {}", f.name.display(code), f.t.display(code));
+                                println!("  {}: {}", f.name.display(code), f.t.display_id(code));
                             }
                             println!("protos:");
                             for p in &obj.protos {
@@ -360,7 +360,7 @@ This is the same range notation as Rust and is supported with most commands."#
                                     }
                                 );
                                 for (i, p) in c.params.iter().enumerate() {
-                                    println!("    {i}: {}", p.display(code));
+                                    println!("    {i}: {}", p.display_id(code));
                                 }
                             }
                         }
@@ -372,7 +372,7 @@ This is the same range notation as Rust and is supported with most commands."#
         Command::Global(range) => {
             for i in range {
                 print_i!(i);
-                println!("{}", code.globals[i].display(code));
+                println!("{}", code.globals[i].display_id(code));
                 if let Some(&cst) = code.globals_initializers.get(&RefGlobal(i)) {
                     for init in &code.constants.as_ref().unwrap()[cst].fields {
                         println!("    {}", init);
@@ -540,7 +540,7 @@ This is the same range notation as Rust and is supported with most commands."#
             ElementRef::Global(idx) => {
                 println!(
                     "Finding references to global@{idx} : {}\n",
-                    code.globals[idx].display(code)
+                    code.globals[idx].display_id(code)
                 );
                 if let Some(constants) = &code.constants {
                     for (i, c) in constants.iter().enumerate() {
