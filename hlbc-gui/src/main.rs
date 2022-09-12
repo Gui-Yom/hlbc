@@ -1,8 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::io::BufReader;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::{env, fs};
 
@@ -88,7 +88,7 @@ struct App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         {
-            if let Some(tab) = self.ctx.as_ref().and_then(|app| app.new_tab()) {
+            if let Some(tab) = self.ctx.as_ref().and_then(|app| app.take_tab_to_open()) {
                 self.tree[NodeIndex::root().left()].append_tab(tab);
             }
         }
@@ -179,57 +179,46 @@ impl eframe::App for App {
 /// Usage warning ! The methods 'lock' the inner RefCell immutably and mutably (RW lock).
 /// Be careful of guards (Ref<> and RefMut<>) lifetimes.
 #[derive(Clone)]
-struct AppCtxHandle(Rc<RefCell<AppCtx>>);
+struct AppCtxHandle(Rc<AppCtx>);
 
 impl AppCtxHandle {
     fn new(appctx: AppCtx) -> Self {
-        Self(Rc::new(RefCell::new(appctx)))
+        Self(Rc::new(appctx))
     }
 
-    fn lock(&self) -> Ref<AppCtx> {
-        self.0.borrow()
+    fn file(&self) -> &Path {
+        &self.0.file
     }
 
-    /// mut lock
-    fn lock_mut(&self) -> RefMut<AppCtx> {
-        self.0.borrow_mut()
-    }
-
-    fn file(&self) -> Ref<PathBuf> {
-        Ref::map(self.lock(), |app| &app.file)
-    }
-
-    fn code(&self) -> Ref<Bytecode> {
-        Ref::map(self.lock(), |app| &app.code)
+    fn code(&self) -> &Bytecode {
+        &self.0.code
     }
 
     /// mut lock
     fn open_tab(&self, tab: impl AppTab) {
-        self.lock_mut().new_tab = Some(tab.make_tab(self.clone()));
+        self.0.new_tab.set(Some(tab.make_tab(self.clone())));
     }
 
-    /// mut lock
-    fn new_tab(&self) -> Option<Box<dyn Tab>> {
-        self.lock_mut().new_tab.take()
+    fn take_tab_to_open(&self) -> Option<Box<dyn Tab>> {
+        self.0.new_tab.take()
     }
 
     fn selected(&self) -> ItemSelection {
-        self.lock().selected
+        self.0.selected.get()
     }
 
-    /// mut lock
     fn set_selected(&self, s: ItemSelection) {
-        self.lock_mut().selected = s;
+        self.0.selected.set(s);
     }
 }
 
 struct AppCtx {
     file: PathBuf,
     code: Bytecode,
-    selected: ItemSelection,
+    selected: Cell<ItemSelection>,
     /// To open a tab from another tab.
     /// This can't be done directly because this would need a mutable reference to a tree and the tree owns the tab.
-    new_tab: Option<Box<dyn Tab>>,
+    new_tab: Cell<Option<Box<dyn Tab>>>,
 }
 
 impl AppCtx {
@@ -241,16 +230,16 @@ impl AppCtx {
         AppCtx {
             file,
             code,
-            selected: ItemSelection::None,
-            new_tab: None,
+            selected: Cell::new(ItemSelection::None),
+            new_tab: Cell::new(None),
         }
     }
 }
 
 fn default_tabs_ui(ctx: AppCtxHandle) -> DynamicTree {
     let mut tree = Tree::new(vec![
-        InfoView::default().make_tab(ctx.clone()),
         SyncInspectorView::default().make_tab(ctx.clone()),
+        InfoView::default().make_tab(ctx.clone()),
     ]);
 
     tree.split_left(

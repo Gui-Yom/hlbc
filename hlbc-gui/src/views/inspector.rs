@@ -1,7 +1,9 @@
 use std::ops::Deref;
 
 use eframe::egui::style::Margin;
-use eframe::egui::{Color32, Frame, Grid, RichText, ScrollArea, TextStyle, Ui, WidgetText};
+use eframe::egui::{
+    Color32, Frame, Grid, Hyperlink, Link, RichText, ScrollArea, TextStyle, Ui, WidgetText,
+};
 
 use hlbc::types::{FunPtr, RefField, RefFun, RefGlobal, RefString, RefType};
 use hlbc::Bytecode;
@@ -68,31 +70,42 @@ fn inspector_ui(ui: &mut Ui, ctx: AppCtxHandle, item: ItemSelection) {
             ScrollArea::vertical()
                 .id_source("functions_scroll_area")
                 .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    let code = ctx.code();
-                    let code = code.deref();
-                    match item {
-                        ItemSelection::Fun(fun) => {
-                            function_inspector(ui, fun, code);
-                        }
-                        ItemSelection::Class(t) => {
-                            class_inspector(ui, t, code);
-                        }
-                        ItemSelection::Global(g) => {
-                            global_inspector(ui, g, code);
-                        }
-                        ItemSelection::String(s) => {
-                            string_inspector(ui, s, code);
-                        }
-                        _ => {
-                            ui.label("Select a function or a class.");
-                        }
+                .show(ui, |ui| match item {
+                    ItemSelection::Fun(fun) => {
+                        function_inspector(ui, ctx, fun);
+                    }
+                    ItemSelection::Class(t) => {
+                        class_inspector(ui, ctx, t);
+                    }
+                    ItemSelection::Global(g) => {
+                        global_inspector(ui, ctx, g);
+                    }
+                    ItemSelection::String(s) => {
+                        string_inspector(ui, ctx, s);
+                    }
+                    _ => {
+                        ui.label("Select a function or a class.");
                     }
                 });
         });
 }
 
-fn function_inspector(ui: &mut Ui, fun: RefFun, code: &Bytecode) {
+fn inspector_link(ui: &mut Ui, ctx: AppCtxHandle, item: ItemSelection) {
+    let res = ui
+        .add(Link::new(item.name(ctx.code().deref())))
+        .context_menu(|ui| {
+            if ui.button("Open in inspector").clicked() {
+                ctx.open_tab(InspectorView::new(item, ctx.code().deref()));
+                ui.close_menu();
+            }
+        });
+    if res.clicked() {
+        ctx.set_selected(item);
+    }
+}
+
+fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
+    let code = ctx.code();
     match fun.resolve(code) {
         FunPtr::Fun(f) => {
             ui.heading(format!(
@@ -101,10 +114,10 @@ fn function_inspector(ui: &mut Ui, fun: RefFun, code: &Bytecode) {
                 f.findex.0
             ));
             if let Some(parent) = f.parent {
-                ui.label(format!(
-                    "static/instance method of {}",
-                    parent.display_id(code)
-                ));
+                ui.horizontal(|ui| {
+                    ui.label("static/instance method of");
+                    inspector_link(ui, ctx.clone(), ItemSelection::Class(parent));
+                });
             } else {
                 ui.label("Probably a closure.");
             }
@@ -154,14 +167,25 @@ fn function_inspector(ui: &mut Ui, fun: RefFun, code: &Bytecode) {
     }
 }
 
-fn class_inspector(ui: &mut Ui, t: RefType, code: &Bytecode) {
+fn class_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
+    let code = ctx.code();
     ui.heading(format!("Class : {}", t.display_id(code)));
     if let Some(obj) = t.resolve_as_obj(&code.types) {
         if let Some(super_) = obj.super_ {
-            ui.label(format!("extends {}", super_.display_id(code)));
+            ui.horizontal(|ui| {
+                ui.label("extends");
+                inspector_link(ui, ctx.clone(), ItemSelection::Class(super_));
+            });
         }
         if obj.global.0 >= 1 {
-            ui.label(format!("initialized by global {}", obj.global.0 - 1));
+            ui.horizontal(|ui| {
+                ui.label("initialized by global");
+                inspector_link(
+                    ui,
+                    ctx.clone(),
+                    ItemSelection::Global(RefGlobal(obj.global.0 - 1)),
+                );
+            });
         }
 
         if obj.own_fields.is_empty() {
@@ -176,11 +200,12 @@ fn class_inspector(ui: &mut Ui, t: RefType, code: &Bytecode) {
                         for (i, f) in obj.own_fields.iter().enumerate() {
                             ui.label(f.name.resolve(&code.strings));
                             ui.label(f.t.display_id(code));
-                            if let Some(binding) = obj
+                            if let Some(&binding) = obj
                                 .bindings
                                 .get(&RefField(i + obj.fields.len() - obj.own_fields.len()))
                             {
-                                ui.monospace(format!("bound to {}", binding.display_id(code)));
+                                ui.monospace("bound to");
+                                inspector_link(ui, ctx.clone(), ItemSelection::Fun(binding));
                             } else {
                                 ui.monospace("variable");
                             }
@@ -201,7 +226,7 @@ fn class_inspector(ui: &mut Ui, t: RefType, code: &Bytecode) {
                     .show(ui, |ui| {
                         for f in &obj.protos {
                             ui.label(f.name.resolve(&code.strings));
-                            ui.label(f.findex.display_id(code).to_string());
+                            inspector_link(ui, ctx.clone(), ItemSelection::Fun(f.findex));
                             ui.end_row();
                         }
                     });
@@ -212,11 +237,17 @@ fn class_inspector(ui: &mut Ui, t: RefType, code: &Bytecode) {
     }
 }
 
-fn global_inspector(ui: &mut Ui, g: RefGlobal, code: &Bytecode) {
+fn global_inspector(ui: &mut Ui, ctx: AppCtxHandle, g: RefGlobal) {
     ui.heading(format!("Global@{}", g.0));
-    ui.label(format!("Type : {}", code.globals[g.0].display_id(code)));
+    ui.label(format!(
+        "Type : {}",
+        ctx.code().globals[g.0].display_id(ctx.code().deref())
+    ));
 
-    if let (Some(&cst), Some(constants)) = (code.globals_initializers.get(&g), &code.constants) {
+    if let (Some(&cst), Some(constants)) = (
+        ctx.code().globals_initializers.get(&g),
+        &ctx.code().constants,
+    ) {
         let def = &constants[cst];
         ui.label(format!("{:?}", def.fields));
     } else {
@@ -224,9 +255,9 @@ fn global_inspector(ui: &mut Ui, g: RefGlobal, code: &Bytecode) {
     }
 }
 
-fn string_inspector(ui: &mut Ui, s: RefString, code: &Bytecode) {
+fn string_inspector(ui: &mut Ui, ctx: AppCtxHandle, s: RefString) {
     ui.heading(format!("String@{}", s.0));
     ui.separator();
     ui.add_space(4.0);
-    ui.label(RichText::new(s.resolve(&code.strings)).monospace());
+    ui.label(RichText::new(s.resolve(&ctx.code().strings)).monospace());
 }
