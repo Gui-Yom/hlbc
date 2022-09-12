@@ -1,0 +1,14 @@
+%YAML 1.2
+---
+# Custom syntax for hlbc instruction dump
+name: hlbc
+file_extensions:
+  - hl
+scope: source.hl
+contexts:
+  main:
+    - match: ^\s*(\d+):\s+(\w+)\s*?(.*)$
+      captures:
+        1: entity.name.label.hl
+        2: keyword.data.hl
+        3: punctuation.definition.string.begin.asm

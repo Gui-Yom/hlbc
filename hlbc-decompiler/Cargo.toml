@@ -1,6 +1,6 @@
 [package]
 name = "hlbc-decompiler"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
 edition = "2021"
 rust-version = "1.56"
@@ -15,7 +15,7 @@ categories = ["visualization", "compilers"]
 [dependencies]
 # Advanced formatting functionalities
 fmtools = "0.1"
-hlbc = { version = "0.4", path = "../hlbc" }
+hlbc = { version = "0.5", path = "../hlbc" }
 # Graph utilities
 petgraph = { version = "0.6", default-features = false, features = ["graphmap"], optional = true }
 

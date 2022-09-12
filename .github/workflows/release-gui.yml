@@ -1,9 +1,9 @@
-name: Build release binaries
+name: Build GUI release binaries
 
 on:
   push:
     tags:
-      - "v*.*.*"
+      - "gui-v*.*.*"
 
 jobs:
   release-linux:
@@ -19,12 +19,12 @@ jobs:
           default: true
           profile: minimal
       - name: Build release
-        working-directory: hlbc-cli
+        working-directory: hlbc-gui
         run: cargo build --release
       - name: Upload release artifact
         uses: softprops/action-gh-release@v1
         with:
-          files: target/release/hlbc
+          files: target/release/hlbc-gui
   release-windows:
     name: Build release (windows)
     runs-on: windows-latest
@@ -38,9 +38,9 @@ jobs:
           default: true
           profile: minimal
       - name: Build release
-        working-directory: hlbc-cli
+        working-directory: hlbc-gui
         run: cargo build --release
       - name: Upload release artifact
         uses: softprops/action-gh-release@v1
         with:
-          files: target/release/hlbc.exe
+          files: target/release/hlbc-gui.exe

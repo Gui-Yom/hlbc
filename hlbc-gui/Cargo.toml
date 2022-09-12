@@ -1,35 +1,31 @@
 [package]
 name = "hlbc-gui"
-version = "0.4.0"
+version = "0.1.0"
 authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
 edition = "2021"
 rust-version = "1.62"
-description = "Hashlink bytecode disassembler, analyzer and decompiler cli"
+description = "Hashlink bytecode disassembler, analyzer and decompiler gui"
 repository = "https://github.com/Gui-Yom/hlbc"
 license = "MIT"
 categories = ["command-line-utilities", "parser-implementations", "visualization", "compilers"]
-include = ["src/**/*", "README.md", "CHANGELOG.md"]
+keywords = ["hashlink", "bytecode", "disassembler", "analysis", "decompiler"]
+include = ["src/**/*", "README.md", "CHANGELOG.md", "assets/Haxe.sublime-syntax"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[[bin]]
-name = "hlbcw"
-path = "src/main.rs"
 
 [dependencies]
 # AIO GUI framework
 eframe = { version = "0.19" }
 # Docking tabs
-egui_dock = { version = "0.1", git = "https://github.com/Adanos020/egui_dock" }
-#egui_dock = { version = "0.1", path = "../../egui_dock" }
+egui_dock = { version = "0.2" } #, git = "https://github.com/Adanos020/egui_dock" }
 # Core library
-hlbc = { version = "0.4", path = "../hlbc", default-features = false }
+hlbc = { version = "0.5", path = "../hlbc", default-features = false }
 # Decompiler
-hlbc-decompiler = { version = "0.4", path = "../hlbc-decompiler", default-features = false }
+hlbc-decompiler = { version = "0.5", path = "../hlbc-decompiler", default-features = false }
 # Open file dialogs
 rfd = "0.10"
 syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes", "regex-onig"] }
-webbrowser = "0.7"
+webbrowser = "0.8"
 
 
 [features]

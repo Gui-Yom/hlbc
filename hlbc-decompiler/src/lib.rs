@@ -117,7 +117,7 @@ impl<'c> DecompilerState<'c> {
 
     /// Expands the expression of many registers
     fn args_expr(&self, args: &[Reg]) -> Vec<Expr> {
-        args.into_iter().map(|&r| self.expr(r)).collect()
+        args.iter().map(|&r| self.expr(r)).collect()
     }
 
     /// Push a call to a function, which might be a constructor call.
@@ -143,16 +143,12 @@ impl<'c> DecompilerState<'c> {
                 call(
                     Expr::Field(
                         Box::new(self.expr(args[0])),
-                        func.name
-                            .clone()
-                            .unwrap()
-                            .resolve(&self.code.strings)
-                            .to_owned(),
+                        func.name.unwrap().resolve(&self.code.strings).to_owned(),
                     ),
                     self.args_expr(&args[1..]),
                 )
             } else {
-                call_fun(fun, self.args_expr(&args))
+                call_fun(fun, self.args_expr(args))
             };
             if fun.ty(self.code).ret.is_void() {
                 self.push_stmt(stmt(call));
@@ -703,7 +699,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 state.push_expr(
                     i,
                     *dst,
-                    Expr::EnumConstr(f.regtype(*dst), *construct, state.args_expr(&args)),
+                    Expr::EnumConstr(f.regtype(*dst), *construct, state.args_expr(args)),
                 );
             }
             &Opcode::EnumIndex { dst, value } => {
