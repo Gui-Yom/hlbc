@@ -25,9 +25,9 @@ Or build the crate from the latest sources :
 
 ```shell
 git clone https://github.com/Gui-Yom/hlbc
-cd hlbc
+cd hlbc-cli
 cargo build --release
-# The resulting binary can be found in target/release
+# The resulting binary can be found in ../target/release
 ```
 
 ## Usage
