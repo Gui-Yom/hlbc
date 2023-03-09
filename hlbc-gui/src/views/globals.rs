@@ -3,12 +3,12 @@ use eframe::egui::{Color32, Frame, RichText, ScrollArea, TextStyle, Ui, WidgetTe
 
 use hlbc::types::RefGlobal;
 
-use crate::{AppCtxHandle, AppTab, ItemSelection};
+use crate::{AppCtxHandle, AppView, ItemSelection};
 
 #[derive(Default)]
 pub(crate) struct GlobalsView;
 
-impl AppTab for GlobalsView {
+impl AppView for GlobalsView {
     fn title(&self) -> WidgetText {
         RichText::new("Globals").color(Color32::WHITE).into()
     }

@@ -1,6 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::cell::{Cell, Ref, RefCell, RefMut};
+use std::cell::Cell;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -9,18 +9,19 @@ use std::{env, fs};
 use eframe::egui::style::Margin;
 use eframe::egui::{CentralPanel, Frame, Rounding, TopBottomPanel, Vec2, Visuals};
 use eframe::{egui, NativeOptions, Theme};
-use egui_dock::{DockArea, DynamicTabViewer, DynamicTree, NodeIndex, Tab, Tree};
+use egui_dock::{DockArea, NodeIndex, Tree};
 
 use hlbc::types::{RefFun, RefGlobal, RefString, RefType};
 use hlbc::Bytecode;
 
 use crate::views::{
-    AppTab, ClassesView, FunctionsView, GlobalsView, InfoView, StringsView, SyncInspectorView,
+    AppView, ClassesView, DynamicTabViewer, FunctionsView, GlobalsView, InfoView, StringsView,
+    SyncInspectorView,
 };
 
 mod views;
 
-fn main() {
+fn main() -> eframe::Result<()> {
     eframe::run_native(
         "hlbc gui",
         NativeOptions {
@@ -48,8 +49,8 @@ fn main() {
             };
 
             // Dock tabs tree
-            let tree = if let Some(ctx) = ctx.clone() {
-                default_tabs_ui(ctx)
+            let tree = if ctx.is_some() {
+                default_tabs_ui()
             } else {
                 Tree::new(vec![])
             };
@@ -72,14 +73,14 @@ fn main() {
                 about_window_open: false,
             })
         }),
-    );
+    )
 }
 
 struct App {
     /// Some when a file is loaded
     ctx: Option<AppCtxHandle>,
     // Dock
-    tree: DynamicTree,
+    tree: Tree<Box<dyn AppView>>,
     style: egui_dock::Style,
     options_window_open: bool,
     about_window_open: bool,
@@ -101,7 +102,7 @@ impl eframe::App for App {
                         if ui.button("Open").clicked() {
                             if let Some(file) = rfd::FileDialog::new().pick_file() {
                                 let appctx = AppCtxHandle::new(AppCtx::new_from_file(file));
-                                self.tree = default_tabs_ui(appctx.clone());
+                                self.tree = default_tabs_ui();
                                 self.ctx = Some(appctx);
                             }
                         }
@@ -110,15 +111,15 @@ impl eframe::App for App {
                             self.tree = Tree::new(vec![]);
                         }
                     });
-                    if let Some(appctx) = self.ctx.as_ref() {
+                    if self.ctx.is_some() {
                         ui.menu_button("Views", |ui| {
                             if ui.button("Functions").clicked() {
                                 self.tree[NodeIndex::root().right()]
-                                    .append_tab(FunctionsView::default().make_tab(appctx.clone()));
+                                    .append_tab(Box::<FunctionsView>::default());
                             }
                             if ui.button("Info").clicked() {
                                 self.tree[NodeIndex::root().left()]
-                                    .append_tab(InfoView::default().make_tab(appctx.clone()));
+                                    .append_tab(Box::<InfoView>::default());
                             }
                         });
                     }
@@ -158,10 +159,10 @@ impl eframe::App for App {
                 // TODO about page
             });
 
-        if self.ctx.is_some() {
+        if let Some(appctx) = self.ctx.clone() {
             DockArea::new(&mut self.tree)
                 .style(self.style.clone())
-                .show(ctx, &mut DynamicTabViewer::default());
+                .show(ctx, &mut DynamicTabViewer(appctx));
         } else {
             CentralPanel::default()
                 .frame(Frame::group(ctx.style().as_ref()).outer_margin(Margin::same(4.0)))
@@ -195,11 +196,11 @@ impl AppCtxHandle {
     }
 
     /// mut lock
-    fn open_tab(&self, tab: impl AppTab) {
-        self.0.new_tab.set(Some(tab.make_tab(self.clone())));
+    fn open_tab(&self, tab: impl AppView + 'static) {
+        self.0.new_tab.set(Some(Box::new(tab)));
     }
 
-    fn take_tab_to_open(&self) -> Option<Box<dyn Tab>> {
+    fn take_tab_to_open(&self) -> Option<Box<dyn AppView>> {
         self.0.new_tab.take()
     }
 
@@ -218,7 +219,7 @@ struct AppCtx {
     selected: Cell<ItemSelection>,
     /// To open a tab from another tab.
     /// This can't be done directly because this would need a mutable reference to a tree and the tree owns the tab.
-    new_tab: Cell<Option<Box<dyn Tab>>>,
+    new_tab: Cell<Option<Box<dyn AppView>>>,
 }
 
 impl AppCtx {
@@ -236,25 +237,25 @@ impl AppCtx {
     }
 }
 
-fn default_tabs_ui(ctx: AppCtxHandle) -> DynamicTree {
-    let mut tree = Tree::new(vec![
-        SyncInspectorView::default().make_tab(ctx.clone()),
-        InfoView::default().make_tab(ctx.clone()),
+fn default_tabs_ui() -> Tree<Box<dyn AppView>> {
+    let mut tree: Tree<Box<dyn AppView>> = Tree::new(vec![
+        Box::<SyncInspectorView>::default(),
+        Box::<InfoView>::default(),
     ]);
 
     tree.split_left(
         NodeIndex::root(),
         0.20,
         vec![
-            FunctionsView::default().make_tab(ctx.clone()),
-            GlobalsView::default().make_tab(ctx.clone()),
-            StringsView::default().make_tab(ctx.clone()),
+            Box::<FunctionsView>::default(),
+            Box::<GlobalsView>::default(),
+            Box::<StringsView>::default(),
         ],
     );
     tree.split_below(
         NodeIndex::root().right(),
         0.5,
-        vec![ClassesView::default().make_tab(ctx)],
+        vec![Box::<ClassesView>::default()],
     );
 
     tree

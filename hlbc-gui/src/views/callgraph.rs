@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 use eframe::egui::style::Margin;
-use eframe::egui::{Area, Color32, DragValue, Frame, ScrollArea, Stroke, Ui, Vec2, Widget};
+use eframe::egui::{Area, Color32, DragValue, Frame, Id, ScrollArea, Stroke, Ui, Vec2, Widget};
 use eframe::epaint::CubicBezierShape;
 
 use hlbc::analysis::graph::petgraph::visit::EdgeRef;
@@ -66,7 +66,7 @@ impl CallgraphView {
                             let pos = ui.next_widget_position();
                             nodes_pos.insert(
                                 n,
-                                Area::new(n)
+                                Area::new(Id::new(n))
                                     .default_pos(pos)
                                     .drag_bounds(rect.translate(start))
                                     .show(ui.ctx(), |ui| {

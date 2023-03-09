@@ -7,7 +7,7 @@ use hlbc::analysis::IsFromStd;
 use hlbc::types::RefFun;
 
 use crate::views::{DecompilerView, InspectorView};
-use crate::{AppCtxHandle, AppTab, ItemSelection};
+use crate::{AppCtxHandle, AppView, ItemSelection};
 
 #[derive(Default)]
 pub(crate) struct FunctionsView {
@@ -17,7 +17,7 @@ pub(crate) struct FunctionsView {
     cache_valid: bool,
 }
 
-impl AppTab for FunctionsView {
+impl AppView for FunctionsView {
     fn title(&self) -> WidgetText {
         RichText::new("ƒ Functions").color(Color32::WHITE).into()
     }

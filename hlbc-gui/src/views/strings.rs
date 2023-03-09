@@ -6,12 +6,12 @@ use eframe::egui::{Color32, Frame, RichText, ScrollArea, TextStyle, Ui, WidgetTe
 
 use hlbc::types::RefString;
 
-use crate::{AppCtxHandle, AppTab, ItemSelection};
+use crate::{AppCtxHandle, AppView, ItemSelection};
 
 #[derive(Default)]
 pub(crate) struct StringsView;
 
-impl AppTab for StringsView {
+impl AppView for StringsView {
     fn title(&self) -> WidgetText {
         RichText::new("Strings").color(Color32::WHITE).into()
     }

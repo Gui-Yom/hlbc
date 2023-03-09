@@ -5,12 +5,12 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use clap::Parser as ClapParser;
-use temp_dir::TempDir;
-use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use hlbc::opcodes::Opcode;
 use hlbc::types::{FunPtr, RefFun, RefGlobal, Type};
 use hlbc::*;
+use temp_dir::TempDir;
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use crate::command::{commands_parser, Command, ElementRef, FileOrIndex, ParseContext, Parser};
 
@@ -139,7 +139,7 @@ fn main() -> anyhow::Result<()> {
 
         'watch: loop {
             match rx.recv() {
-                Ok(events) => {
+                Ok(Ok(events)) => {
                     for e in events {
                         if is_source {
                             compile(&args.file, &file)?;
@@ -152,6 +152,10 @@ fn main() -> anyhow::Result<()> {
 
                         execute_commands!(&code, commands.clone(); break 'watch);
                     }
+                }
+                Ok(Err(e)) => {
+                    println!("Error while watching : {e:?}");
+                    break;
                 }
                 Err(e) => {
                     println!("Error while watching : {e}");
@@ -226,14 +230,14 @@ g,global    <idx>            | Get global at index
 c,constant  <idx>            | Get constant at index
 n,native    <idx>            | Get native at index
 fnh         <findex>         | Get header of function at index
-fn          <findex>         | Get function at index
-fnn,fnamed  <str>            | Show the function named
+fn          <findex>         | Get a function by findex
+fnn,fnamed  <str>            | Get a function by name
 sfn         <str>            | Find a function by name
 infile      <idx|str>        | Find functions in file
 fileof      <findex>         | Get the file where findex is defined
 refto       <any@idx>        | Find references to a given bytecode element
 saveto      <filename>       | Serialize the bytecode to a file
-callgraph   <findex> <depth> | Create a dot call graph froma function and a max depth
+callgraph   <findex> <depth> | Create a dot call graph from a function and a max depth
 decomp      <findex>         | Decompile a function
 decompt     <idx>            | Decompile a type
 
@@ -486,7 +490,7 @@ This is the same range notation as Rust and is supported with most commands."#
             }
         }
         Command::SaveTo(file) => {
-            let mut w = BufWriter::new(fs::File::create(&file)?);
+            let mut w = BufWriter::new(fs::File::create(file)?);
             code.serialize(&mut w)?;
         }
         Command::Callgraph(idx, depth) => {

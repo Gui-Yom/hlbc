@@ -7,7 +7,7 @@ use hlbc::analysis::IsFromStd;
 use hlbc::types::{RefType, Type};
 
 use crate::views::{DecompilerView, InspectorView};
-use crate::{AppCtxHandle, AppTab, ItemSelection};
+use crate::{AppCtxHandle, AppView, ItemSelection};
 
 #[derive(Default)]
 pub(crate) struct ClassesView {
@@ -16,7 +16,7 @@ pub(crate) struct ClassesView {
     cache_valid: bool,
 }
 
-impl AppTab for ClassesView {
+impl AppView for ClassesView {
     fn title(&self) -> WidgetText {
         RichText::new("Classes").color(Color32::WHITE).into()
     }

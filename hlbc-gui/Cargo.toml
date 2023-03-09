@@ -3,7 +3,7 @@ name = "hlbc-gui"
 version = "0.1.0"
 authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
 edition = "2021"
-rust-version = "1.62"
+rust-version = "1.65"
 description = "Hashlink bytecode disassembler, analyzer and decompiler gui"
 repository = "https://github.com/Gui-Yom/hlbc"
 license = "MIT"
@@ -15,15 +15,15 @@ include = ["src/**/*", "README.md", "CHANGELOG.md", "assets/Haxe.sublime-syntax"
 
 [dependencies]
 # AIO GUI framework
-eframe = { version = "0.19" }
+eframe = { version = "0.21" }
 # Docking tabs
-egui_dock = { version = "0.2" } #, git = "https://github.com/Adanos020/egui_dock" }
+egui_dock = { version = "0.4" } #, git = "https://github.com/Adanos020/egui_dock" }
 # Core library
 hlbc = { version = "0.5", path = "../hlbc", default-features = false }
 # Decompiler
 hlbc-decompiler = { version = "0.5", path = "../hlbc-decompiler", default-features = false }
 # Open file dialogs
-rfd = "0.10"
+rfd = "0.11"
 syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes", "regex-onig"] }
 webbrowser = "0.8"
 

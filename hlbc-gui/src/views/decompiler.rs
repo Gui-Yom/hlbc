@@ -14,7 +14,7 @@ use hlbc::types::FunPtr;
 use hlbc_decompiler::fmt::FormatOptions;
 use hlbc_decompiler::{decompile_class, decompile_function};
 
-use crate::{AppCtxHandle, AppTab, ItemSelection};
+use crate::{AppCtxHandle, AppView, ItemSelection};
 
 #[derive(Default)]
 pub(crate) struct DecompilerView {
@@ -23,7 +23,7 @@ pub(crate) struct DecompilerView {
     cache_selected: ItemSelection,
 }
 
-impl AppTab for DecompilerView {
+impl AppView for DecompilerView {
     fn title(&self) -> WidgetText {
         RichText::new("Decompilation output")
             .color(Color32::WHITE)
@@ -63,12 +63,13 @@ impl AppTab for DecompilerView {
                         .lock_focus(false)
                         .layouter(&mut |ui, code, _wrap| {
                             let job = {
-                                let mut memory = ui.memory();
-                                let highlight_cache =
-                                    memory.caches.cache::<FrameCache<LayoutJob, Highlighter>>();
-                                highlight_cache.get(("base16-mocha.dark", code, "hx"))
+                                ui.memory_mut(|mem| {
+                                    let cache =
+                                        mem.caches.cache::<FrameCache<LayoutJob, Highlighter>>();
+                                    cache.get(("base16-mocha.dark", code, "hx"))
+                                })
                             };
-                            ui.fonts().layout_job(job)
+                            ui.fonts(|fonts| fonts.layout_job(job))
                         }),
                 );
             });
@@ -123,7 +124,7 @@ impl ComputerMut<(&str, &str, &str), LayoutJob> for Highlighter {
                 let underline = if underline {
                     Stroke::new(1.0, text_color)
                 } else {
-                    Stroke::none()
+                    Stroke::NONE
                 };
                 job.sections.push(LayoutSection {
                     leading_space: 0.0,

@@ -1,14 +1,12 @@
 use std::ops::Deref;
 
 use eframe::egui::style::Margin;
-use eframe::egui::{
-    Color32, Frame, Grid, Hyperlink, Link, RichText, ScrollArea, TextStyle, Ui, WidgetText,
-};
+use eframe::egui::{Color32, Frame, Grid, Link, RichText, ScrollArea, TextStyle, Ui, WidgetText};
 
 use hlbc::types::{FunPtr, RefField, RefFun, RefGlobal, RefString, RefType};
 use hlbc::Bytecode;
 
-use crate::{AppCtxHandle, AppTab, ItemSelection};
+use crate::{AppCtxHandle, AppView, ItemSelection};
 
 /// View detailed information about a bytecode element.
 pub(crate) struct SyncInspectorView {
@@ -23,7 +21,7 @@ impl Default for SyncInspectorView {
     }
 }
 
-impl AppTab for SyncInspectorView {
+impl AppView for SyncInspectorView {
     fn title(&self) -> WidgetText {
         self.name.clone().into()
     }
@@ -53,7 +51,7 @@ impl InspectorView {
     }
 }
 
-impl AppTab for InspectorView {
+impl AppView for InspectorView {
     fn title(&self) -> WidgetText {
         self.name.clone().into()
     }
@@ -110,7 +108,7 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
         FunPtr::Fun(f) => {
             ui.heading(format!(
                 "Function : {}@{}",
-                f.name(code).unwrap_or("_"),
+                f.name_default(code),
                 f.findex.0
             ));
             if let Some(parent) = f.parent {

@@ -3,13 +3,13 @@ use std::ops::Deref;
 use eframe::egui::style::Margin;
 use eframe::egui::{Color32, Frame, Grid, RichText, ScrollArea, Ui, WidgetText};
 
-use crate::views::AppTab;
+use crate::views::AppView;
 use crate::AppCtxHandle;
 
 #[derive(Default)]
 pub(crate) struct InfoView;
 
-impl AppTab for InfoView {
+impl AppView for InfoView {
     fn title(&self) -> WidgetText {
         RichText::new("🛈 Info").color(Color32::WHITE).into()
     }
