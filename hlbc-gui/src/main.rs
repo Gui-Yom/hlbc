@@ -1,15 +1,18 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use std::cell::Cell;
-use std::io::BufReader;
+use std::io::{BufReader, Cursor};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::Arc;
 use std::{env, fs};
 
 use eframe::egui::style::Margin;
 use eframe::egui::{CentralPanel, Frame, Rounding, TopBottomPanel, Vec2, Visuals};
-use eframe::{egui, NativeOptions, Theme};
+use eframe::{egui, Theme};
 use egui_dock::{DockArea, NodeIndex, Tree};
+use poll_promise::Promise;
+use rfd::FileHandle;
 
 use hlbc::types::{RefFun, RefGlobal, RefString, RefType};
 use hlbc::Bytecode;
@@ -21,31 +24,27 @@ use crate::views::{
 
 mod views;
 
+#[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
     eframe::run_native(
         "hlbc gui",
-        NativeOptions {
+        eframe::NativeOptions {
             vsync: true,
             initial_window_size: Some(Vec2::new(1280.0, 720.0)),
             ..Default::default()
         },
         Box::new(|cc| {
-            if cc
-                .integration_info
-                .system_theme
-                .map(|t| matches!(t, Theme::Dark))
-                .unwrap_or(true)
-            {
-                cc.egui_ctx.set_visuals(Visuals::dark());
-            }
-
             let args = env::args().skip(1).collect::<String>();
             let ctx = if args.is_empty() {
                 None
             } else {
-                Some(AppCtxHandle::new(AppCtx::new_from_file(PathBuf::from(
-                    args,
-                ))))
+                let path = PathBuf::from(args);
+                let code =
+                    Bytecode::load(&mut BufReader::new(fs::File::open(&path).unwrap())).unwrap();
+                Some(AppCtxHandle::new(AppCtx::new_from_code(
+                    path.display().to_string(),
+                    code,
+                )))
             };
 
             // Dock tabs tree
@@ -57,15 +56,9 @@ fn main() -> eframe::Result<()> {
 
             // Dock tabs styling
             let mut style = egui_dock::Style::from_egui(cc.egui_ctx.style().as_ref());
-            style.tab_outline_color = style.tab_bar_background_color;
-            style.tab_rounding = Rounding {
-                nw: 1.0,
-                ne: 1.0,
-                sw: 0.0,
-                se: 0.0,
-            };
 
             Box::new(App {
+                loader: None,
                 ctx,
                 tree,
                 style,
@@ -76,7 +69,41 @@ fn main() -> eframe::Result<()> {
     )
 }
 
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    // Make sure panics are logged using `console.error`.
+    console_error_panic_hook::set_once();
+
+    // Redirect tracing to console.log and friends:
+    //tracing_wasm::set_as_global_default();
+
+    let web_options = eframe::WebOptions::default();
+
+    wasm_bindgen_futures::spawn_local(async {
+        eframe::start_web(
+            "eframe_canvas", // hardcode it
+            web_options,
+            Box::new(|cc| {
+                // Dock tabs styling
+                let mut style = egui_dock::Style::from_egui(cc.egui_ctx.style().as_ref());
+
+                Box::new(App {
+                    loader: None,
+                    ctx: None,
+                    tree: Tree::new(vec![]),
+                    style,
+                    options_window_open: false,
+                    about_window_open: false,
+                })
+            }),
+        )
+        .await
+        .expect("failed to start eframe");
+    });
+}
+
 struct App {
+    loader: Option<Promise<Option<(String, Bytecode)>>>,
     /// Some when a file is loaded
     ctx: Option<AppCtxHandle>,
     // Dock
@@ -89,6 +116,20 @@ struct App {
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         {
+            if let Some(loader) = self.loader.take() {
+                match loader.try_take() {
+                    Ok(Some((file, code))) => {
+                        self.ctx = Some(AppCtxHandle::new(AppCtx::new_from_code(file, code)));
+                        self.tree = default_tabs_ui();
+                    }
+                    Ok(None) => {}
+                    Err(loader) => {
+                        self.loader = Some(loader);
+                        ctx.request_repaint();
+                    }
+                }
+            }
+
             if let Some(tab) = self.ctx.as_ref().and_then(|app| app.take_tab_to_open()) {
                 self.tree[NodeIndex::root().left()].append_tab(tab);
             }
@@ -100,10 +141,36 @@ impl eframe::App for App {
                 egui::menu::bar(ui, |ui| {
                     ui.menu_button("File", |ui| {
                         if ui.button("Open").clicked() {
-                            if let Some(file) = rfd::FileDialog::new().pick_file() {
-                                let appctx = AppCtxHandle::new(AppCtx::new_from_file(file));
-                                self.tree = default_tabs_ui();
-                                self.ctx = Some(appctx);
+                            #[cfg(target_arch = "wasm32")]
+                            {
+                                self.loader = Some(Promise::spawn_async(async {
+                                    if let Some(file) =
+                                        rfd::AsyncFileDialog::new().pick_file().await
+                                    {
+                                        Some((
+                                            file.file_name(),
+                                            Bytecode::load(&mut &file.read().await[..]).unwrap(),
+                                        ))
+                                    } else {
+                                        None
+                                    }
+                                }));
+                            }
+                            #[cfg(not(target_arch = "wasm32"))]
+                            {
+                                self.loader = Some(Promise::spawn_thread("bg-loader", || {
+                                    if let Some(file) = rfd::FileDialog::new().pick_file() {
+                                        Some((
+                                            file.display().to_string(),
+                                            Bytecode::load(&mut BufReader::new(
+                                                fs::File::open(&file).unwrap(),
+                                            ))
+                                            .unwrap(),
+                                        ))
+                                    } else {
+                                        None
+                                    }
+                                }));
                             }
                         }
                         if ui.button("Close").clicked() {
@@ -187,8 +254,8 @@ impl AppCtxHandle {
         Self(Rc::new(appctx))
     }
 
-    fn file(&self) -> &Path {
-        &self.0.file
+    fn file(&self) -> String {
+        self.0.file.clone()
     }
 
     fn code(&self) -> &Bytecode {
@@ -214,7 +281,7 @@ impl AppCtxHandle {
 }
 
 struct AppCtx {
-    file: PathBuf,
+    file: String,
     code: Bytecode,
     selected: Cell<ItemSelection>,
     /// To open a tab from another tab.
@@ -223,12 +290,8 @@ struct AppCtx {
 }
 
 impl AppCtx {
-    fn new_from_file(file: PathBuf) -> Self {
-        let code = Bytecode::load(&mut BufReader::new(
-            fs::File::open(&file).expect("Can't open file"),
-        ))
-        .expect("Can't load bytecode");
-        AppCtx {
+    fn new_from_code(file: String, code: Bytecode) -> Self {
+        Self {
             file,
             code,
             selected: Cell::new(ItemSelection::None),

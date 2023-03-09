@@ -27,7 +27,7 @@ impl AppView for InfoView {
                             .show(ui, |ui| {
                                 ui.label("File")
                                     .on_hover_text("Currently opened bytecode file");
-                                ui.label(ctx.file().to_str().unwrap());
+                                ui.label(ctx.file());
                                 ui.end_row();
                                 let code = ctx.code();
                                 let code = code.deref();
