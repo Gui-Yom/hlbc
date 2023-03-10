@@ -8,4 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/Gui-Yom/hlbc/compare/gui-v0.1.0...HEAD)
 
+`hlbc-gui` now runs on the web !
+
+### Changed
+
+- Load bytecode on a background thread instead of blocking the ui.
+
 ## [0.1.0](https://github.com/Gui-Yom/hlbc/compare/v0.4.0...gui-v0.1.0) - 2021-09-15

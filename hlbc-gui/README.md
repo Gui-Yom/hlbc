@@ -4,6 +4,8 @@ A GUI for hlbc.
 
 ![screenshot](screenshot.png)
 
+The GUI also runs on the web ! The latest release is available at : https://gui-yom.github.io/hlbc
+
 ---
 
 ## Installation

@@ -12,34 +12,47 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
       - name: Install rust stable
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           default: true
           profile: minimal
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
+
       - name: Build release
         working-directory: hlbc-gui
         run: cargo build --release
+
       - name: Upload release artifact
         uses: softprops/action-gh-release@v1
         with:
           files: target/release/hlbc-gui
+
   release-windows:
     name: Build release (windows)
     runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
       - name: Install rust stable
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           default: true
           profile: minimal
+
+      - uses: Swatinem/rust-cache@v2
+
       - name: Build release
         working-directory: hlbc-gui
         run: cargo build --release
+
       - name: Upload release artifact
         uses: softprops/action-gh-release@v1
         with:

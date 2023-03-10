@@ -1,0 +1,43 @@
+name: Deploy GUI to GitHub Pages
+
+on:
+  push:
+    tags:
+      - "gui-v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release-linux:
+    name: Build wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install latest rust stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          default: true
+          profile: minimal
+          target: wasm32-unknown-unknown
+          override: true
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install trunk
+        uses: jetli/trunk-action@v0.4.0
+        with:
+          version: 'v0.16.0'
+
+      - name: Build
+        working-directory: hlbc-gui/web
+        run: trunk build --release --public-url "${GITHUB_REPOSITORY#*/}"
+
+      - name: Deploy 🚀
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: hlbc-gui/web/dist
+          single-commit: true
