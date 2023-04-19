@@ -197,6 +197,7 @@ impl<T: Read> ReadHlExt for T {
             19 => Ok(Type::Null(self.read_type_ref()?)),
             20 => Ok(Type::Method(self.read_type_fun()?)),
             21 => Ok(Type::Struct(self.read_type_obj()?)),
+            22 => Ok(Type::Packed(self.read_type_ref()?)),
             other => Err(Error::MalformedBytecode(format!(
                 "Invalid type kind '{other}'"
             ))),

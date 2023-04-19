@@ -155,6 +155,7 @@ pub enum Type {
     Null(RefType),
     Method(TypeFun),
     Struct(TypeObj),
+    Packed(RefType),
 }
 
 impl Type {

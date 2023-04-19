@@ -160,6 +160,9 @@ impl Type {
                     .collect();
                 format!("{}<{}>", name.display(ctx), fields.join(", "))
             }
+            Type::Packed(reftype) => {
+                format!("packed<{}>", reftype.display_rec(ctx, parents.clone()))
+            }
         }
     }
 }

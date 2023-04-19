@@ -190,6 +190,10 @@ impl<T: Write> WriteHlExt for T {
                 self.write_u8(21)?;
                 self.write_type_obj(obj)?;
             }
+            Type::Packed(inner) => {
+                self.write_u8(22)?;
+                self.write_vi32(inner.0 as i32)?;
+            }
         }
         Ok(())
     }
