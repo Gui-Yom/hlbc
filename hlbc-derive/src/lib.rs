@@ -1,11 +1,12 @@
-use proc_macro::TokenStream;
-
+use proc_macro2::TokenStream;
 use quote::quote;
-use syn::__private::TokenStream2;
-use syn::{Data, DeriveInput, GenericArgument, Ident, LitStr, PathArguments, Type, Variant};
+use syn::{
+    Data, DeriveInput, Expr, ExprLit, GenericArgument, Ident, Lit, LitStr, PathArguments, Type,
+    Variant,
+};
 
 #[proc_macro_derive(OpcodeHelper)]
-pub fn derive_opcode_helper(input: TokenStream) -> TokenStream {
+pub fn derive_opcode_helper(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = syn::parse_macro_input!(input as DeriveInput);
     let variants = match &ast.data {
         Data::Enum(v) => Some(&v.variants),
@@ -30,15 +31,25 @@ pub fn derive_opcode_helper(input: TokenStream) -> TokenStream {
     let vdesc = variants.iter().map(|v| {
         let mut acc = String::new();
         for attr in &v.attrs {
-            if let Some(x) = attr.tokens.clone().into_iter().nth(1) {
-                let s = x.to_string();
-                if s != "\"\"" {
-                    acc.push_str(&s[2..s.len() - 1]);
-                    acc.push('\n');
+            if let Ok(nv) = attr.meta.require_name_value() {
+                if nv.path.is_ident("doc") {
+                    match &nv.value {
+                        Expr::Lit(ExprLit {
+                            lit: Lit::Str(lit), ..
+                        }) => {
+                            let lstr = lit.value();
+                            let to_acc = lstr.trim();
+                            if !to_acc.is_empty() {
+                                acc.push_str(to_acc);
+                                acc.push('\n');
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             }
         }
-        acc
+        acc.trim().to_string()
     });
     let vdefault_init = variants.iter().map(|v| {
         let vname = &v.ident;
@@ -53,7 +64,7 @@ pub fn derive_opcode_helper(input: TokenStream) -> TokenStream {
         }
     });
 
-    TokenStream::from(quote! {
+    proc_macro::TokenStream::from(quote! {
         impl #name {
             /// Decode an instruction
             pub fn decode(r: &mut impl std::io::Read) -> crate::Result<#name> {
@@ -129,23 +140,15 @@ fn ident(ty: &Type) -> String {
     }
 }
 
-fn gen_initr(enum_name: &Ident, v: &Variant) -> TokenStream2 {
-    let rvi32 = quote! {
-        r.read_vari()?
-    };
-    let rvu32 = quote! {
-        r.read_varu()?
-    };
-    let reg = quote! {
-        Reg(#rvi32 as u32)
-    };
+fn gen_initr(enum_name: &Ident, v: &Variant) -> TokenStream {
+    let rvi32 = quote!(r.read_vari()?);
+    let rvu32 = quote!(r.read_varu()?);
+    let reg = quote!(Reg(#rvi32 as u32));
 
     let vname = &v.ident;
     let fname = v.fields.iter().map(|f| &f.ident);
     let fvalue = v.fields.iter().map(|f| match ident(&f.ty).as_str() {
-        "usize" => quote! {
-            #rvi32 as usize
-        },
+        "usize" => quote!(#rvi32 as usize),
         "i32" => quote! {
             #rvi32 as JumpOffset
         },
@@ -203,7 +206,7 @@ fn gen_initr(enum_name: &Ident, v: &Variant) -> TokenStream2 {
         "RefEnumConstruct" => quote! {
             RefEnumConstruct(#rvi32 as usize)
         },
-        _ => TokenStream2::default(),
+        _ => TokenStream::default(),
     });
     quote! {
         Ok(#enum_name::#vname {
@@ -212,7 +215,7 @@ fn gen_initr(enum_name: &Ident, v: &Variant) -> TokenStream2 {
     }
 }
 
-fn gen_initw(enum_name: &Ident, v: &Variant, i: u8) -> TokenStream2 {
+fn gen_initw(enum_name: &Ident, v: &Variant, i: u8) -> TokenStream {
     let vname = &v.ident;
     let fname = v.fields.iter().map(|f| &f.ident);
     let fwrite = v.fields.iter().map(|f| {
@@ -274,7 +277,7 @@ fn gen_initw(enum_name: &Ident, v: &Variant, i: u8) -> TokenStream2 {
             "RefEnumConstruct" => quote! {
                 w.write_vi32(#fname.0 as i32)?;
             },
-            _ => TokenStream2::default(),
+            _ => TokenStream::default(),
         }
     });
     quote! {
