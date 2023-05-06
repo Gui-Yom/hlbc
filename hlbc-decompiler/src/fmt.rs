@@ -2,8 +2,9 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 
 use crate::ast::{Class, Constant, ConstructorCall, Expr, Method, Operation, Statement};
+use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{Function, RefField, Type};
-use hlbc::Bytecode;
+use hlbc::{Bytecode, Resolve};
 
 #[derive(Clone)]
 pub struct FormatOptions {
@@ -50,7 +51,7 @@ fn to_haxe_type<'a>(ty: &Type, ctx: &'a Bytecode) -> impl Display + 'a {
         Bytes => "hl.Bytes",
         Dyn => "Dynamic",
         Fun(_) => "Function",
-        Obj(obj) => obj.name.resolve(&ctx.strings),
+        Obj(obj) => ctx.resolve(obj.name),
         _ => "other",
     }
 }
@@ -61,7 +62,7 @@ impl Class {
         fmtools::fmt! { move
             {opts}"class "{self.name} if let Some(parent) = self.parent.as_ref() { " extends "{parent} } " {\n"
             for f in &self.fields {
-                {new_opts} if f.static_ { "static " } "var "{f.name}": "{to_haxe_type(f.ty.resolve(&ctx.types), ctx)}";\n"
+                {new_opts} if f.static_ { "static " } "var "{f.name}": "{to_haxe_type(&ctx[f.ty], ctx)}";\n"
             }
             for m in &self.methods {
                 "\n"
@@ -75,15 +76,15 @@ impl Class {
 impl Method {
     pub fn display<'a>(&'a self, ctx: &'a Bytecode, opts: &'a FormatOptions) -> impl Display + 'a {
         let new_opts = opts.inc_nesting();
-        let fun = self.fun.resolve_as_fn(ctx).unwrap();
+        let fun = self.fun.as_fn(ctx).unwrap();
         fmtools::fmt! { move
             {opts} if self.static_ { "static " } if self.dynamic { "dynamic " }
             "function "{fun.name_default(ctx)}"("
             {fmtools::join(", ", fun.args(ctx).iter().enumerate().skip(if self.static_ { 0 } else { 1 })
                 .map(move |(i, arg)| fmtools::fmt! {move
-                    {fun.arg_name(ctx, i).unwrap_or("_")}": "{to_haxe_type(arg.resolve(&ctx.types), ctx)}
+                    {fun.arg_name(ctx, i).unwrap_or("_")}": "{to_haxe_type(&ctx[*arg], ctx)}
                 }))}
-            ")" if !fun.ty(ctx).ret.is_void() { ": "{to_haxe_type(fun.ty(ctx).ret.resolve(&ctx.types), ctx)} } " {"
+            ")" if !fun.ty(ctx).ret.is_void() { ": "{to_haxe_type(fun.ret(ctx), ctx)} } " {"
 
             if self.statements.is_empty() {
                 "}"
@@ -103,6 +104,7 @@ impl Display for Constant {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         use Constant::*;
         match self {
+            InlineInt(c) => Display::fmt(c, f),
             Int(c) => Display::fmt(c, f),
             Float(c) => Display::fmt(c, f),
             String(c) => write!(f, "\"{c}\""),
@@ -167,14 +169,14 @@ impl Expr {
         }
         fmtools::fmt! { move
             match self {
-                Expr::Anonymous(ty, values) => match ty.resolve(&code.types) {
+                Expr::Anonymous(ty, values) => match &code[*ty] {
                     Type::Virtual { fields } => {
                         "{"{ fmtools::join(", ", fields
                             .iter()
                             .enumerate()
                             .map(|(i, f)| {
                                 fmtools::fmt! { move
-                                    {f.name.resolve(&code.strings)}": "{disp!(values.get(&RefField(i)).unwrap())}
+                                    {f.name}": "{disp!(values.get(&RefField(i)).unwrap())}
                                 }
                             })) }"}"
                     }
@@ -188,13 +190,13 @@ impl Expr {
                 }
                 Expr::Constant(c) => {{c}},
                 Expr::Constructor(ConstructorCall { ty, args }) => {
-                    "new "{ty.display(code)}"("{fmtools::join(", ", args.iter().map(|e| disp!(e)))}")"
+                    "new "{ty.display::<EnhancedFmt>(code)}"("{fmtools::join(", ", args.iter().map(|e| disp!(e)))}")"
                 }
                 Expr::Closure(f, stmts) => {
-                    let fun = f.resolve_as_fn(code).unwrap();
+                    let fun = f.as_fn(code).unwrap();
                     "("{fmtools::join(", ", fun.ty(code).args.iter().enumerate().map(move |(i, arg)|
                         fmtools::fmt! { move
-                            {fun.arg_name(code, i).unwrap_or("_")}": "{to_haxe_type(arg.resolve(&code.types), code)}
+                            {fun.arg_name(code, i).unwrap_or("_")}": "{to_haxe_type(&code[*arg], code)}
                         }
                     ))}") -> {\n"
                     let indent2 = indent.inc_nesting();
@@ -204,7 +206,7 @@ impl Expr {
                     {indent}"}"
                 }
                 Expr::EnumConstr(ty, constr, args) => {
-                    {constr.display(*ty, code)}"("{fmtools::join(", ", args.iter().map(|e| disp!(e)))}")"
+                    {constr.display::<EnhancedFmt>(code, &code[*ty])}"("{fmtools::join(", ", args.iter().map(|e| disp!(e)))}")"
                 }
                 Expr::Field(receiver, name) => {
                     {disp!(receiver)}"."{name}

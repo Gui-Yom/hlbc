@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/Gui-Yom/hlbc/compare/v0.5.0...HEAD)
 
+- Updated to latest hlbc
+
 ## [0.5.0](https://github.com/Gui-Yom/hlbc/compare/v0.4.0...v0.5.0) - 2021-09-15
 
 ### Changed
@@ -22,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - If and else statements are unified for better formatting and easier post-processing
 - New (currently hidden) ast post-processing step (AST-PP) to improve the decompiler output
-- New AST_PP : if-expressions
+- New AST-PP : if-expressions
 - New AST-PP : string concatenations :(`__add__("a", "b")` to `"a" + "b"`)
 - New AST-PP : Hide calls to itos. Int to strings conversions are usually hidden.
 - Ability to generate comments in the AST

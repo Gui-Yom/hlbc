@@ -556,3 +556,25 @@ pub enum Opcode {
     /// No-op
     Nop,
 }
+
+#[cfg(test)]
+mod test {
+    use crate::opcodes::Opcode;
+    use crate::types::Reg;
+
+    #[test]
+    fn test_doc() {
+        assert_eq!(
+            "Copy value from *src* into *dst*",
+            Opcode::Mov {
+                dst: Reg(0),
+                src: Reg(0),
+            }
+            .description()
+        );
+        assert_eq!(
+            "Nullify a register\n*dst* = null",
+            Opcode::Null { dst: Reg(0) }.description()
+        );
+    }
+}

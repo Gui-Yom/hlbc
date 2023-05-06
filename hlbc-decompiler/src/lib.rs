@@ -6,8 +6,9 @@
 use std::collections::{HashMap, HashSet};
 
 use ast::*;
+use hlbc::fmt::EnhancedFmt;
 use hlbc::opcodes::Opcode;
-use hlbc::types::{Function, RefField, RefFun, Reg, Type, TypeObj};
+use hlbc::types::{Function, RefField, RefFun, RefString, Reg, Type, TypeObj};
 use hlbc::Bytecode;
 use scopes::*;
 
@@ -59,7 +60,7 @@ impl<'c> DecompilerState<'c> {
         // First argument / First register is 'this'
         if f.is_method()
             || f.name
-                .map(|n| n.resolve(&code.strings) == "__constructor__")
+                .map(|n| code[n] == "__constructor__")
                 .unwrap_or(false)
         {
             reg_state.insert(Reg(0), cst_this());
@@ -135,15 +136,14 @@ impl<'c> DecompilerState<'c> {
                 self.expr_ctx.pop();
             }
         } else {
-            self.push_stmt(comment(fun.display_id(self.code).to_string()));
-            let call = if let Some((func, true)) = fun
-                .resolve_as_fn(self.code)
-                .map(|func| (func, func.is_method()))
+            self.push_stmt(comment(fun.display::<EnhancedFmt>(self.code).to_string()));
+            let call = if let Some((func, true)) =
+                fun.as_fn(self.code).map(|func| (func, func.is_method()))
             {
                 call(
                     Expr::Field(
                         Box::new(self.expr(args[0])),
-                        func.name.unwrap().resolve(&self.code.strings).to_owned(),
+                        func.name_default(self.code).to_owned(),
                     ),
                     self.args_expr(&args[1..]),
                 )
@@ -262,6 +262,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                             // It's a break condition
                             state.push_stmt(Statement::Break);
                         }
+                        // TODO else
                     } else if state.scopes.last_is_if() {
                         // It's the jump over of an else clause
                         state.scopes.push_else(offset + 1);
@@ -311,16 +312,16 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
             //region CONSTANTS
             &Opcode::Int { dst, ptr } => {
-                state.push_expr(i, dst, cst_int(ptr.resolve(&code.ints)));
+                state.push_expr(i, dst, cst_int(ptr));
             }
             &Opcode::Float { dst, ptr } => {
-                state.push_expr(i, dst, cst_float(ptr.resolve(&code.floats)));
+                state.push_expr(i, dst, cst_float(ptr));
             }
             &Opcode::Bool { dst, value } => {
                 state.push_expr(i, dst, cst_bool(value.0));
             }
             &Opcode::String { dst, ptr } => {
-                state.push_expr(i, dst, cst_refstring(ptr, code));
+                state.push_expr(i, dst, cst_string(ptr));
             }
             &Opcode::Null { dst } => {
                 state.push_expr(i, dst, cst_null());
@@ -431,7 +432,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         );
                     }
                 } else {
-                    state.push_stmt(comment(fun.display_id(code).to_string()));
+                    state.push_stmt(comment(fun.display::<EnhancedFmt>(code).to_string()));
                     let call = call_fun(*fun, state.args_expr(args));
                     if fun.ty(code).ret.is_void() {
                         state.push_stmt(stmt(call));
@@ -447,7 +448,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 );
                 if f.regtype(args[0])
                     .method(field.0, code)
-                    .and_then(|p| p.findex.resolve_as_fn(code))
+                    .and_then(|p| p.findex.as_fn(code))
                     .map(|fun| fun.ty(code).ret.is_void())
                     .unwrap_or(false)
                 {
@@ -459,15 +460,12 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
             Opcode::CallThis { dst, field, args } => {
                 let method = f.regs[0].method(field.0, code).unwrap();
                 let call = call(
-                    Expr::Field(
-                        Box::new(cst_this()),
-                        method.name.resolve(&code.strings).to_owned(),
-                    ),
+                    Expr::Field(Box::new(cst_this()), method.name(code).to_owned()),
                     state.args_expr(args),
                 );
                 if method
                     .findex
-                    .resolve_as_fn(code)
+                    .as_fn(code)
                     .map(|fun| fun.ty(code).ret.is_void())
                     .unwrap_or(false)
                 {
@@ -479,7 +477,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
             Opcode::CallClosure { dst, fun, args } => {
                 let call = call(state.expr(*fun), state.args_expr(args));
                 if f.regtype(*fun)
-                    .resolve_as_fun(&code.types)
+                    .as_fun(code)
                     .map(|ty| ty.ret.is_void())
                     .unwrap_or(false)
                 {
@@ -492,25 +490,28 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
 
             //region CLOSURES
             &Opcode::StaticClosure { dst, fun } => {
-                state.push_stmt(comment(format!("closure : {}", fun.display_id(code))));
+                state.push_stmt(comment(format!(
+                    "closure : {}",
+                    fun.display::<EnhancedFmt>(code)
+                )));
                 state.push_expr(
                     i,
                     dst,
-                    Expr::Closure(fun, decompile_code(code, fun.resolve_as_fn(code).unwrap())),
+                    Expr::Closure(fun, decompile_code(code, fun.as_fn(code).unwrap())),
                 );
             }
             &Opcode::InstanceClosure { dst, obj, fun } => {
-                state.push_stmt(comment(format!("closure : {}", fun.display_id(code))));
-                match f.regtype(obj).resolve(&code.types) {
+                state.push_stmt(comment(format!(
+                    "closure : {}",
+                    fun.display::<EnhancedFmt>(code)
+                )));
+                match &code[f[obj]] {
                     // This is an anonymous enum holding the capture for the closure
                     Type::Enum { .. } => {
                         state.push_expr(
                             i,
                             dst,
-                            Expr::Closure(
-                                fun,
-                                decompile_code(code, fun.resolve_as_fn(code).unwrap()),
-                            ),
+                            Expr::Closure(fun, decompile_code(code, fun.as_fn(code).unwrap())),
                         );
                     }
                     _ => {
@@ -519,7 +520,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                             dst,
                             Expr::Field(
                                 Box::new(state.expr(obj)),
-                                fun.resolve_as_fn(code)
+                                fun.as_fn(code)
                                     .unwrap()
                                     .name(code)
                                     .unwrap_or("_")
@@ -534,28 +535,28 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
             //region ACCESSES
             &Opcode::GetGlobal { dst, global } => {
                 // Is a string
-                if f.regtype(dst).0 == 13 {
+                if f[dst].0 == 13 {
                     state.push_expr(
                         i,
                         dst,
-                        cst_string(
+                        cst_string(RefString(
                             code.globals_initializers
                                 .get(&global)
                                 .and_then(|&x| {
-                                    code.constants.as_ref().map(|constants| {
-                                        code.strings[constants[x].fields[0]].to_owned()
-                                    })
+                                    code.constants
+                                        .as_ref()
+                                        .map(|constants| constants[x].fields[0])
                                 })
-                                .unwrap(),
-                        ),
+                                .unwrap_or(0),
+                        )),
                     );
                 } else {
-                    match f.regtype(dst).resolve(&code.types) {
+                    match &code[f[dst]] {
                         Type::Obj(obj) | Type::Struct(obj) => {
                             state.push_expr(
                                 i,
                                 dst,
-                                Expr::Variable(dst, Some(obj.name.display(code))),
+                                Expr::Variable(dst, Some(code[obj.name].to_owned())),
                             );
                         }
                         Type::Enum { .. } => {
@@ -619,12 +620,12 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 });
             }
             &Opcode::DynGet { dst, obj, field } => {
-                state.push_expr(i, dst, array(state.expr(obj), cst_refstring(field, code)));
+                state.push_expr(i, dst, array(state.expr(obj), cst_string(field)));
             }
             &Opcode::DynSet { obj, field, src } => {
                 state.push_stmt(Statement::Assign {
                     declaration: false,
-                    variable: array(state.expr(obj), cst_refstring(field, code)),
+                    variable: array(state.expr(obj), cst_string(field)),
                     assign: state.expr(src),
                 });
             }
@@ -658,8 +659,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
             }
             &Opcode::New { dst } => {
                 // Constructor analysis
-                let ty = f.regtype(dst).resolve(&code.types);
-                match ty {
+                match &code[f[dst]] {
                     Type::Obj(_) | Type::Struct(_) => {
                         state
                             .expr_ctx
@@ -819,7 +819,7 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
             continue;
         }
         fields.push(ClassField {
-            name: f.name.display(code),
+            name: f.name(code).to_owned(),
             static_: false,
             ty: f.t,
         });
@@ -834,7 +834,7 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
                 continue;
             }
             fields.push(ClassField {
-                name: f.name.display(code),
+                name: f.name(code).to_owned(),
                 static_: true,
                 ty: f.t,
             });
@@ -847,7 +847,7 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
             fun: *fun,
             static_: false,
             dynamic: true,
-            statements: decompile_code(code, fun.resolve_as_fn(code).unwrap()),
+            statements: decompile_code(code, fun.as_fn(code).unwrap()),
         })
     }
     if let Some(ty) = static_type {
@@ -856,7 +856,7 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
                 fun: *fun,
                 static_: true,
                 dynamic: false,
-                statements: decompile_code(code, fun.resolve_as_fn(code).unwrap()),
+                statements: decompile_code(code, fun.as_fn(code).unwrap()),
             })
         }
     }
@@ -865,16 +865,16 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
             fun: f.findex,
             static_: false,
             dynamic: false,
-            statements: decompile_code(code, f.findex.resolve_as_fn(code).unwrap()),
+            statements: decompile_code(code, f.findex.as_fn(code).unwrap()),
         })
     }
 
     Class {
-        name: obj.name.resolve(&code.strings).to_owned(),
+        name: obj.name(code).to_owned(),
         parent: obj
             .super_
-            .and_then(|ty| ty.resolve_as_obj(&code.types))
-            .map(|ty| ty.name.display(code)),
+            .and_then(|ty| ty.as_obj(code))
+            .map(|ty| ty.name(code).to_owned()),
         fields,
         methods,
     }

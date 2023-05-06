@@ -1,6 +1,7 @@
 use std::collections::HashMap;
+use std::ops::Index;
 
-use crate::{Bytecode, Opcode};
+use crate::{Bytecode, Opcode, Resolve};
 
 /// A register argument
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Hash)]
@@ -10,21 +11,9 @@ pub struct Reg(pub u32);
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct RefInt(pub usize);
 
-impl RefInt {
-    pub fn resolve(&self, ints: &[i32]) -> i32 {
-        ints[self.0]
-    }
-}
-
 /// A reference to the f64 constant pool
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct RefFloat(pub usize);
-
-impl RefFloat {
-    pub fn resolve(&self, floats: &[f64]) -> f64 {
-        floats[self.0]
-    }
-}
 
 /// A reference to the bytes constant pool
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
@@ -33,12 +22,6 @@ pub struct RefBytes(pub usize);
 /// Reference to the string constant pool
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct RefString(pub usize);
-
-impl RefString {
-    pub fn resolve<'a>(&self, strings: &'a [String]) -> &'a str {
-        &strings[self.0]
-    }
-}
 
 /// An inline bool value
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
@@ -57,6 +40,12 @@ pub struct ObjField {
     pub t: RefType,
 }
 
+impl ObjField {
+    pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
+        code.resolve(self.name)
+    }
+}
+
 /// A reference to an object field
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Default)]
 pub struct RefField(pub usize);
@@ -72,14 +61,25 @@ pub struct ObjProto {
     pub pindex: i32,
 }
 
+impl ObjProto {
+    pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
+        code.resolve(self.name)
+    }
+}
+
 /// An enum variant definition
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnumConstruct {
-    /// Variant name, can be null (pointing to 0)
-    // TODO wrap this in an option
+    /// Variant name
     pub name: RefString,
     /// Variant fields types
     pub params: Vec<RefType>,
+}
+
+impl EnumConstruct {
+    pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
+        code.resolve(self.name)
+    }
 }
 
 /// A reference to an enum variant
@@ -112,10 +112,14 @@ pub struct TypeObj {
 }
 
 impl TypeObj {
+    pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
+        code.resolve(self.name)
+    }
+
     /// Get the static part of this class
     pub fn get_static_type<'a>(&self, ctx: &'a Bytecode) -> Option<&'a TypeObj> {
         if self.global.0 > 0 {
-            ctx.globals[self.global.0 - 1].resolve_as_obj(&ctx.types)
+            ctx.globals[self.global.0 - 1].as_obj(ctx)
         } else {
             None
         }
@@ -189,34 +193,28 @@ impl Type {
 pub struct RefType(pub usize);
 
 impl RefType {
-    pub fn resolve<'a>(&self, types: &'a [Type]) -> &'a Type {
-        &types[self.0]
-    }
-
     pub fn is_void(&self) -> bool {
         self.0 == 0
     }
 
-    pub fn resolve_as_fun<'a>(&self, types: &'a [Type]) -> Option<&'a TypeFun> {
-        match self.resolve(types) {
+    pub fn as_fun<'a>(&self, ctx: &'a Bytecode) -> Option<&'a TypeFun> {
+        match ctx.resolve(*self) {
             Type::Fun(fun) => Some(fun),
             Type::Method(fun) => Some(fun),
             _ => None,
         }
     }
 
-    pub fn resolve_as_obj<'a>(&self, types: &'a [Type]) -> Option<&'a TypeObj> {
-        self.resolve(types).get_type_obj()
+    pub fn as_obj<'a>(&self, ctx: &'a Bytecode) -> Option<&'a TypeObj> {
+        ctx.resolve(*self).get_type_obj()
     }
 
-    pub fn field<'a>(&self, field: RefField, code: &'a Bytecode) -> Option<&'a ObjField> {
-        self.resolve_as_obj(&code.types)
-            .map(|obj| &obj.fields[field.0])
+    pub fn field<'a>(&self, field: RefField, ctx: &'a Bytecode) -> Option<&'a ObjField> {
+        self.as_obj(ctx).map(|obj| &obj.fields[field.0])
     }
 
-    pub fn method<'a>(&self, meth: usize, code: &'a Bytecode) -> Option<&'a ObjProto> {
-        self.resolve_as_obj(&code.types)
-            .map(|obj| &obj.protos[meth])
+    pub fn method<'a>(&self, meth: usize, ctx: &'a Bytecode) -> Option<&'a ObjProto> {
+        self.as_obj(ctx).map(|obj| &obj.protos[meth])
     }
 }
 
@@ -233,13 +231,13 @@ pub struct Native {
 
 impl Native {
     pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
-        self.name.resolve(&code.strings)
+        code.resolve(self.name)
     }
 
     /// Get the native function signature type
     pub fn ty<'a>(&self, code: &'a Bytecode) -> &'a TypeFun {
         // Guaranteed to be a TypeFun
-        self.t.resolve_as_fun(&code.types).expect("Unknown type ?")
+        self.t.as_fun(code).expect("Unknown type ?")
     }
 
     pub fn args<'a>(&self, code: &'a Bytecode) -> &'a [RefType] {
@@ -247,7 +245,7 @@ impl Native {
     }
 
     pub fn ret<'a>(&self, code: &'a Bytecode) -> &'a Type {
-        self.ty(code).ret.resolve(&code.types)
+        code.resolve(self.ty(code).ret)
     }
 }
 
@@ -275,12 +273,12 @@ pub struct Function {
 impl Function {
     /// Get the type of a register
     pub fn regtype(&self, reg: Reg) -> RefType {
-        self.regs[reg.0 as usize]
+        self[reg]
     }
 
     /// Convenience method to resolve the function name
     pub fn name<'a>(&self, code: &'a Bytecode) -> Option<&'a str> {
-        self.name.map(|n| n.resolve(&code.strings))
+        self.name.map(|n| code.resolve(n))
     }
 
     /// Convenience method to get the function name or "_"
@@ -291,7 +289,7 @@ impl Function {
     /// Get the function signature type
     pub fn ty<'a>(&self, code: &'a Bytecode) -> &'a TypeFun {
         // Guaranteed to be a TypeFun
-        self.t.resolve_as_fun(&code.types).expect("Unknown type ?")
+        self.t.as_fun(code).expect("Unknown type ?")
     }
 
     /// Convenience method to resolve the function args
@@ -301,7 +299,7 @@ impl Function {
 
     /// Convenience method to resolve the function return type
     pub fn ret<'a>(&self, code: &'a Bytecode) -> &'a Type {
-        self.ty(code).ret.resolve(&code.types)
+        code.resolve(self.ty(code).ret)
     }
 
     /// Uses the assigns to find the name of an argument
@@ -310,9 +308,9 @@ impl Function {
             a.iter()
                 .filter(|&&(_, i)| i == 0)
                 .enumerate()
-                .find_map(|(j, (s, _))| {
+                .find_map(|(j, &(s, _))| {
                     if j == pos {
-                        Some(s.resolve(&code.strings))
+                        Some(code.resolve(s))
                     } else {
                         None
                     }
@@ -325,7 +323,7 @@ impl Function {
         self.assigns.as_ref().and_then(|a| {
             a.iter().find_map(|&(s, i)| {
                 if pos + 1 == i {
-                    Some(s.resolve(&code.strings).to_owned())
+                    Some(code[s].to_owned())
                 } else {
                     None
                 }
@@ -341,36 +339,41 @@ impl Function {
     }
 }
 
+impl Index<Reg> for Function {
+    type Output = RefType;
+
+    /// Get the type of a register
+    fn index(&self, index: Reg) -> &Self::Output {
+        &self.regs[index.0 as usize]
+    }
+}
+
 /// Index reference to a function or a native in the pool (findex)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Ord, PartialOrd, Default)]
 pub struct RefFun(pub usize);
 
 impl RefFun {
-    pub fn resolve<'a>(&self, code: &'a Bytecode) -> FunPtr<'a> {
-        code.findexes[self.0].resolve(code)
-    }
-
     /// Useful when you already know you should be getting a Function
-    pub fn resolve_as_fn<'a>(&self, code: &'a Bytecode) -> Option<&'a Function> {
-        code.findexes[self.0].resolve_as_fn(code)
+    pub fn as_fn<'a>(&self, code: &'a Bytecode) -> Option<&'a Function> {
+        code.resolve(*self).as_fn()
     }
 
     pub fn name<'a>(&self, code: &'a Bytecode) -> Option<&'a str> {
-        match self.resolve(code) {
+        match code.resolve(*self) {
             FunPtr::Fun(fun) => fun.name(code),
-            FunPtr::Native(n) => Some(n.name.resolve(&code.strings)),
+            FunPtr::Native(n) => Some(n.name(code)),
         }
     }
 
     pub fn name_default<'a>(&self, code: &'a Bytecode) -> &'a str {
-        match self.resolve(code) {
+        match code.resolve(*self) {
             FunPtr::Fun(fun) => fun.name_default(code),
             FunPtr::Native(n) => n.name(code),
         }
     }
 
     pub fn ty<'a>(&self, code: &'a Bytecode) -> &'a TypeFun {
-        match self.resolve(code) {
+        match code.resolve(*self) {
             FunPtr::Fun(fun) => fun.ty(code),
             FunPtr::Native(n) => n.ty(code),
         }
@@ -381,30 +384,7 @@ impl RefFun {
     }
 
     pub fn ret<'a>(&self, code: &'a Bytecode) -> &'a Type {
-        self.ty(code).ret.resolve(&code.types)
-    }
-}
-
-// Index reference to either a function or a native.
-#[derive(Debug, Copy, Clone)]
-pub enum RefFunKnown {
-    Fun(usize),
-    Native(usize),
-}
-
-impl RefFunKnown {
-    pub fn resolve<'a>(&self, code: &'a Bytecode) -> FunPtr<'a> {
-        match *self {
-            RefFunKnown::Fun(x) => FunPtr::Fun(&code.functions[x]),
-            RefFunKnown::Native(x) => FunPtr::Native(&code.natives[x]),
-        }
-    }
-
-    pub fn resolve_as_fn<'a>(&self, code: &'a Bytecode) -> Option<&'a Function> {
-        match self {
-            &RefFunKnown::Fun(x) => Some(&code.functions[x]),
-            _ => None,
-        }
+        code.resolve(self.ty(code).ret)
     }
 }
 
@@ -415,7 +395,14 @@ pub enum FunPtr<'a> {
     Native(&'a Native),
 }
 
-impl FunPtr<'_> {
+impl<'a> FunPtr<'a> {
+    pub fn as_fn(self: FunPtr<'a>) -> Option<&'a Function> {
+        match self {
+            FunPtr::Fun(fun) => Some(fun),
+            FunPtr::Native(_) => None,
+        }
+    }
+
     pub fn findex(&self) -> RefFun {
         match self {
             FunPtr::Fun(fun) => fun.findex,

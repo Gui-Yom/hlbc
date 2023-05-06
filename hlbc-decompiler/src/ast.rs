@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use hlbc::types::{RefEnumConstruct, RefField, RefFun, RefString, RefType, Reg};
+use hlbc::fmt::EnhancedFmt;
+use hlbc::types::{RefEnumConstruct, RefField, RefFloat, RefFun, RefInt, RefString, RefType, Reg};
 use hlbc::Bytecode;
 
 #[derive(Debug)]
@@ -35,9 +36,10 @@ pub struct Method {
 
 #[derive(Debug, Clone)]
 pub enum Constant {
-    Int(i32),
-    Float(f64),
-    String(String),
+    InlineInt(usize),
+    Int(RefInt),
+    Float(RefFloat),
+    String(RefString),
     Bool(bool),
     Null,
     /// 'this' instance
@@ -157,32 +159,27 @@ pub enum Expr {
     Variable(Reg, Option<String>),
 }
 
-pub fn cst_int(cst: i32) -> Expr {
+pub const fn cst_int(cst: RefInt) -> Expr {
     Expr::Constant(Constant::Int(cst))
 }
 
-pub fn cst_float(cst: f64) -> Expr {
+pub const fn cst_float(cst: RefFloat) -> Expr {
     Expr::Constant(Constant::Float(cst))
 }
 
-pub fn cst_bool(cst: bool) -> Expr {
+pub const fn cst_bool(cst: bool) -> Expr {
     Expr::Constant(Constant::Bool(cst))
 }
 
-pub fn cst_string(cst: String) -> Expr {
+pub const fn cst_string(cst: RefString) -> Expr {
     Expr::Constant(Constant::String(cst))
 }
 
-// TODO make an ast node to contain a RefString directly
-pub fn cst_refstring(cst: RefString, code: &Bytecode) -> Expr {
-    cst_string(cst.resolve(&code.strings).to_owned())
-}
-
-pub fn cst_null() -> Expr {
+pub const fn cst_null() -> Expr {
     Expr::Constant(Constant::Null)
 }
 
-pub fn cst_this() -> Expr {
+pub const fn cst_this() -> Expr {
     Expr::Constant(Constant::This)
 }
 
@@ -260,11 +257,10 @@ pub fn call_fun(fun: RefFun, args: Vec<Expr>) -> Expr {
 }
 
 pub fn field(expr: Expr, obj: RefType, field: RefField, code: &Bytecode) -> Expr {
+    // FIXME meh
     Expr::Field(
         Box::new(expr),
-        field
-            .display_obj(obj.resolve(&code.types), code)
-            .to_string(),
+        field.display::<EnhancedFmt>(code, &code[obj]).to_string(),
     )
 }
 

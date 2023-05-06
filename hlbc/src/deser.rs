@@ -58,7 +58,7 @@ impl<T: Read> ReadHlExt for T {
         let i = self.read_vari()?;
         if i < 0 {
             Err(Error::MalformedBytecode(format!(
-                "Got negative index '{i}' (expected > 0)"
+                "Got negative index '{i}' (expected >= 0)"
             )))
         } else {
             Ok(i as u32)

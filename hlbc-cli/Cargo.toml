@@ -8,7 +8,7 @@ description = "Hashlink bytecode disassembler, analyzer and decompiler cli"
 repository = "https://github.com/Gui-Yom/hlbc"
 license = "MIT"
 categories = ["command-line-utilities", "parser-implementations", "visualization", "compilers"]
-keywords = ["hashlink", "bytecode", "disassembler", "analysis", "decompiler"]
+keywords = ["hashlink", "bytecode", "haxe", "disassembler", "reverse-enginneering"]
 include = ["src/**/*", "README.md", "CHANGELOG.md"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

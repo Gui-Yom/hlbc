@@ -1,4 +1,4 @@
-use crate::ast::{cst_int, Expr, Statement};
+use crate::ast::{Constant, Expr, Statement};
 
 #[derive(Debug)]
 pub(crate) enum ScopeType {
@@ -200,7 +200,7 @@ impl Scopes {
                 self.scopes.push(Scope::new(
                     ScopeType::Manual,
                     ScopeData::SwitchCase {
-                        pattern: cst_int(cst as i32),
+                        pattern: Expr::Constant(Constant::InlineInt(cst)),
                     },
                 ));
             }

@@ -10,7 +10,7 @@ use petgraph::visit::{EdgeRef, IntoEdgeReferences, IntoNodeReferences, NodeIndex
 
 use crate::analysis::IsFromStd;
 use crate::types::{FunPtr, Function, RefFun};
-use crate::{Bytecode, Opcode, Type};
+use crate::{Bytecode, Opcode, Resolve, Type};
 
 pub enum Call {
     // Called with Call0, Call1, ...
@@ -32,7 +32,7 @@ pub fn find_calls<'a>(
         ($i:ident; $args:expr) => {{
             let mut tmp = RegCtx::new();
             for (p, arg) in $args.into_iter().enumerate() {
-                if matches!(f.regs[arg.0 as usize].resolve(&code.types), Type::Fun(_)) {
+                if matches!(code[f[*arg]], Type::Fun(_)) {
                     if let Some(value) = f
                         .find_last_closure_assign(code, *arg, $i)
                         .or_else(|| reg_ctx.get(&(arg.0 as usize)).copied())
@@ -45,7 +45,7 @@ pub fn find_calls<'a>(
         }};
     }
 
-    f.ops.iter().enumerate().filter_map(|(i, o)| match o {
+    f.ops.iter().enumerate().filter_map(move |(i, o)| match o {
         Opcode::Call0 { fun, .. } => Some((Call::Direct, *fun, RegCtx::new())),
         Opcode::Call1 { fun, arg0, .. } => Some((Call::Direct, *fun, build_ctx!(i; [arg0]))),
         Opcode::Call2 {
@@ -75,12 +75,10 @@ pub fn find_calls<'a>(
                     .get(&(fun.0 as usize))
                     .map(|param| (Call::Closure, *param, build_ctx!(i; args)))
             }),
-        Opcode::CallMethod { field, args, .. } => f.regs[args[0].0 as usize]
-            .resolve(&code.types)
+        Opcode::CallMethod { field, args, .. } => code[f[args[0]]]
             .get_type_obj()
             .map(|o| (Call::Direct, o.protos[field.0].findex, build_ctx!(i; args))),
-        Opcode::CallThis { field, args, .. } => f.regs[0]
-            .resolve(&code.types)
+        Opcode::CallThis { field, args, .. } => code[f.regs[0]]
             .get_type_obj()
             .map(|o| (Call::Direct, o.protos[field.0].findex, build_ctx!(i; args))),
         _ => None,
@@ -89,7 +87,7 @@ pub fn find_calls<'a>(
 
 pub fn call_graph(code: &Bytecode, f: RefFun, max_depth: usize) -> Callgraph {
     let mut g = Callgraph::new();
-    match f.resolve(code) {
+    match code.resolve(f) {
         FunPtr::Fun(f) => {
             g.add_node(f.findex);
             build_graph_rec(code, &mut g, f, &RegCtx::new(), max_depth);
@@ -107,7 +105,7 @@ fn build_graph_rec(code: &Bytecode, g: &mut Callgraph, f: &Function, ctx: &RegCt
     }
     for (call, fun, ctx) in find_calls(code, f, ctx) {
         if fun.is_from_std(code) {
-            match fun.resolve(code) {
+            match code.resolve(fun) {
                 FunPtr::Fun(fun) => {
                     if !g.contains_node(fun.findex) {
                         g.add_node(fun.findex);
@@ -156,10 +154,10 @@ impl Display for GraphDisplay<'_> {
         for node in self.g.node_references() {
             writeln!(
                 f,
-                "{}{} [ label = \"{}\" fontsize=18 shape=box color=\"#b20400\" fillcolor=\"#edd6d5\" ]",
+                "{}{} [ label = \"{:?}\" fontsize=18 shape=box color=\"#b20400\" fillcolor=\"#edd6d5\" ]",
                 INDENT,
                 self.g.to_index(node.id()),
-                node.weight().display_header(self.code)
+                self.code.resolve(*node.weight())
             )?;
         }
         // output all edges

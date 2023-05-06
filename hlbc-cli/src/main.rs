@@ -5,12 +5,13 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use clap::Parser as ClapParser;
+use temp_dir::TempDir;
+use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
+use hlbc::fmt::EnhancedFmt;
 use hlbc::opcodes::Opcode;
 use hlbc::types::{FunPtr, RefFun, RefGlobal, Type};
 use hlbc::*;
-use temp_dir::TempDir;
-use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
 
 use crate::command::{commands_parser, Command, ElementRef, FileOrIndex, ParseContext, Parser};
 
@@ -73,7 +74,7 @@ fn main() -> anyhow::Result<()> {
 
     let code = {
         let mut r = BufReader::new(fs::File::open(&file)?);
-        Bytecode::load(&mut r)?
+        Bytecode::deserialize(&mut r)?
     };
 
     if tty {
@@ -89,7 +90,7 @@ fn main() -> anyhow::Result<()> {
         global_max: code.globals.len(),
         native_max: code.natives.len(),
         constant_max: code.constants.as_ref().map(|v| v.len()).unwrap_or(0),
-        findex_max: code.findexes.len(),
+        findex_max: code.findex_max(),
     };
 
     let parser = commands_parser(&parse_ctx);
@@ -147,7 +148,7 @@ fn main() -> anyhow::Result<()> {
 
                         let code = {
                             let mut r = BufReader::new(fs::File::open(&file)?);
-                            Bytecode::load(&mut r)?
+                            Bytecode::deserialize(&mut r)?
                         };
 
                         execute_commands!(&code, commands.clone(); break 'watch);
@@ -269,7 +270,7 @@ This is the same range notation as Rust and is supported with most commands."#
             );
         }
         Command::Entrypoint => {
-            println!("{}", code.entrypoint.display_header(code));
+            println!("{}", code.entrypoint().display_header::<EnhancedFmt>(code));
         }
         Command::Int(range) => {
             for i in range {
@@ -318,25 +319,29 @@ This is the same range notation as Rust and is supported with most commands."#
             for i in range {
                 print_i!(i);
                 let t = &code.types[i];
-                println!("{}", t.display(code));
+                println!("{}", t.display::<EnhancedFmt>(code));
                 // Only display full info if selecting a single item
                 if range_len == 1 {
                     match t {
                         Type::Obj(obj) => {
                             if let Some(sup) = obj.super_ {
-                                println!("extends {}", sup.display_id(code));
+                                println!("extends {}", sup.display::<EnhancedFmt>(code));
                             }
                             println!("global: {}", obj.global.0);
                             println!("fields:");
                             for f in &obj.own_fields {
-                                println!("  {}: {}", f.name.display(code), f.t.display_id(code));
+                                println!(
+                                    "  {}: {}",
+                                    f.name.display::<EnhancedFmt>(code),
+                                    f.t.display::<EnhancedFmt>(code)
+                                );
                             }
                             println!("protos:");
                             for p in &obj.protos {
                                 println!(
                                     "  {}: {} ({})",
-                                    p.name.display(code),
-                                    p.findex.display_header(code),
+                                    p.name.display::<EnhancedFmt>(code),
+                                    code.resolve(p.findex).display_header::<EnhancedFmt>(code),
                                     p.pindex
                                 );
                             }
@@ -344,8 +349,8 @@ This is the same range notation as Rust and is supported with most commands."#
                             for (fi, fun) in &obj.bindings {
                                 println!(
                                     "  {}: {}",
-                                    fi.display_obj(t, code),
-                                    fun.display_header(code)
+                                    fi.display::<EnhancedFmt>(code, t),
+                                    fun.display_header::<EnhancedFmt>(code)
                                 );
                             }
                         }
@@ -355,16 +360,9 @@ This is the same range notation as Rust and is supported with most commands."#
                             println!("global: {}", global.0);
                             println!("constructs:");
                             for c in constructs {
-                                println!(
-                                    "  {}:",
-                                    if c.name.0 == 0 {
-                                        "_".to_string()
-                                    } else {
-                                        c.name.display(code)
-                                    }
-                                );
+                                println!("  {}:", c.name(code));
                                 for (i, p) in c.params.iter().enumerate() {
-                                    println!("    {i}: {}", p.display_id(code));
+                                    println!("    {i}: {}", p.display::<EnhancedFmt>(code));
                                 }
                             }
                         }
@@ -376,7 +374,7 @@ This is the same range notation as Rust and is supported with most commands."#
         Command::Global(range) => {
             for i in range {
                 print_i!(i);
-                println!("{}", code.globals[i].display_id(code));
+                println!("{}", code.globals[i].display::<EnhancedFmt>(code));
                 if let Some(&cst) = code.globals_initializers.get(&RefGlobal(i)) {
                     for init in &code.constants.as_ref().unwrap()[cst].fields {
                         println!("    {}", init);
@@ -387,7 +385,7 @@ This is the same range notation as Rust and is supported with most commands."#
         Command::Native(range) => {
             for i in range {
                 print_i!(i);
-                println!("{}", code.natives[i].display_header(code));
+                println!("{}", code.natives[i].display::<EnhancedFmt>(code));
             }
         }
         Command::Constant(range) => {
@@ -399,24 +397,24 @@ This is the same range notation as Rust and is supported with most commands."#
         Command::FunctionHeader(range) => {
             for findex in range {
                 print_i!(findex);
-                match RefFun(findex).resolve(code) {
-                    FunPtr::Fun(f) => println!("{}", f.display_header(code)),
-                    FunPtr::Native(n) => println!("{}", n.display_header(code)),
+                match code.resolve(RefFun(findex)) {
+                    FunPtr::Fun(f) => println!("{}", f.display_header::<EnhancedFmt>(code)),
+                    FunPtr::Native(n) => println!("{}", n.display::<EnhancedFmt>(code)),
                 }
             }
         }
         Command::Function(range) => {
             for findex in range {
                 print_i!(findex);
-                match RefFun(findex).resolve(code) {
-                    FunPtr::Fun(f) => println!("{}", f.display(code)),
-                    FunPtr::Native(n) => println!("{}", n.display_header(code)),
+                match code.resolve(RefFun(findex)) {
+                    FunPtr::Fun(f) => println!("{}", f.display::<EnhancedFmt>(code)),
+                    FunPtr::Native(n) => println!("{}", n.display::<EnhancedFmt>(code)),
                 }
             }
         }
         Command::FunctionNamed(str) => {
             if let Some(&i) = code.fnames.get(&str) {
-                println!("{}", code.functions[i].display(code));
+                println!("{}", code.functions[i].display::<EnhancedFmt>(code));
             } else {
                 println!("unknown '{str}'");
             }
@@ -424,7 +422,7 @@ This is the same range notation as Rust and is supported with most commands."#
         Command::SearchFunction(str) => {
             // TODO search for function
             if let Some(&i) = code.fnames.get(&str) {
-                println!("{}", code.functions[i].display_header(code));
+                println!("{}", code.functions[i].display_header::<EnhancedFmt>(code));
             } else {
                 println!("unknown");
             }
@@ -451,7 +449,7 @@ This is the same range notation as Rust and is supported with most commands."#
                         for (i, f) in code.functions.iter().enumerate() {
                             if f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0 == idx {
                                 print_i!(i);
-                                println!("{}", f.display_header(code));
+                                println!("{}", f.display_header::<EnhancedFmt>(code));
                             }
                         }
                     } else {
@@ -463,7 +461,7 @@ This is the same range notation as Rust and is supported with most commands."#
                     for (i, f) in code.functions.iter().enumerate() {
                         if f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0 == idx {
                             print_i!(i);
-                            println!("{}", f.display_header(code));
+                            println!("{}", f.display_header::<EnhancedFmt>(code));
                         }
                     }
                 }
@@ -471,20 +469,20 @@ This is the same range notation as Rust and is supported with most commands."#
         }
         Command::FileOf(idx) => {
             let debug_files = require_debug_info!();
-            match RefFun(idx).resolve(code) {
+            match code.resolve(RefFun(idx)) {
                 FunPtr::Fun(f) => {
                     let idx = f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0;
                     println!(
                         "{} is in file@{idx} : {}",
-                        f.display_header(code),
+                        f.display_header::<EnhancedFmt>(code),
                         &debug_files[idx]
                     );
                 }
                 FunPtr::Native(n) => {
                     println!(
                         "native {} is in the module {}",
-                        n.display_header(code),
-                        n.lib.resolve(&code.strings)
+                        n.display::<EnhancedFmt>(code),
+                        code.resolve(n.lib)
                     )
                 }
             }
@@ -523,7 +521,10 @@ This is the same range notation as Rust and is supported with most commands."#
                             code.ops().for_each(|(f, (i, o))| match o {
                                 Opcode::GetGlobal { global, .. } => {
                                     if *global == c.global {
-                                        println!("in {} at {i}: GetGlobal", f.display_header(code));
+                                        println!(
+                                            "in {} at {i}: GetGlobal",
+                                            f.display_header::<EnhancedFmt>(code)
+                                        );
                                     }
                                 }
                                 _ => {}
@@ -535,7 +536,7 @@ This is the same range notation as Rust and is supported with most commands."#
                 code.ops().for_each(|(f, (i, o))| match o {
                     Opcode::String { ptr, .. } => {
                         if ptr.0 == idx {
-                            println!("{} at {i}: String", f.display_header(code));
+                            println!("{} at {i}: String", f.display_header::<EnhancedFmt>(code));
                         }
                     }
                     _ => {}
@@ -544,7 +545,7 @@ This is the same range notation as Rust and is supported with most commands."#
             ElementRef::Global(idx) => {
                 println!(
                     "Finding references to global@{idx} : {}\n",
-                    code.globals[idx].display_id(code)
+                    code.globals[idx].display::<EnhancedFmt>(code)
                 );
                 if let Some(constants) = &code.constants {
                     for (i, c) in constants.iter().enumerate() {
@@ -558,7 +559,11 @@ This is the same range notation as Rust and is supported with most commands."#
                 code.ops().for_each(|(f, (i, o))| match o {
                     Opcode::GetGlobal { global, .. } | Opcode::SetGlobal { global, .. } => {
                         if global.0 == idx {
-                            println!("{} at {i}: {}", f.display_header(code), o.name());
+                            println!(
+                                "{} at {i}: {}",
+                                f.display_header::<EnhancedFmt>(code),
+                                o.name()
+                            );
                         }
                     }
                     _ => {}
@@ -567,24 +572,28 @@ This is the same range notation as Rust and is supported with most commands."#
             ElementRef::Fn(idx) => {
                 println!(
                     "Finding references to fn@{idx} : {}\n",
-                    RefFun(idx).display_header(code)
+                    RefFun(idx).display_header::<EnhancedFmt>(code)
                 );
                 code.functions
                     .iter()
                     .flat_map(|f| repeat(f).zip(f.find_fun_refs()))
                     .for_each(|(f, (i, o, fun))| {
                         if fun.0 == idx {
-                            println!("{} at {i}: {}", f.display_header(code), o.name());
+                            println!(
+                                "{} at {i}: {}",
+                                f.display_header::<EnhancedFmt>(code),
+                                o.name()
+                            );
                         }
                     });
             }
         },
         Command::Decomp(idx) => {
-            if let Some(fun) = RefFun(idx).resolve_as_fn(code) {
+            if let Some(fun) = RefFun(idx).as_fn(code) {
                 println!(
                     "{}",
                     hlbc_decompiler::decompile_function(code, fun)
-                        .display(code, &hlbc_decompiler::fmt::FormatOptions::new("  "))
+                        .display(code, &hlbc_decompiler::fmt::FormatOptions::new("  "),)
                 );
             }
         }
@@ -592,7 +601,7 @@ This is the same range notation as Rust and is supported with most commands."#
             let ty = &code.types[idx];
             match ty {
                 Type::Obj(obj) => {
-                    println!("Dumping type@{idx} : {}", ty.display(code));
+                    println!("Dumping type@{idx} : {}", ty.display::<EnhancedFmt>(code));
                     println!(
                         "{}",
                         hlbc_decompiler::decompile_class(code, obj)

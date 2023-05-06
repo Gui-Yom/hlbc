@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add support for hashlink `PACKED` type.
+- Bytecode formatting trait `BytecodeFmt`, and its implementations : `DebugFmt`, `DisplayFmt`, `EnhancedFmt`.
+- `Index` impl for `Bytecode` to resolve most types.
+- `Resolve` trait to resolve `Ref*` elements.
+
+### Changed
+
+- Bytecode formatting requires the usage of the `BytecodeFmt` trait
+
+### Removed
+
+- Most types now don't have a `resolve` method, use index access (`[]`) instead
 
 ## [0.5.0](https://github.com/Gui-Yom/hlbc/compare/v0.4.0...v0.5.0) - 2021-09-15
 

@@ -1,7 +1,7 @@
 use std::iter::repeat;
 
 use crate::types::{FunPtr, Reg};
-use crate::{Bytecode, Function, Native, Opcode, RefFun, RefType, Type, TypeObj};
+use crate::{Bytecode, Function, Native, Opcode, RefFun, RefType, Resolve, Type, TypeObj};
 
 #[cfg(feature = "graph")]
 pub mod graph;
@@ -23,7 +23,7 @@ pub trait IsFromStd {
 
 impl IsFromStd for RefFun {
     fn is_from_std(&self, code: &Bytecode) -> bool {
-        match self.resolve(code) {
+        match code.resolve(*self) {
             FunPtr::Fun(fun) => fun.is_from_std(code),
             FunPtr::Native(n) => n.is_from_std(code),
         }
@@ -75,7 +75,7 @@ impl Function {
                 Opcode::InstanceClosure { dst, fun, .. } if dst == reg => Some(fun),
                 Opcode::Field { dst, obj, field } if dst == reg => self
                     .regtype(obj)
-                    .resolve_as_obj(&code.types)
+                    .as_obj(code)
                     .and_then(|o| o.bindings.get(&field).copied()),
                 _ => None,
             })
@@ -84,13 +84,13 @@ impl Function {
 
 impl IsFromStd for Native {
     fn is_from_std(&self, code: &Bytecode) -> bool {
-        self.lib.resolve(&code.strings) == "std"
+        code[self.lib] == "std"
     }
 }
 
 impl IsFromStd for RefType {
     fn is_from_std(&self, code: &Bytecode) -> bool {
-        self.resolve(&code.types).is_from_std(code)
+        code[*self].is_from_std(code)
     }
 }
 
@@ -110,7 +110,7 @@ impl IsFromStd for TypeObj {
         } else if let Some(&fun) = self.bindings.values().next() {
             fun.is_from_std(code)
         } else {
-            let name = self.name.resolve(&code.strings);
+            let name = code[self.name].as_str();
             name.starts_with("hl")
                 || name.starts_with("haxe")
                 || name == "Std"

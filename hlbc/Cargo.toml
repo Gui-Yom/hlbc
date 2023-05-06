@@ -7,7 +7,7 @@ rust-version = "1.56"
 description = "Hashlink bytecode disassembler and analyzer"
 repository = "https://github.com/Gui-Yom/hlbc"
 license = "MIT"
-keywords = ["hashlink", "bytecode", "disassembler", "analysis"]
+keywords = ["hashlink", "bytecode", "haxe", "disassembler", "reverse-enginneering"]
 categories = ["parser-implementations", "visualization", "compilers"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
