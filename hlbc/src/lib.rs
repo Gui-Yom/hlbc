@@ -242,14 +242,14 @@ impl Bytecode {
             {
                 for p in protos {
                     if let RefFunKnown::Fun(x) = findexes[p.findex.0] {
-                        functions[x].name = Some(p.name);
+                        functions[x].name = p.name;
                         functions[x].parent = Some(RefType(i));
                     }
                 }
                 for (fid, findex) in bindings {
                     if let Some(field) = t.get_type_obj().map(|o| &o.fields[fid.0]) {
                         if let RefFunKnown::Fun(x) = findexes[findex.0] {
-                            functions[x].name = Some(field.name);
+                            functions[x].name = field.name;
                             functions[x].parent = Some(RefType(i));
                         }
                     }
@@ -260,10 +260,8 @@ impl Bytecode {
         // Function names
         let mut fnames = HashMap::with_capacity(functions.len());
         for (i, f) in functions.iter().enumerate() {
-            if let Some(s) = f.name {
-                // FIXME we possibly overwrite some values here, is that a problem ?
-                fnames.insert(strings[s.0].clone(), i);
-            }
+            // FIXME duplicates ?
+            fnames.insert(strings[f.name.0].clone(), i);
         }
         fnames.insert(
             "init".to_string(),
@@ -479,14 +477,6 @@ impl Index<RefInt> for Bytecode {
     }
 }
 
-impl Index<RefInt> for &Bytecode {
-    type Output = i32;
-
-    fn index(&self, index: RefInt) -> &Self::Output {
-        self.ints.index(index.0)
-    }
-}
-
 impl Index<RefFloat> for Bytecode {
     type Output = f64;
 
@@ -495,15 +485,7 @@ impl Index<RefFloat> for Bytecode {
     }
 }
 
-impl Index<RefFloat> for &Bytecode {
-    type Output = f64;
-
-    fn index(&self, index: RefFloat) -> &Self::Output {
-        self.floats.index(index.0)
-    }
-}
-
-impl<'a> Index<RefString> for &'a Bytecode {
+impl Index<RefString> for Bytecode {
     type Output = String;
 
     fn index(&self, index: RefString) -> &Self::Output {
@@ -511,7 +493,7 @@ impl<'a> Index<RefString> for &'a Bytecode {
     }
 }
 
-impl<'a> Index<RefType> for &'a Bytecode {
+impl Index<RefType> for Bytecode {
     type Output = Type;
 
     fn index(&self, index: RefType) -> &Self::Output {

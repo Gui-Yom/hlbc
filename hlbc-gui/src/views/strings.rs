@@ -33,7 +33,7 @@ impl AppView for StringsView {
                                 _ => false,
                             };
                             let job = LayoutJob::simple_singleline(
-                                s.display(ctx.code().deref()),
+                                ctx.code()[s].to_owned(),
                                 TextStyle::Body.resolve(ui.style().as_ref()),
                                 Color32::WHITE,
                             );

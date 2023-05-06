@@ -482,7 +482,7 @@ This is the same range notation as Rust and is supported with most commands."#
                     println!(
                         "native {} is in the module {}",
                         n.display::<EnhancedFmt>(code),
-                        code.resolve(n.lib)
+                        n.lib(code)
                     )
                 }
             }

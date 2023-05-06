@@ -383,9 +383,7 @@ impl BytecodeFmt for EnhancedFmt {
     }
 
     fn fmt_reffun(&self, f: &mut Formatter, ctx: &Bytecode, v: RefFun) -> Result {
-        //TODO
-        // self.fmt_refstring(f, ctx, ctx[v].name())?;
-        Display::fmt(&v, f)
+        write!(f, "{}{}", v.name(ctx), v)
     }
 
     fn fmt_native(&self, f: &mut Formatter, ctx: &Bytecode, v: &Native) -> Result {
@@ -402,7 +400,7 @@ impl BytecodeFmt for EnhancedFmt {
         write!(
             f,
             "fn {}{} {}",
-            v.name_default(ctx),
+            v.name(ctx),
             fmt(|f| self.fmt_reffun(f, ctx, v.findex)),
             fmt(|f| self.fmt_type(f, ctx, &ctx[v.t]))
         )

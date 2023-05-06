@@ -309,9 +309,7 @@ impl AstVisitor for StringConcat {
         let args = match expr {
             Expr::Call(call) => match call.fun {
                 Expr::FunRef(fun) => {
-                    if fun.name(code).map(|n| n == "__add__").unwrap_or(false)
-                        && call.args.len() == 2
-                    {
+                    if fun.name(code) == "__add__" && call.args.len() == 2 {
                         Some((call.args[0].clone(), call.args[1].clone()))
                     } else {
                         None
@@ -335,19 +333,13 @@ impl AstVisitor for Itos {
     fn visit_expr(&mut self, code: &Bytecode, expr: &mut Expr) {
         let var = match expr {
             Expr::Call(call) => match call.fun {
-                Expr::FunRef(fun) if fun.name(code).map(|n| n == "__alloc__").unwrap_or(false) => {
-                    match &call.args[0] {
-                        Expr::Call(call) => match call.fun {
-                            Expr::FunRef(fun)
-                                if fun.name(code).map(|n| n == "itos").unwrap_or(false) =>
-                            {
-                                Some(call.args[0].clone())
-                            }
-                            _ => None,
-                        },
+                Expr::FunRef(fun) if fun.name(code) == "__alloc__" => match &call.args[0] {
+                    Expr::Call(call) => match call.fun {
+                        Expr::FunRef(fun) if fun.name(code) == "itos" => Some(call.args[0].clone()),
                         _ => None,
-                    }
-                }
+                    },
+                    _ => None,
+                },
                 _ => None,
             },
             _ => None,

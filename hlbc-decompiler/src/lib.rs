@@ -9,7 +9,7 @@ use ast::*;
 use hlbc::fmt::EnhancedFmt;
 use hlbc::opcodes::Opcode;
 use hlbc::types::{Function, RefField, RefFun, RefString, Reg, Type, TypeObj};
-use hlbc::Bytecode;
+use hlbc::{Bytecode, Resolve};
 use scopes::*;
 
 #[cfg(feature = "alt")]
@@ -58,11 +58,7 @@ impl<'c> DecompilerState<'c> {
 
         let mut start = 0;
         // First argument / First register is 'this'
-        if f.is_method()
-            || f.name
-                .map(|n| code[n] == "__constructor__")
-                .unwrap_or(false)
-        {
+        if f.is_method() || code.resolve(f.name) == "__constructor__" {
             reg_state.insert(Reg(0), cst_this());
             start = 1;
         }
@@ -143,7 +139,7 @@ impl<'c> DecompilerState<'c> {
                 call(
                     Expr::Field(
                         Box::new(self.expr(args[0])),
-                        func.name_default(self.code).to_owned(),
+                        func.name(self.code).to_owned(),
                     ),
                     self.args_expr(&args[1..]),
                 )
@@ -520,11 +516,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                             dst,
                             Expr::Field(
                                 Box::new(state.expr(obj)),
-                                fun.as_fn(code)
-                                    .unwrap()
-                                    .name(code)
-                                    .unwrap_or("_")
-                                    .to_owned(),
+                                fun.as_fn(code).unwrap().name(code).to_owned(),
                             ),
                         );
                     }

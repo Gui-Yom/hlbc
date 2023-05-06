@@ -4,6 +4,7 @@ use eframe::egui::style::Margin;
 use eframe::egui::{Color32, Frame, RichText, ScrollArea, TextStyle, Ui, WidgetText};
 
 use hlbc::analysis::IsFromStd;
+use hlbc::fmt::EnhancedFmt;
 use hlbc::types::RefFun;
 
 use crate::views::{DecompilerView, InspectorView};
@@ -27,13 +28,16 @@ impl AppView for FunctionsView {
         if !self.cache_valid {
             self.cache = Vec::new();
             let code = ctx.code();
-            for fk in &ctx.code().findexes {
-                let f = fk.resolve(code.deref());
-                let findex = f.findex();
-                if (self.show_std || !findex.is_from_std(code.deref()))
-                    && (self.show_natives || f.is_fun())
-                {
-                    self.cache.push(findex);
+            for f in &code.functions {
+                if self.show_std || !f.is_from_std(code) {
+                    self.cache.push(f.findex);
+                }
+            }
+            if self.show_natives {
+                for n in &code.natives {
+                    if self.show_std || !n.is_from_std(code) {
+                        self.cache.push(n.findex);
+                    }
                 }
             }
             self.cache_valid = true;
@@ -65,7 +69,10 @@ impl AppView for FunctionsView {
                         self.cache.len(),
                         |ui, range| {
                             for f in range.map(|i| self.cache[i]) {
-                                let text = { f.display_header(ctx.code().deref()).to_string() };
+                                let text = {
+                                    f.display_header::<EnhancedFmt>(ctx.code().deref())
+                                        .to_string()
+                                };
                                 let selected = match ctx.selected() {
                                     ItemSelection::Fun(f2) => f == f2,
                                     _ => false,

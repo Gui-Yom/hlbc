@@ -14,6 +14,7 @@ use egui_dock::{DockArea, NodeIndex, Tree};
 use poll_promise::Promise;
 use rfd::FileHandle;
 
+use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{RefFun, RefGlobal, RefString, RefType};
 use hlbc::Bytecode;
 
@@ -40,7 +41,8 @@ fn main() -> eframe::Result<()> {
             } else {
                 let path = PathBuf::from(args);
                 let code =
-                    Bytecode::load(&mut BufReader::new(fs::File::open(&path).unwrap())).unwrap();
+                    Bytecode::deserialize(&mut BufReader::new(fs::File::open(&path).unwrap()))
+                        .unwrap();
                 Some(AppCtxHandle::new(AppCtx::new_from_code(
                     path.display().to_string(),
                     code,
@@ -149,7 +151,8 @@ impl eframe::App for App {
                                     {
                                         Some((
                                             file.file_name(),
-                                            Bytecode::load(&mut &file.read().await[..]).unwrap(),
+                                            Bytecode::deserialize(&mut &file.read().await[..])
+                                                .unwrap(),
                                         ))
                                     } else {
                                         None
@@ -162,7 +165,7 @@ impl eframe::App for App {
                                     if let Some(file) = rfd::FileDialog::new().pick_file() {
                                         Some((
                                             file.display().to_string(),
-                                            Bytecode::load(&mut BufReader::new(
+                                            Bytecode::deserialize(&mut BufReader::new(
                                                 fs::File::open(&file).unwrap(),
                                             ))
                                             .unwrap(),
@@ -337,8 +340,8 @@ enum ItemSelection {
 impl ItemSelection {
     pub(crate) fn name(&self, code: &Bytecode) -> String {
         match self {
-            ItemSelection::Fun(fun) => fun.display_id(code).to_string(),
-            ItemSelection::Class(t) => t.display_id(code),
+            ItemSelection::Fun(fun) => fun.display::<EnhancedFmt>(code).to_string(),
+            ItemSelection::Class(t) => t.display::<EnhancedFmt>(code).to_string(),
             ItemSelection::Global(g) => format!("global@{}", g.0),
             ItemSelection::String(s) => {
                 format!("string@{}", s.0)

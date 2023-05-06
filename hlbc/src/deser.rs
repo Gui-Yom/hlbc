@@ -278,7 +278,7 @@ impl<T: Read> ReadHlExt for T {
             None
         };
         Ok(Function {
-            name: None,
+            name: RefString(0),
             t,
             findex,
             regs,

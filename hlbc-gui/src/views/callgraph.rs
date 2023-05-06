@@ -8,6 +8,7 @@ use eframe::epaint::CubicBezierShape;
 use hlbc::analysis::graph::petgraph::visit::EdgeRef;
 use hlbc::analysis::graph::petgraph::visit::IntoEdgeReferences;
 use hlbc::analysis::graph::{call_graph, Callgraph};
+use hlbc::fmt::EnhancedFmt;
 use hlbc::types::RefFun;
 
 use crate::AppCtxHandle;
@@ -72,7 +73,8 @@ impl CallgraphView {
                                     .show(ui.ctx(), |ui| {
                                         Frame::window(ui.style().as_ref()).show(ui, |ui| {
                                             ui.code(
-                                                n.display_header(ctx.code().deref()).to_string(),
+                                                n.display_header::<EnhancedFmt>(ctx.code().deref())
+                                                    .to_string(),
                                             )
                                         })
                                     })

@@ -234,6 +234,10 @@ impl Native {
         code.resolve(self.name)
     }
 
+    pub fn lib<'a>(&self, code: &'a Bytecode) -> &'a str {
+        code.resolve(self.lib)
+    }
+
     /// Get the native function signature type
     pub fn ty<'a>(&self, code: &'a Bytecode) -> &'a TypeFun {
         // Guaranteed to be a TypeFun
@@ -252,7 +256,8 @@ impl Native {
 /// A function definition with its code.
 #[derive(Debug, Clone)]
 pub struct Function {
-    pub name: Option<RefString>,
+    /// Functions have no name per se, this is the name of the field or method they are attached to
+    pub name: RefString,
     pub t: RefType,
     pub findex: RefFun,
     /// The types of the registers used by this function
@@ -277,13 +282,8 @@ impl Function {
     }
 
     /// Convenience method to resolve the function name
-    pub fn name<'a>(&self, code: &'a Bytecode) -> Option<&'a str> {
-        self.name.map(|n| code.resolve(n))
-    }
-
-    /// Convenience method to get the function name or "_"
-    pub fn name_default<'a>(&self, code: &'a Bytecode) -> &'a str {
-        self.name(code).unwrap_or("_")
+    pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
+        code.index(self.name)
     }
 
     /// Get the function signature type
@@ -299,7 +299,7 @@ impl Function {
 
     /// Convenience method to resolve the function return type
     pub fn ret<'a>(&self, code: &'a Bytecode) -> &'a Type {
-        code.resolve(self.ty(code).ret)
+        code.index(self.ty(code).ret)
     }
 
     /// Uses the assigns to find the name of an argument
@@ -358,16 +358,9 @@ impl RefFun {
         code.resolve(*self).as_fn()
     }
 
-    pub fn name<'a>(&self, code: &'a Bytecode) -> Option<&'a str> {
+    pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
         match code.resolve(*self) {
             FunPtr::Fun(fun) => fun.name(code),
-            FunPtr::Native(n) => Some(n.name(code)),
-        }
-    }
-
-    pub fn name_default<'a>(&self, code: &'a Bytecode) -> &'a str {
-        match code.resolve(*self) {
-            FunPtr::Fun(fun) => fun.name_default(code),
             FunPtr::Native(n) => n.name(code),
         }
     }

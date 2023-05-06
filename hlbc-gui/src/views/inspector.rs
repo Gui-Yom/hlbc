@@ -3,8 +3,9 @@ use std::ops::Deref;
 use eframe::egui::style::Margin;
 use eframe::egui::{Color32, Frame, Grid, Link, RichText, ScrollArea, TextStyle, Ui, WidgetText};
 
+use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{FunPtr, RefField, RefFun, RefGlobal, RefString, RefType};
-use hlbc::Bytecode;
+use hlbc::{Bytecode, Resolve};
 
 use crate::{AppCtxHandle, AppView, ItemSelection};
 
@@ -104,13 +105,9 @@ fn inspector_link(ui: &mut Ui, ctx: AppCtxHandle, item: ItemSelection) {
 
 fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
     let code = ctx.code();
-    match fun.resolve(code) {
+    match code.resolve(fun) {
         FunPtr::Fun(f) => {
-            ui.heading(format!(
-                "Function : {}@{}",
-                f.name_default(code),
-                f.findex.0
-            ));
+            ui.heading(format!("Function : {}@{}", f.name(code), f.findex.0));
             if let Some(parent) = f.parent {
                 ui.horizontal(|ui| {
                     ui.label("static/instance method of");
@@ -127,7 +124,7 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
                     .show(ui, |ui| {
                         for (i, reg) in f.regs.iter().enumerate() {
                             ui.label(format!("reg{i}"));
-                            ui.label(reg.display_id(code));
+                            ui.label(reg.display::<EnhancedFmt>(code).to_string());
                             ui.end_row();
                         }
                     });
@@ -157,8 +154,8 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
         }
         FunPtr::Native(n) => {
             ui.heading("Native function");
-            ui.label(format!("native library : {}", n.lib.resolve(&code.strings)));
-            ui.label(format!("function name : {}", n.name.resolve(&code.strings)));
+            ui.label(format!("native library : {}", n.lib(code)));
+            ui.label(format!("function name : {}", n.name(code)));
             ui.label(format!("function index : {}", n.findex.0))
                 .on_hover_text("This is the native function unique index in the function pool.");
         }
@@ -167,8 +164,8 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
 
 fn class_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
     let code = ctx.code();
-    ui.heading(format!("Class : {}", t.display_id(code)));
-    if let Some(obj) = t.resolve_as_obj(&code.types) {
+    ui.heading(format!("Class : {}", t.display::<EnhancedFmt>(code)));
+    if let Some(obj) = t.as_obj(code) {
         if let Some(super_) = obj.super_ {
             ui.horizontal(|ui| {
                 ui.label("extends");
@@ -196,8 +193,8 @@ fn class_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
                     .num_columns(3)
                     .show(ui, |ui| {
                         for (i, f) in obj.own_fields.iter().enumerate() {
-                            ui.label(f.name.resolve(&code.strings));
-                            ui.label(f.t.display_id(code));
+                            ui.label(f.name(code));
+                            ui.label(f.t.display::<EnhancedFmt>(code).to_string());
                             if let Some(&binding) = obj
                                 .bindings
                                 .get(&RefField(i + obj.fields.len() - obj.own_fields.len()))
@@ -223,7 +220,7 @@ fn class_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
                     .num_columns(2)
                     .show(ui, |ui| {
                         for f in &obj.protos {
-                            ui.label(f.name.resolve(&code.strings));
+                            ui.label(f.name(code));
                             inspector_link(ui, ctx.clone(), ItemSelection::Fun(f.findex));
                             ui.end_row();
                         }
@@ -239,7 +236,7 @@ fn global_inspector(ui: &mut Ui, ctx: AppCtxHandle, g: RefGlobal) {
     ui.heading(format!("Global@{}", g.0));
     ui.label(format!(
         "Type : {}",
-        ctx.code().globals[g.0].display_id(ctx.code().deref())
+        ctx.code().globals[g.0].display::<EnhancedFmt>(ctx.code().deref())
     ));
 
     if let (Some(&cst), Some(constants)) = (
@@ -257,5 +254,5 @@ fn string_inspector(ui: &mut Ui, ctx: AppCtxHandle, s: RefString) {
     ui.heading(format!("String@{}", s.0));
     ui.separator();
     ui.add_space(4.0);
-    ui.label(RichText::new(s.resolve(&ctx.code().strings)).monospace());
+    ui.label(RichText::new(&ctx.code()[s]).monospace());
 }

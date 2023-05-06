@@ -5,6 +5,7 @@ use eframe::egui::{Color32, Frame, RichText, ScrollArea, TextStyle, Ui, WidgetTe
 
 use hlbc::analysis::IsFromStd;
 use hlbc::types::{RefType, Type};
+use hlbc::Resolve;
 
 use crate::views::{DecompilerView, InspectorView};
 use crate::{AppCtxHandle, AppView, ItemSelection};
@@ -33,7 +34,7 @@ impl AppView for ClassesView {
                         let should_show = self.show_std || !obj.is_from_std(code);
                         if should_show {
                             self.cache
-                                .push((RefType(i), obj.name.resolve(&code.strings).to_string()));
+                                .push((RefType(i), code.resolve(obj.name).to_owned()));
                         }
                     }
                     _ => {}

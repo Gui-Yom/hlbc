@@ -5,6 +5,8 @@ use eframe::egui::util::cache::{ComputerMut, FrameCache};
 use eframe::egui::{
     Color32, FontId, RichText, ScrollArea, Stroke, TextEdit, TextFormat, Ui, WidgetText,
 };
+use hlbc::fmt::EnhancedFmt;
+use hlbc::Resolve;
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{FontStyle, ThemeSet};
 use syntect::parsing::{SyntaxDefinition, SyntaxSet, SyntaxSetBuilder};
@@ -36,17 +38,15 @@ impl AppView for DecompilerView {
             let code = code.deref();
 
             self.output = match ctx.selected() {
-                ItemSelection::Fun(fun) => match fun.resolve(code) {
+                ItemSelection::Fun(fun) => match code.resolve(fun) {
                     FunPtr::Fun(func) => decompile_function(code, func)
                         .display(code, &FormatOptions::new("  "))
                         .to_string(),
-                    FunPtr::Native(n) => n.display_header(code).to_string(),
+                    FunPtr::Native(n) => n.display::<EnhancedFmt>(code).to_string(),
                 },
-                ItemSelection::Class(t) => {
-                    decompile_class(code, t.resolve_as_obj(&code.types).unwrap())
-                        .display(code, &FormatOptions::new("  "))
-                        .to_string()
-                }
+                ItemSelection::Class(t) => decompile_class(code, t.as_obj(code).unwrap())
+                    .display(code, &FormatOptions::new("  "))
+                    .to_string(),
                 _ => String::new(),
             };
             self.cache_selected = ctx.selected();
