@@ -29,7 +29,7 @@ clap = { version = "4", features = ["derive"] }
 # Core functionnality
 hlbc = { version = "0.6", path = "../hlbc", default-features = false }
 # Decompiler
-hlbc-decompiler = { version = "0.6", path = "../hlbc-decompiler" }
+hlbc-decompiler = { version = "0.6", path = "../decompiler" }
 # File system watching
 notify = { version = "5", optional = true, default-features = false, features = ["macos_fsevent"] }
 notify-debouncer-mini = { version = "0.2", optional = true, default-features = false }

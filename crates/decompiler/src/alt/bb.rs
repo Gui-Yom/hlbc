@@ -20,8 +20,14 @@ pub struct BasicBlock<'a> {
     cf: ControlFlow,
 }
 
+impl<'a> BasicBlock<'a> {
+    fn is_end(&self) -> bool {
+        matches!(self.ops.last(), Some(Opcode::Ret { .. }))
+    }
+}
+
 #[derive(Debug)]
-pub struct BasicBlocks<'a>(HashMap<usize, BasicBlock<'a>>);
+pub struct BasicBlocks<'a>(pub HashMap<usize, BasicBlock<'a>>);
 
 impl<'a> BasicBlocks<'a> {
     pub fn new(f: &'a Function) -> BasicBlocks<'a> {
@@ -148,11 +154,13 @@ mod graph {
     use crate::alt::bb::{BasicBlock, BasicBlocks, ControlFlow};
 
     impl BasicBlocks<'_> {
-        pub fn make_graph(&self) -> BlockGraph {
+        pub fn make_graph(&self, with_end: bool) -> BlockGraph {
             let mut graph = DiGraphMap::with_capacity(self.0.len() + 2, self.0.len() * 2);
 
             graph.add_node(GraphNode::Start);
-            graph.add_node(GraphNode::End);
+            if with_end {
+                graph.add_node(GraphNode::End);
+            }
             for bb in self.0.values() {
                 graph.add_node(GraphNode::Block(bb));
             }
@@ -183,7 +191,9 @@ mod graph {
                         );
                     }
                     ControlFlow::Return => {
-                        graph.add_edge(GraphNode::Block(bb), GraphNode::End, "");
+                        if with_end {
+                            graph.add_edge(GraphNode::Block(bb), GraphNode::End, "");
+                        }
                     }
                 }
             }
@@ -302,18 +312,19 @@ mod tests {
     #[test]
     fn simple() {
         let ctx =
-            Bytecode::load(&mut Cursor::new(include_bytes!("../../../data/Branch.hl"))).unwrap();
+            Bytecode::deserialize(&mut Cursor::new(include_bytes!("../../../data/Branch.hl")))
+                .unwrap();
         let f = &ctx.functions[*ctx.fnames.get("main").unwrap()];
-        println!("{}", BasicBlocks::new(f).make_graph().display(&ctx, f));
+        println!("{}", BasicBlocks::new(f).make_graph(false).display(&ctx, f));
     }
 
     #[test]
     fn nested() {
-        let ctx = Bytecode::load(&mut Cursor::new(include_bytes!(
+        let ctx = Bytecode::deserialize(&mut Cursor::new(include_bytes!(
             "../../../data/BranchNested.hl"
         )))
         .unwrap();
         let f = &ctx.functions[*ctx.fnames.get("main").unwrap()];
-        println!("{}", BasicBlocks::new(f).make_graph().display(&ctx, f));
+        println!("{}", BasicBlocks::new(f).make_graph(false).display(&ctx, f));
     }
 }

@@ -21,7 +21,7 @@ egui_dock = { version = "0.5" } #, git = "https://github.com/Adanos020/egui_dock
 # Core library
 hlbc = { version = "0.6", path = "../hlbc", default-features = false }
 # Decompiler
-hlbc-decompiler = { version = "0.6", path = "../hlbc-decompiler", default-features = false }
+hlbc-decompiler = { version = "0.6", path = "../decompiler", default-features = false }
 # Open file dialogs
 rfd = { version = "0.11", features = ["file-handle-inner"] }
 webbrowser = "0.8"

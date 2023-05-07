@@ -16,18 +16,18 @@
     This repository contains a collection of Rust crates and cli tools to load, disassemble, decompile and
     analyze <a href="https://hashlink.haxe.org/">Hashlink</a> bytecode.
     <br/>
-    <img src="hlbc-cli/screenshot.png">
-    <img src="hlbc-gui/screenshot.png">
+    <img src="crates/cli/screenshot.png" width="318" height="215">
+    <img src="crates/gui/screenshot.png" width="354" height="249">
 </div>
 
 ## Repository structure
 
 - `data/` : Haxe source files to test the tools
-- `hlbc/` : Core library to load and disassemble bytecode
-- `hlbc-cli/` : CLI frontend for `hlbc`
-- `hlbc-decompiler/` : Decompiler library
-- `hlbc-derive/` : helper proc macros for hlbc
-- `hlbc-gui/` : GUI to explore bytecode visually
+- `crates/hlbc/` : Core library to load and disassemble bytecode
+- `crates/cli/` : CLI frontend for `hlbc`
+- `crates/decompiler/` : Decompiler library
+- `crates/derive/` : helper proc macros for hlbc
+- `crates/gui/` : GUI to explore bytecode visually
 
 ## Wiki
 
