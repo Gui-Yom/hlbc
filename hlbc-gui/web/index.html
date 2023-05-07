@@ -8,7 +8,7 @@
 
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="white">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#404040">
-    <base data-trunk-public-url/>
+    <base href="/hlbc/">
 
     <style>
         html {
@@ -65,10 +65,13 @@
             text-align: center;
         }
     </style>
+    <link rel="preload" href="/hlbc/hlbc-gui_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
+    <link rel="modulepreload" href="/hlbc/hlbc-gui.js">
 </head>
 <body>
 <canvas id="eframe_canvas"></canvas>
-<link data-trunk rel="rust" href="../Cargo.toml" data-wasm-opt="z" data-cargo-no-default-features
-      data-cargo-features="web"/>
+<script type="module">
+    import init from '/hlbc/hlbc-gui.js';init('/hlbc/hlbc-gui_bg.wasm');
+</script>
 </body>
 </html>

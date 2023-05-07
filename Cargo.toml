@@ -1,5 +1,12 @@
 [workspace]
 members = ["hlbc-derive", "hlbc", "hlbc-decompiler", "hlbc-cli", "hlbc-gui"]
+resolver = "2"
 
 [profile.release]
+lto = "thin"
+codegen-units = 4
+
+[profile.release-web]
+inherits = "release"
 opt-level = "s"
+strip = true

@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  release-linux:
+  build:
     name: Build wasm
     runs-on: ubuntu-latest
     steps:
@@ -27,17 +27,32 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Install trunk
-        uses: jetli/trunk-action@v0.4.0
+      - uses: jetli/wasm-bindgen-action@v0.2.0
         with:
-          version: 'v0.16.0'
+          version: 'latest'
+
+      - name: Install wasm-opt
+        run: wget -qO- https://github.com/WebAssembly/binaryen/releases/download/version_112/binaryen-version_112-x86_64-linux.tar.gz | tar xvz -C /home/runner/.cargo/bin/ binaryen-version_112/bin/wasm-opt --strip=2
 
       - name: Build
         working-directory: hlbc-gui/web
-        run: trunk build --release --public-url "${GITHUB_REPOSITORY#*/}"
+        run: sh build.sh
 
-      - name: Deploy 🚀
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: Upload artifact 🚀
+        uses: actions/upload-pages-artifact@v1
         with:
-          folder: hlbc-gui/web/dist
-          single-commit: true
+          path: hlbc-gui/web/dist/
+
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages 🚀
+        id: deployment
+        uses: actions/deploy-pages@v2

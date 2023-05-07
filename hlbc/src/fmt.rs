@@ -5,7 +5,7 @@
 //! - [DisplayFmt]: based on the [Display] impl. This formatting can't access the [Bytecode] context and is limited.
 //! - [EnhancedFmt]: Advanced formatter for showing the bytecode with the most help for the reader.
 
-use std::fmt::{Debug, Display, Formatter, Result};
+use std::fmt::{Debug, Display, Formatter, Result, Write};
 use std::iter::repeat;
 
 pub use fmtools::fmt;
@@ -46,7 +46,22 @@ impl Display for RefString {
 
 impl Display for RefType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "@{}", self.0)
+        if self.0 <= 6 {
+            f.write_str(match self.0 {
+                0 => "void",
+                1 => "i8",
+                2 => "i16",
+                3 => "i32",
+                4 => "i64",
+                5 => "f32",
+                6 => "f64",
+                _ => {
+                    unreachable!()
+                }
+            })
+        } else {
+            write!(f, "@{}", self.0)
+        }
     }
 }
 
@@ -345,7 +360,7 @@ impl BytecodeFmt for EnhancedFmt {
             Type::Obj(TypeObj { name, .. }) => self.fmt_refstring(f, ctx, *name),
             Type::Ref(reftype) => fmtools::write!(f,
                 "ref<"
-                |f| self.fmt_reftype(f, ctx, *reftype)?;
+                |f| self.fmt_type(f, ctx, &ctx[*reftype])?;
                 ">"
             ),
             Type::Virtual { fields } => fmtools::write!(f,
@@ -378,7 +393,7 @@ impl BytecodeFmt for EnhancedFmt {
     fn fmt_typefun(&self, f: &mut Formatter, ctx: &Bytecode, v: &TypeFun) -> Result {
         fmtools::write!(f,
             "("{fmtools::join(", ", v.args.iter().map(|a| fmt(|f| self.fmt_type(f, ctx, &ctx[*a]))))}
-            ") -> ("|f| self.fmt_type(f, ctx, &ctx[v.ret])?;")"
+            ") -> "|f| self.fmt_type(f, ctx, &ctx[v.ret])?;
         )
     }
 
@@ -389,18 +404,18 @@ impl BytecodeFmt for EnhancedFmt {
     fn fmt_native(&self, f: &mut Formatter, ctx: &Bytecode, v: &Native) -> Result {
         write!(
             f,
-            "{}/{}{}",
+            "{}/{}{} {}",
             fmt(|f| self.fmt_refstring(f, ctx, v.lib)),
             fmt(|f| self.fmt_refstring(f, ctx, v.name)),
-            v.findex
+            v.findex,
+            fmt(|f| self.fmt_type(f, ctx, &ctx[v.t]))
         )
     }
 
     fn fmt_function_header(&self, f: &mut Formatter, ctx: &Bytecode, v: &Function) -> Result {
         write!(
             f,
-            "fn {}{} {}",
-            v.name(ctx),
+            "fn {} {}",
             fmt(|f| self.fmt_reffun(f, ctx, v.findex)),
             fmt(|f| self.fmt_type(f, ctx, &ctx[v.t]))
         )
@@ -413,7 +428,7 @@ impl BytecodeFmt for EnhancedFmt {
             fmtools::fmt! {
                 |f| self.fmt_function_header(f, ctx, v)?;" ("{v.regs.len()}" regs, "{v.ops.len()}" ops)\n"
                 for (i, reg) in v.regs.iter().enumerate() {
-                    "    reg"{i:<2}" "|f| self.fmt_reftype(f, ctx, *reg)?;"\n"
+                    "    reg"{i:<2}" "|f| self.fmt_type(f, ctx, &ctx[*reg])?;"\n"
                 }
                 if let Some(debug) = &v.debug_info {
                     for ((i, o), (file, line)) in v.ops

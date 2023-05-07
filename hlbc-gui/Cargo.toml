@@ -22,18 +22,20 @@ egui_dock = { version = "0.5" } #, git = "https://github.com/Adanos020/egui_dock
 hlbc = { version = "0.5", path = "../hlbc", default-features = false }
 # Decompiler
 hlbc-decompiler = { version = "0.5", path = "../hlbc-decompiler", default-features = false }
-poll-promise = { version = "0.2" }
 # Open file dialogs
 rfd = { version = "0.11", features = ["file-handle-inner"] }
-syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes"] }
 webbrowser = "0.8"
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+poll-promise = { version = "0.2" }
+syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes", "regex-onig"] }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
+poll-promise = { version = "0.2", features = ["web"] }
+syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes", "regex-fancy"] }
+wasm-bindgen-futures = "0.4"
 
 [features]
-default = ["callgraph", "native"]
+default = ["callgraph"]
 callgraph = ["hlbc/graph"]
-web = ["syntect/regex-fancy", "poll-promise/web"]
-native = ["syntect/regex-onig"]
