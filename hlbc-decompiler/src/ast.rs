@@ -32,9 +32,7 @@ pub struct Method {
     pub statements: Vec<Statement>,
 }
 
-// TODO make this zero copy by accepting the Ref* types instead and only resolving on demand
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Constant {
     InlineInt(usize),
     Int(RefInt),

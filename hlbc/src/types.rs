@@ -163,6 +163,15 @@ pub enum Type {
 }
 
 impl Type {
+    pub fn is_wrapper_type(&self) -> bool {
+        match self {
+            Type::Ref(_) => true,
+            Type::Null(_) => true,
+            Type::Packed(_) => true,
+            _ => false,
+        }
+    }
+
     pub fn get_type_obj(&self) -> Option<&TypeObj> {
         match self {
             Type::Obj(obj) => Some(obj),
@@ -195,6 +204,34 @@ pub struct RefType(pub usize);
 impl RefType {
     pub fn is_void(&self) -> bool {
         self.0 == 0
+    }
+
+    /// Some type references points to the base hashlink types that are always loaded in the same place.
+    /// This is a bit risky to rely on this.
+    pub fn is_known(&self) -> bool {
+        self.0 <= 9 || self.0 == 11 || self.0 == 14
+    }
+
+    /// ### Panics
+    /// Panics if `self.is_known() == false`
+    pub fn to_known(&self) -> Type {
+        match self.0 {
+            0 => Type::Void,
+            1 => Type::UI8,
+            2 => Type::UI16,
+            3 => Type::I32,
+            4 => Type::I64,
+            5 => Type::F32,
+            6 => Type::F64,
+            7 => Type::Bool,
+            8 => Type::Type,
+            9 => Type::Dyn,
+            11 => Type::Array,
+            14 => Type::Bytes,
+            _ => {
+                panic!("")
+            }
+        }
     }
 
     pub fn as_fun<'a>(&self, ctx: &'a Bytecode) -> Option<&'a TypeFun> {

@@ -1,10 +1,11 @@
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use crate::ast::{Class, Constant, ConstructorCall, Expr, Method, Operation, Statement};
-use hlbc::fmt::EnhancedFmt;
+use hlbc::fmt::{BytecodeFmt, EnhancedFmt};
 use hlbc::types::{Function, RefField, Type};
 use hlbc::{Bytecode, Resolve};
+
+use crate::ast::{Class, Constant, ConstructorCall, Expr, Method, Operation, Statement};
 
 #[derive(Clone)]
 pub struct FormatOptions {
@@ -100,17 +101,19 @@ impl Method {
     }
 }
 
-impl Display for Constant {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl Constant {
+    fn fmt(&self, f: &mut Formatter, code: &Bytecode) -> fmt::Result {
         use Constant::*;
-        match self {
-            InlineInt(c) => Display::fmt(c, f),
-            Int(c) => Display::fmt(c, f),
-            Float(c) => Display::fmt(c, f),
-            String(c) => write!(f, "\"{c}\""),
-            Bool(c) => Display::fmt(c, f),
-            Null => Display::fmt("null", f),
-            This => Display::fmt("this", f),
+        match *self {
+            InlineInt(c) => Display::fmt(&c, f),
+            Int(c) => EnhancedFmt.fmt_refint(f, code, c),
+            Float(c) => EnhancedFmt.fmt_reffloat(f, code, c),
+            String(c) => {
+                write!(f, "\"{}\"", c.display::<EnhancedFmt>(code))
+            }
+            Bool(c) => Display::fmt(&c, f),
+            Null => f.write_str("null"),
+            This => f.write_str("this"),
         }
     }
 }
@@ -176,7 +179,7 @@ impl Expr {
                             .enumerate()
                             .map(|(i, f)| {
                                 fmtools::fmt! { move
-                                    {f.name}": "{disp!(values.get(&RefField(i)).unwrap())}
+                                    {f.name(code)}": "{disp!(values.get(&RefField(i)).unwrap())}
                                 }
                             })) }"}"
                     }
@@ -188,7 +191,7 @@ impl Expr {
                 Expr::Call(call) => {
                     {disp!(call.fun)}"("{fmtools::join(", ", call.args.iter().map(|e| disp!(e)))}")"
                 }
-                Expr::Constant(c) => {{c}},
+                Expr::Constant(c) => {|f| c.fmt(f, code)?;},
                 Expr::Constructor(ConstructorCall { ty, args }) => {
                     "new "{ty.display::<EnhancedFmt>(code)}"("{fmtools::join(", ", args.iter().map(|e| disp!(e)))}")"
                 }

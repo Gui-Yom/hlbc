@@ -377,6 +377,10 @@ impl Bytecode {
     pub fn findex_max(&self) -> usize {
         self.findexes.len()
     }
+
+    pub fn functions<'a>(&'a self) -> impl Iterator<Item = FunPtr<'a>> + 'a {
+        (0..self.findex_max()).map(RefFun).map(|r| self.resolve(r))
+    }
 }
 
 impl Default for Bytecode {

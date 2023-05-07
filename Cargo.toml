@@ -9,4 +9,3 @@ codegen-units = 4
 [profile.release-web]
 inherits = "release"
 opt-level = "s"
-strip = true

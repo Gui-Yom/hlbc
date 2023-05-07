@@ -5,7 +5,7 @@
 //! - [DisplayFmt]: based on the [Display] impl. This formatting can't access the [Bytecode] context and is limited.
 //! - [EnhancedFmt]: Advanced formatter for showing the bytecode with the most help for the reader.
 
-use std::fmt::{Debug, Display, Formatter, Result, Write};
+use std::fmt::{Debug, Display, Formatter, Result};
 use std::iter::repeat;
 
 pub use fmtools::fmt;
@@ -46,19 +46,10 @@ impl Display for RefString {
 
 impl Display for RefType {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        if self.0 <= 6 {
-            f.write_str(match self.0 {
-                0 => "void",
-                1 => "i8",
-                2 => "i16",
-                3 => "i32",
-                4 => "i64",
-                5 => "f32",
-                6 => "f64",
-                _ => {
-                    unreachable!()
-                }
-            })
+        // We can already know the type for some of them
+        // We prefer to show a name instead of @number
+        if self.is_known() {
+            Display::fmt(&self.to_known(), f)
         } else {
             write!(f, "@{}", self.0)
         }
@@ -305,8 +296,13 @@ impl BytecodeFmt for EnhancedFmt {
     }
 
     fn fmt_reftype(&self, f: &mut Formatter, ctx: &Bytecode, v: RefType) -> Result {
-        self.fmt_type(f, ctx, &ctx[v])?;
-        Display::fmt(&v, f)
+        let ty = &ctx[v];
+        self.fmt_type(f, ctx, ty)?;
+        // No need to display @number if type is known
+        if !v.is_known() && !ty.is_wrapper_type() {
+            Display::fmt(&v, f)?
+        }
+        Ok(())
     }
 
     fn fmt_reffield(
@@ -320,12 +316,12 @@ impl BytecodeFmt for EnhancedFmt {
             if v.0 < obj.fields.len() {
                 self.fmt_refstring(f, ctx, obj.fields[v.0].name)
             } else {
-                panic!(
-                    "Trying to use an unknown field here ({}, field: {})",
-                    fmt(|f| self.fmt_type(f, ctx, parent)),
-                    v
-                );
-                //Display::fmt(&v, f)
+                // panic!(
+                //     "Trying to use an unknown field here ({}, field: {})",
+                //     fmt(|f| self.fmt_type(f, ctx, parent)),
+                //     v
+                // );
+                Display::fmt(&v, f)
             }
         } else if let Type::Virtual { fields } = parent {
             self.fmt_refstring(f, ctx, fields[v.0].name)
@@ -845,10 +841,22 @@ impl Opcode {
 
 #[cfg(test)]
 mod test {
-    use crate::fmt::fmt;
+    use std::fmt::Write;
+    use std::fs;
+    use std::io::BufReader;
+
+    use crate::fmt::{fmt, EnhancedFmt};
     use crate::fmt::{BytecodeFmt, DebugFmt};
-    use crate::types::Reg;
+    use crate::types::{FunPtr, Reg};
     use crate::Bytecode;
+
+    struct Null;
+
+    impl Write for Null {
+        fn write_str(&mut self, s: &str) -> std::fmt::Result {
+            Ok(())
+        }
+    }
 
     #[test]
     fn debug_formatter() {
@@ -857,5 +865,32 @@ mod test {
             format!("{:?}", Reg(0)),
             format!("{}", fmt(|f| DebugFmt.fmt_reg(f, &ctx, Reg(0))))
         )
+    }
+
+    #[test]
+    fn fmt_all() {
+        for entry in fs::read_dir("../data").unwrap() {
+            let path = entry.unwrap().path();
+            if let Some(ext) = path.extension() {
+                if ext == "hl" {
+                    let code =
+                        Bytecode::deserialize(&mut BufReader::new(fs::File::open(&path).unwrap()))
+                            .unwrap();
+                    for f in code.functions() {
+                        write!(Null, "{}", f.display_header::<EnhancedFmt>(&code)).unwrap();
+                        match f {
+                            FunPtr::Fun(fun) => {
+                                write!(Null, "{}", fun.display_header::<EnhancedFmt>(&code))
+                                    .unwrap();
+                                write!(Null, "{}", fun.display::<EnhancedFmt>(&code)).unwrap();
+                            }
+                            FunPtr::Native(n) => {
+                                write!(Null, "{}", n.display::<EnhancedFmt>(&code)).unwrap();
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }

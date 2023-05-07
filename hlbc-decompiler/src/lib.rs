@@ -161,7 +161,7 @@ impl<'c> DecompilerState<'c> {
             if matches!(self.f.ops[i + offset as usize], Opcode::JAlways { offset } if offset < 0) {
                 if let Some(loop_cond) = self.scopes.last_loop_cond_mut() {
                     if matches!(loop_cond, Expr::Unknown(_)) {
-                        println!("old loop cond : {:?}", loop_cond);
+                        //println!("old loop cond : {:?}", loop_cond);
                         *loop_cond = cond;
                     } else {
                         self.scopes.push_if(offset + 1, cond);
@@ -869,5 +869,67 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
             .map(|ty| ty.name(code).to_owned()),
         fields,
         methods,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::hint::black_box;
+    use std::io::BufReader;
+
+    use hlbc::Bytecode;
+
+    use crate::{decompile_class, decompile_code, decompile_function};
+
+    #[test]
+    fn decomp_code_all() {
+        for entry in fs::read_dir("../data").unwrap() {
+            let path = entry.unwrap().path();
+            if let Some(ext) = path.extension() {
+                if ext == "hl" {
+                    let code =
+                        Bytecode::deserialize(&mut BufReader::new(fs::File::open(&path).unwrap()))
+                            .unwrap();
+                    for f in &code.functions {
+                        black_box(decompile_code(&code, f));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn decomp_fn_all() {
+        for entry in fs::read_dir("../data").unwrap() {
+            let path = entry.unwrap().path();
+            if let Some(ext) = path.extension() {
+                if ext == "hl" {
+                    let code =
+                        Bytecode::deserialize(&mut BufReader::new(fs::File::open(&path).unwrap()))
+                            .unwrap();
+                    for f in &code.functions {
+                        black_box(decompile_function(&code, f));
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn decomp_class_all() {
+        for entry in fs::read_dir("../data").unwrap() {
+            let path = entry.unwrap().path();
+            if let Some(ext) = path.extension() {
+                if ext == "hl" {
+                    let code =
+                        Bytecode::deserialize(&mut BufReader::new(fs::File::open(&path).unwrap()))
+                            .unwrap();
+                    for t in code.types.iter().filter_map(|t| t.get_type_obj()) {
+                        black_box(decompile_class(&code, t));
+                    }
+                }
+            }
+        }
     }
 }
