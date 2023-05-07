@@ -1,7 +1,9 @@
 use std::ops::Deref;
 
 use eframe::egui::style::Margin;
-use eframe::egui::{Color32, Frame, Grid, Link, RichText, ScrollArea, TextStyle, Ui, WidgetText};
+use eframe::egui::{
+    Color32, Frame, Grid, Label, Link, RichText, ScrollArea, TextEdit, TextStyle, Ui, WidgetText,
+};
 
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{FunPtr, RefField, RefFun, RefGlobal, RefString, RefType};
@@ -254,5 +256,8 @@ fn string_inspector(ui: &mut Ui, ctx: AppCtxHandle, s: RefString) {
     ui.heading(format!("String@{}", s.0));
     ui.separator();
     ui.add_space(4.0);
-    ui.label(RichText::new(&ctx.code()[s]).monospace());
+    TextEdit::multiline(&mut ctx.code().resolve(s))
+        .code_editor()
+        .lock_focus(false)
+        .show(ui);
 }
