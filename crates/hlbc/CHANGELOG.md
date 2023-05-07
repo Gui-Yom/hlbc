@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/Gui-Yom/hlbc/compare/v0.6.0...HEAD)
 
+### Changed
+
+- Refactored read and write api
+
 ## [0.6.0](https://github.com/Gui-Yom/hlbc/compare/v0.5.0...v0.6.0) - 2023-05-07
 
 ### Added

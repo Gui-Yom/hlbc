@@ -1,6 +1,6 @@
 [package]
 name = "hlbc-derive"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 license = "MIT"
 description = "Procedural macros for the 'hlbc' crate"

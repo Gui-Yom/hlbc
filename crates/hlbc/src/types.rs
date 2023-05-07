@@ -23,6 +23,13 @@ pub struct RefBytes(pub usize);
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct RefString(pub usize);
 
+impl RefString {
+    /// If a [RefString] is null, it indicates an element has no name
+    pub fn is_null(&self) -> bool {
+        self.0 == 0
+    }
+}
+
 /// An inline bool value
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 pub struct ValBool(pub bool);
@@ -164,12 +171,7 @@ pub enum Type {
 
 impl Type {
     pub fn is_wrapper_type(&self) -> bool {
-        match self {
-            Type::Ref(_) => true,
-            Type::Null(_) => true,
-            Type::Packed(_) => true,
-            _ => false,
-        }
+        matches!(self, Type::Ref(_) | Type::Null(_) | Type::Packed(_))
     }
 
     pub fn get_type_obj(&self) -> Option<&TypeObj> {

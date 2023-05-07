@@ -1425,7 +1425,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hlbc"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "byteorder",
  "fmtools",
@@ -1436,7 +1436,7 @@ dependencies = [
 
 [[package]]
 name = "hlbc-cli"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "atty",
@@ -1453,7 +1453,7 @@ dependencies = [
 
 [[package]]
 name = "hlbc-decompiler"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "fmtools",
  "hlbc",
@@ -1462,7 +1462,7 @@ dependencies = [
 
 [[package]]
 name = "hlbc-derive"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1471,7 +1471,7 @@ dependencies = [
 
 [[package]]
 name = "hlbc-gui"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "console_error_panic_hook",
  "eframe",

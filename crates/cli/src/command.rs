@@ -145,7 +145,7 @@ pub fn command_parser(ctx: &ParseContext) -> impl Parser<char, Command, Error = 
                 .map(|v| InFile(FileOrIndex::File(v.into_iter().collect()))),
         ))),
         cmd!("fileof"; num() => FileOf),
-        cmd!("saveto"; string.clone() => SaveTo),
+        cmd!("saveto"; string => SaveTo),
         cmd!("callgraph")
             .ignore_then(num())
             .then(num().padded())

@@ -17,11 +17,11 @@ pub fn derive_opcode_helper(input: proc_macro::TokenStream) -> proc_macro::Token
     let name = &ast.ident;
     let i = 0..variants.len() as u8;
 
-    let initr = variants.iter().map(|v| gen_initr(name, v));
+    let initr = variants.iter().map(|v| read_variant(name, v));
     let initw = variants
         .iter()
         .enumerate()
-        .map(|(i, v)| gen_initw(name, v, i as u8));
+        .map(|(i, v)| write_variant(name, v, i as u8));
     let vname = variants.iter().map(|v| &v.ident);
     let vname2 = vname.clone();
     let vname_str = variants
@@ -67,11 +67,11 @@ pub fn derive_opcode_helper(input: proc_macro::TokenStream) -> proc_macro::Token
     proc_macro::TokenStream::from(quote! {
         impl #name {
             /// Decode an instruction
-            pub fn decode(r: &mut impl std::io::Read) -> crate::Result<#name> {
+            pub fn read(r: &mut impl std::io::Read) -> crate::Result<#name> {
 
                 use byteorder::ReadBytesExt;
-                use crate::deser::ReadHlExt;
                 use crate::types::*;
+                use crate::read::{read_vari, read_varu};
 
                 let op = r.read_u8()?;
                 match op {
@@ -81,11 +81,11 @@ pub fn derive_opcode_helper(input: proc_macro::TokenStream) -> proc_macro::Token
             }
 
             /// Encode an instruction
-            pub fn encode(&self, w: &mut impl std::io::Write) -> crate::Result<()> {
+            pub fn write(&self, w: &mut impl std::io::Write) -> crate::Result<()> {
 
                 use byteorder::WriteBytesExt;
-                use crate::ser::WriteHlExt;
                 use crate::types::*;
+                use crate::write::write_var;
 
                 match self {
                     #( #initw )*
@@ -140,9 +140,9 @@ fn ident(ty: &Type) -> String {
     }
 }
 
-fn gen_initr(enum_name: &Ident, v: &Variant) -> TokenStream {
-    let rvi32 = quote!(r.read_vari()?);
-    let rvu32 = quote!(r.read_varu()?);
+fn read_variant(enum_name: &Ident, v: &Variant) -> TokenStream {
+    let rvi32 = quote!(read_vari(r)?);
+    let rvu32 = quote!(read_varu(r)?);
     let reg = quote!(Reg(#rvi32 as u32));
 
     let vname = &v.ident;
@@ -177,31 +177,31 @@ fn gen_initr(enum_name: &Ident, v: &Variant) -> TokenStream {
             }
         },
         "RefInt" => quote! {
-            RefInt(#rvi32 as usize)
+            RefInt::read(r)?
         },
         "RefFloat" => quote! {
-            RefFloat(#rvi32 as usize)
+            RefFloat::read(r)?
         },
         "RefBytes" => quote! {
             RefBytes(#rvi32 as usize)
         },
         "RefString" => quote! {
-            RefString(#rvi32 as usize)
+            RefString::read(r)?
         },
         "RefType" => quote! {
-            RefType(#rvi32 as usize)
+            RefType::read(r)?
         },
         "ValBool" => quote! {
             ValBool(#rvi32 == 1)
         },
         "RefFun" => quote! {
-            RefFun(#rvi32 as usize)
+            RefFun::read(r)?
         },
         "RefField" => quote! {
-            RefField(#rvi32 as usize)
+            RefField::read(r)?
         },
         "RefGlobal" => quote! {
-            RefGlobal(#rvi32 as usize)
+            RefGlobal::read(r)?
         },
         "RefEnumConstruct" => quote! {
             RefEnumConstruct(#rvi32 as usize)
@@ -215,67 +215,50 @@ fn gen_initr(enum_name: &Ident, v: &Variant) -> TokenStream {
     }
 }
 
-fn gen_initw(enum_name: &Ident, v: &Variant, i: u8) -> TokenStream {
+fn write_variant(enum_name: &Ident, v: &Variant, i: u8) -> TokenStream {
     let vname = &v.ident;
     let fname = v.fields.iter().map(|f| &f.ident);
     let fwrite = v.fields.iter().map(|f| {
         let fname = f.ident.as_ref().unwrap();
         match ident(&f.ty).as_str() {
-            "usize" => quote!(w.write_vi32(#fname as i32)?;),
+            "usize" => quote!(write_var(w, #fname as i32)?;),
             "i32" => quote! {
-                w.write_vi32(#fname)?;
+                write_var(w, #fname)?;
             },
             "JumpOffset" => quote! {
-                w.write_vi32(*#fname as i32)?;
+                write_var(w, *#fname as i32)?;
             },
             "Vec<JumpOffset>" => quote! {
                 {
-                    w.write_vi32(#fname.len() as i32)?;
+                    write_var(w, #fname.len() as i32)?;
                     for r__ in #fname {
-                        w.write_vi32(*r__ as i32)?;
+                        write_var(w, *r__ as i32)?;
                     }
                 }
             },
             "Reg" => quote! {
-                w.write_vi32(#fname.0 as i32)?;
+                write_var(w, #fname.0 as i32)?;
             },
             "Vec<Reg>" => quote! {
                 {
                     w.write_u8(#fname.len() as u8)?;
                     for r__ in #fname {
-                        w.write_vi32(r__.0 as i32)?;
+                        write_var(w, r__.0 as i32)?;
                     }
                 }
             },
-            "RefInt" => quote! {
-                w.write_vi32(#fname.0 as i32)?;
-            },
-            "RefFloat" => quote! {
-                w.write_vi32(#fname.0 as i32)?;
+            "RefInt" | "RefFloat" | "RefString" | "RefType" | "RefFun" | "RefField"
+            | "RefGlobal" => quote! {
+                #fname.write(w)?;
             },
             "RefBytes" => quote! {
-                w.write_vi32(#fname.0 as i32)?;
-            },
-            "RefString" => quote! {
-                w.write_vi32(#fname.0 as i32)?;
-            },
-            "RefType" => quote! {
-                w.write_vi32(#fname.0 as i32)?;
+                write_var(w, #fname.0 as i32)?;
             },
             "ValBool" => quote! {
-                w.write_vi32(if #fname.0 { 1 } else { 0 })?;
-            },
-            "RefFun" => quote! {
-                w.write_vi32(#fname.0 as i32)?;
-            },
-            "RefField" => quote! {
-                w.write_vi32(#fname.0 as i32)?;
-            },
-            "RefGlobal" => quote! {
-                w.write_vi32(#fname.0 as i32)?;
+                write_var(w, if #fname.0 { 1 } else { 0 })?;
             },
             "RefEnumConstruct" => quote! {
-                w.write_vi32(#fname.0 as i32)?;
+                write_var(w, #fname.0 as i32)?;
             },
             _ => TokenStream::default(),
         }

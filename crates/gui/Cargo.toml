@@ -1,6 +1,6 @@
 [package]
 name = "hlbc-gui"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
 edition = "2021"
 rust-version = "1.65"
@@ -19,9 +19,9 @@ eframe = { version = "0.21" }
 # Docking tabs
 egui_dock = { version = "0.5" } #, git = "https://github.com/Adanos020/egui_dock" }
 # Core library
-hlbc = { version = "0.6", path = "../hlbc", default-features = false }
+hlbc = { version = "0.7", path = "../hlbc", default-features = false }
 # Decompiler
-hlbc-decompiler = { version = "0.6", path = "../decompiler", default-features = false }
+hlbc-decompiler = { version = "0.7", path = "../decompiler", default-features = false }
 # Open file dialogs
 rfd = { version = "0.11", features = ["file-handle-inner"] }
 webbrowser = "0.8"
