@@ -9,6 +9,8 @@ pub(crate) use functions::*;
 pub(crate) use globals::*;
 pub(crate) use info::*;
 pub(crate) use inspector::*;
+#[cfg(feature = "search")]
+pub(crate) use search::*;
 pub(crate) use strings::*;
 
 use crate::AppCtxHandle;
@@ -21,6 +23,8 @@ mod functions;
 mod globals;
 mod info;
 mod inspector;
+#[cfg(feature = "search")]
+mod search;
 mod strings;
 
 /// Tab viewer with dynamic dispatch because I don't care

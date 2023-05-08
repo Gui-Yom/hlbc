@@ -442,6 +442,13 @@ impl<'a> FunPtr<'a> {
         }
     }
 
+    pub fn name(&self, code: &'a Bytecode) -> &'a str {
+        match *self {
+            FunPtr::Fun(fun) => fun.name(code),
+            FunPtr::Native(n) => n.name(code),
+        }
+    }
+
     pub fn is_fun(&self) -> bool {
         matches!(self, FunPtr::Fun(_))
     }

@@ -4,7 +4,8 @@ members = [
     "crates/hlbc",
     "crates/decompiler",
     "crates/cli",
-    "crates/gui"
+    "crates/gui",
+    "crates/indexing"
 ]
 resolver = "2"
 

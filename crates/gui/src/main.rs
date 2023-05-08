@@ -181,7 +181,7 @@ impl eframe::App for App {
                             self.tree = Tree::new(vec![]);
                         }
                     });
-                    if self.ctx.is_some() {
+                    if let Some(ctx) = &self.ctx {
                         ui.menu_button("Views", |ui| {
                             if ui.button("Functions").clicked() {
                                 self.tree[NodeIndex::root().right()]
@@ -190,6 +190,11 @@ impl eframe::App for App {
                             if ui.button("Info").clicked() {
                                 self.tree[NodeIndex::root().left()]
                                     .append_tab(Box::<InfoView>::default());
+                            }
+                            #[cfg(feature = "search")]
+                            if ui.button("Search").clicked() {
+                                self.tree[NodeIndex::root().left()]
+                                    .append_tab(Box::new(views::SearchView::new(ctx.code())));
                             }
                         });
                     }
