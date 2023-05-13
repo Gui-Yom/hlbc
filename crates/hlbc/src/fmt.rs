@@ -840,7 +840,7 @@ impl Opcode {
             } => {
                 op!(
                     "{dst} = ({value} as {}).{}",
-                    construct.display::<EnhancedFmt>(ctx, &ctx[parent[*dst]]),
+                    construct.display::<EnhancedFmt>(ctx, &ctx[parent[*value]]),
                     field.0
                 )
             }
