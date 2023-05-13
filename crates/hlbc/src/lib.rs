@@ -239,3 +239,32 @@ impl Index<RefType> for Bytecode {
 }
 
 //endregion
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::io::BufReader;
+
+    use crate::Bytecode;
+
+    #[test]
+    fn test_deserialize_all() {
+        for entry in fs::read_dir("../../data").unwrap() {
+            let path = entry.unwrap().path();
+            if let Some(ext) = path.extension() {
+                if ext == "hl" {
+                    let code =
+                        Bytecode::deserialize(&mut BufReader::new(fs::File::open(&path).unwrap()));
+                    assert!(code.is_ok());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_deserialize_wartales() {
+        let path = "E:\\Games\\Wartales\\hlboot.dat";
+        let code = Bytecode::deserialize(&mut BufReader::new(fs::File::open(path).unwrap()));
+        assert!(code.is_ok());
+    }
+}

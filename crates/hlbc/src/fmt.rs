@@ -360,8 +360,21 @@ impl BytecodeFmt for EnhancedFmt {
                 ">"
             ),
             Type::Virtual { fields } => fmtools::write!(f,
-                "virtual<"{fmtools::join(", ", fields.iter().map(|a|
-                    fmtools::fmt!(|f| self.fmt_refstring(f, ctx, a.name)?;": "|f| self.fmt_type(f, ctx, &ctx[a.t])?;)
+                "virtual<"{fmtools::join(", ", fields.iter().map(|fi|
+                    fmtools::fmt!{
+                        |f| self.fmt_refstring(f, ctx, fi.name)?;": "
+                        match &ctx[fi.t] {
+                            Type::Virtual {..} => {
+                                {v}{fi.t}
+                            }
+                            Type::Fun(fun) | Type::Method(fun) => {
+                                {fun}{fi.t}
+                            }
+                            _ => {
+                                |f| self.fmt_type(f, ctx, &ctx[fi.t])?;
+                            }
+                        }
+                    }
                 ))}">"
             ),
             Type::Abstract { name } => self.fmt_refstring(f, ctx, *name),
@@ -869,7 +882,7 @@ mod test {
 
     #[test]
     fn fmt_all() {
-        for entry in fs::read_dir("../data").unwrap() {
+        for entry in fs::read_dir("../../data").unwrap() {
             let path = entry.unwrap().path();
             if let Some(ext) = path.extension() {
                 if ext == "hl" {
@@ -889,6 +902,27 @@ mod test {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn fmt_wartales() {
+        let path = "E:\\Games\\Wartales\\hlboot.dat";
+        let code =
+            Bytecode::deserialize(&mut BufReader::new(fs::File::open(path).unwrap())).unwrap();
+        for f in code.functions() {
+            //dbg!(f.findex());
+            write!(Null, "{}", f.display_header::<EnhancedFmt>(&code)).unwrap();
+            match f {
+                FunPtr::Fun(fun) => {
+                    write!(Null, "{}", fun.display_header::<EnhancedFmt>(&code)).unwrap();
+                    write!(Null, "{}", fun.display::<EnhancedFmt>(&code)).unwrap();
+                }
+                FunPtr::Native(n) => {
+                    dbg!(n.findex);
+                    write!(Null, "{}", n.display::<EnhancedFmt>(&code)).unwrap();
                 }
             }
         }
