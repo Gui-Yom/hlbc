@@ -22,10 +22,10 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - run: sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
+      - run: sudo apt-get install libgtk-3-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
 
       - name: Build release
-        working-directory: hlbc-gui
+        working-directory: crates/gui
         run: cargo build --release
 
       - name: Upload release artifact
@@ -50,7 +50,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Build release
-        working-directory: hlbc-gui
+        working-directory: crates/gui
         run: cargo build --release
 
       - name: Upload release artifact

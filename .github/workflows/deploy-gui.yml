@@ -35,13 +35,13 @@ jobs:
         run: wget -qO- https://github.com/WebAssembly/binaryen/releases/download/version_112/binaryen-version_112-x86_64-linux.tar.gz | tar xvz -C /home/runner/.cargo/bin/ binaryen-version_112/bin/wasm-opt --strip=2
 
       - name: Build
-        working-directory: hlbc-gui/web
+        working-directory: crates/gui/web
         run: sh build.sh
 
       - name: Upload artifact 🚀
         uses: actions/upload-pages-artifact@v1
         with:
-          path: hlbc-gui/web/dist/
+          path: crates/gui/web/dist/
 
   deploy:
     needs: build
