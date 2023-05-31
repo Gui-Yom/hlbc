@@ -1,8 +1,7 @@
 use std::ops::Deref;
 
-use eframe::egui::style::Margin;
 use eframe::egui::{
-    Color32, Frame, Grid, Label, Link, RichText, ScrollArea, TextEdit, TextStyle, Ui, WidgetText,
+    Color32, Grid, Link, RichText, ScrollArea, TextEdit, TextStyle, Ui, WidgetText,
 };
 
 use hlbc::fmt::EnhancedFmt;
@@ -65,29 +64,25 @@ impl AppView for InspectorView {
 }
 
 fn inspector_ui(ui: &mut Ui, ctx: AppCtxHandle, item: ItemSelection) {
-    Frame::none()
-        .inner_margin(Margin::same(4.0))
-        .show(ui, |ui| {
-            ScrollArea::vertical()
-                .id_source("functions_scroll_area")
-                .auto_shrink([false, false])
-                .show(ui, |ui| match item {
-                    ItemSelection::Fun(fun) => {
-                        function_inspector(ui, ctx, fun);
-                    }
-                    ItemSelection::Class(t) => {
-                        class_inspector(ui, ctx, t);
-                    }
-                    ItemSelection::Global(g) => {
-                        global_inspector(ui, ctx, g);
-                    }
-                    ItemSelection::String(s) => {
-                        string_inspector(ui, ctx, s);
-                    }
-                    _ => {
-                        ui.label("Select a function or a class.");
-                    }
-                });
+    ScrollArea::vertical()
+        .id_source("functions_scroll_area")
+        .auto_shrink([false, false])
+        .show(ui, |ui| match item {
+            ItemSelection::Fun(fun) => {
+                function_inspector(ui, ctx, fun);
+            }
+            ItemSelection::Class(t) => {
+                class_inspector(ui, ctx, t);
+            }
+            ItemSelection::Global(g) => {
+                global_inspector(ui, ctx, g);
+            }
+            ItemSelection::String(s) => {
+                string_inspector(ui, ctx, s);
+            }
+            _ => {
+                ui.label("Select a function or a class.");
+            }
         });
 }
 

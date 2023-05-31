@@ -1,4 +1,6 @@
-use eframe::egui::{Ui, WidgetText};
+use eframe::egui::text::LayoutJob;
+use eframe::egui::{Color32, ScrollArea, TextStyle, Ui, WidgetText};
+use eframe::epaint::text::TextWrapping;
 use egui_dock::TabViewer;
 
 #[cfg(feature = "callgraph")]
@@ -13,7 +15,7 @@ pub(crate) use inspector::*;
 pub(crate) use search::*;
 pub(crate) use strings::*;
 
-use crate::AppCtxHandle;
+use crate::{AppCtxHandle, ItemSelection};
 
 #[cfg(feature = "callgraph")]
 mod callgraph;
@@ -47,4 +49,42 @@ pub(crate) trait AppView {
     fn title(&self) -> WidgetText;
 
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle);
+}
+
+pub(crate) fn list_view<Elem: Copy>(
+    ui: &mut Ui,
+    ctx: AppCtxHandle,
+    num: usize,
+    item: impl Fn(usize) -> Elem,
+    create_selection: impl Fn(Elem) -> ItemSelection,
+    display: impl Fn(&AppCtxHandle, Elem) -> String,
+    context_menu: Option<impl Fn(&mut Ui, &AppCtxHandle, Elem)>,
+) {
+    ScrollArea::both().auto_shrink([false, false]).show_rows(
+        ui,
+        ui.text_style_height(&TextStyle::Button),
+        num,
+        |ui, range| {
+            for elem in range.map(item) {
+                let checked = ctx.selected() == create_selection(elem);
+                let mut job = LayoutJob::simple_singleline(
+                    display(&ctx, elem),
+                    TextStyle::Button.resolve(ui.style().as_ref()),
+                    Color32::WHITE,
+                );
+                job.wrap = TextWrapping {
+                    break_anywhere: true,
+                    max_rows: 1,
+                    ..TextWrapping::default()
+                };
+                let mut label = ui.selectable_label(checked, job);
+                if let Some(context_menu) = &context_menu {
+                    label = label.context_menu(|ui| context_menu(ui, &ctx, elem));
+                }
+                if label.clicked() {
+                    ctx.set_selected(create_selection(elem));
+                }
+            }
+        },
+    );
 }

@@ -1,8 +1,8 @@
-use eframe::egui::style::Margin;
-use eframe::egui::{Color32, Frame, RichText, ScrollArea, TextStyle, Ui, WidgetText};
+use eframe::egui::{Color32, RichText, Ui, WidgetText};
 
 use hlbc::types::RefGlobal;
 
+use crate::views::list_view;
 use crate::{AppCtxHandle, AppView, ItemSelection};
 
 #[derive(Default)]
@@ -14,30 +14,15 @@ impl AppView for GlobalsView {
     }
 
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
-        Frame::none()
-            .inner_margin(Margin::same(4.0))
-            .show(ui, |ui| {
-                let num = ctx.code().globals.len();
-
-                ScrollArea::both().auto_shrink([false, false]).show_rows(
-                    ui,
-                    ui.text_style_height(&TextStyle::Body),
-                    num,
-                    |ui, range| {
-                        for g in range.map(RefGlobal) {
-                            let checked = match ctx.selected() {
-                                ItemSelection::Global(g2) => g == g2,
-                                _ => false,
-                            };
-                            if ui
-                                .selectable_label(checked, format!("global@{}", g.0))
-                                .clicked()
-                            {
-                                ctx.set_selected(ItemSelection::Global(g));
-                            }
-                        }
-                    },
-                );
-            });
+        let num = ctx.code().globals.len();
+        list_view(
+            ui,
+            ctx,
+            num,
+            RefGlobal,
+            ItemSelection::Global,
+            |_, g| format!("global@{}", g.0),
+            None::<&dyn Fn(&mut Ui, &AppCtxHandle, RefGlobal)>,
+        );
     }
 }

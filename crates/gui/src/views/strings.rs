@@ -1,9 +1,8 @@
-use eframe::egui::style::Margin;
-use eframe::egui::text::LayoutJob;
-use eframe::egui::{Color32, Frame, RichText, ScrollArea, TextStyle, Ui, WidgetText};
+use eframe::egui::{Color32, RichText, Ui, WidgetText};
 
 use hlbc::types::RefString;
 
+use crate::views::list_view;
 use crate::{AppCtxHandle, AppView, ItemSelection};
 
 #[derive(Default)]
@@ -15,33 +14,15 @@ impl AppView for StringsView {
     }
 
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
-        Frame::none()
-            .inner_margin(Margin::same(4.0))
-            .show(ui, |ui| {
-                let num = ctx.code().strings.len();
-
-                ScrollArea::both().auto_shrink([false, false]).show_rows(
-                    ui,
-                    ui.text_style_height(&TextStyle::Body),
-                    num,
-                    |ui, range| {
-                        for s in range.map(RefString) {
-                            let checked = match ctx.selected() {
-                                ItemSelection::String(s2) => s == s2,
-                                _ => false,
-                            };
-                            let job = LayoutJob::simple_singleline(
-                                ctx.code()[s].to_owned(),
-                                TextStyle::Body.resolve(ui.style().as_ref()),
-                                Color32::WHITE,
-                            );
-                            //job.wrap = TextWrapping::default();
-                            if ui.selectable_label(checked, job).clicked() {
-                                ctx.set_selected(ItemSelection::String(s));
-                            }
-                        }
-                    },
-                );
-            });
+        let num = ctx.code().strings.len();
+        list_view(
+            ui,
+            ctx,
+            num,
+            RefString,
+            ItemSelection::String,
+            |ctx, s| ctx.code()[s].to_owned(),
+            None::<&dyn Fn(&mut Ui, &AppCtxHandle, RefString)>,
+        );
     }
 }
