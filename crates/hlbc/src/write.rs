@@ -248,6 +248,7 @@ impl Function {
         for o in &self.ops {
             o.write(w)?;
         }
+        // https://github.com/HaxeFoundation/haxe/blob/ea57ab1ef60d212228c8657b7bc5b1085c62714e/src/generators/genhl.ml#L3910
         if let Some(debug_info) = &self.debug_info {
             let mut curfile: i32 = -1;
             let mut curpos = 0;
@@ -270,8 +271,8 @@ impl Function {
                         w.write_u8(((delta << 3) | 4) as u8)?;
                     } else {
                         w.write_u8((p << 3) as u8)?;
-                        w.write_u8((p << 5) as u8)?;
-                        w.write_u8((p << 13) as u8)?;
+                        w.write_u8((p >> 5) as u8)?;
+                        w.write_u8((p >> 13) as u8)?;
                     }
                     curpos = p;
                 }
