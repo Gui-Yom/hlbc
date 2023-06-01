@@ -71,7 +71,7 @@ impl eframe::App for App {
             }
 
             if let Some(tab) = self.ctx.as_ref().and_then(|app| app.take_tab_to_open()) {
-                self.tree[NodeIndex::root().left()].append_tab(tab);
+                self.tree[NodeIndex::root().right()].append_tab(tab);
             }
         }
 
