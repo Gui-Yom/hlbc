@@ -3,12 +3,13 @@ use std::ops::Range;
 use chumsky::prelude::*;
 use chumsky::text::*;
 pub use chumsky::Parser;
+use hlbc::Str;
 
 pub type IndexRange = Range<usize>;
 
 #[derive(Debug, Clone)]
 pub enum FileOrIndex {
-    File(String),
+    File(Str),
     Index(usize),
 }
 
@@ -26,7 +27,7 @@ pub enum Command {
     /// Print the help message about commands
     Help,
     /// Show documentation for an opcode
-    Explain(String),
+    Explain(Str),
     /// Open the wiki in the browser
     Wiki,
 
@@ -37,20 +38,20 @@ pub enum Command {
     Int(IndexRange),
     Float(IndexRange),
     String(IndexRange),
-    SearchStr(String),
+    SearchStr(Str),
     Debugfile(IndexRange),
-    SearchDebugfile(String),
+    SearchDebugfile(Str),
     Type(IndexRange),
     Global(IndexRange),
     Native(IndexRange),
     Constant(IndexRange),
     FunctionHeader(IndexRange),
     Function(IndexRange),
-    FunctionNamed(String),
-    SearchFunction(String),
+    FunctionNamed(Str),
+    SearchFunction(Str),
     InFile(FileOrIndex),
     FileOf(usize),
-    SaveTo(String),
+    SaveTo(Str),
     Callgraph(usize, usize),
     RefTo(ElementRef),
     DecompType(usize),
@@ -162,10 +163,10 @@ pub fn command_parser(ctx: &ParseContext) -> impl Parser<char, Command, Error = 
     ))
 }
 
-fn string() -> impl Parser<char, String, Error = Simple<char>> + Clone {
+fn string() -> impl Parser<char, Str, Error = Simple<char>> + Clone {
     filter(|c: &char| c != &';')
         .repeated()
-        .map(|v| v.into_iter().collect())
+        .map(|v| Str::from_iter(v))
 }
 
 fn num() -> impl Parser<char, usize, Error = Simple<char>> {

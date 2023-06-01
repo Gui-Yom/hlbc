@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{RefEnumConstruct, RefField, RefFloat, RefFun, RefInt, RefString, RefType, Reg};
-use hlbc::Bytecode;
+use hlbc::{Bytecode, Str};
 
 #[derive(Debug)]
 pub struct SourceFile {
@@ -11,15 +11,15 @@ pub struct SourceFile {
 
 #[derive(Debug)]
 pub struct Class {
-    pub name: String,
-    pub parent: Option<String>,
+    pub name: Str,
+    pub parent: Option<Str>,
     pub fields: Vec<ClassField>,
     pub methods: Vec<Method>,
 }
 
 #[derive(Debug)]
 pub struct ClassField {
-    pub name: String,
+    pub name: Str,
     pub ty: RefType,
     pub static_: bool,
 }
@@ -138,7 +138,7 @@ pub enum Expr {
     Closure(RefFun, Vec<Statement>),
     EnumConstr(RefType, RefEnumConstruct, Vec<Expr>),
     /// Field access : obj.field
-    Field(Box<Expr>, String),
+    Field(Box<Expr>, Str),
     /// Function reference
     FunRef(RefFun),
     /// If/Else expression, both branches expressions types must unify (https://haxe.org/manual/expression-if.html)
@@ -154,7 +154,7 @@ pub enum Expr {
     // For when there should be something, but we don't known what
     Unknown(String),
     /// Variable identifier
-    Variable(Reg, Option<String>),
+    Variable(Reg, Option<Str>),
 }
 
 pub const fn cst_int(cst: RefInt) -> Expr {
@@ -258,7 +258,7 @@ pub fn field(expr: Expr, obj: RefType, field: RefField, code: &Bytecode) -> Expr
     // FIXME meh
     Expr::Field(
         Box::new(expr),
-        field.display::<EnhancedFmt>(code, &code[obj]).to_string(),
+        Str::from(field.display::<EnhancedFmt>(code, &code[obj]).to_string()),
     )
 }
 

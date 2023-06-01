@@ -23,6 +23,8 @@ hlbc-derive = { version = "0.7", path = "../derive" }
 petgraph = { version = "0.6", default-features = false, features = ["graphmap"], optional = true }
 # Error types
 thiserror = "1"
+# Cheaply clonable immutable string with inline storage
+flexstr = { version = "0.9" }
 
 [features]
 default = ["graph"]

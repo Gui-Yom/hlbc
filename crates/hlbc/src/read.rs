@@ -1,6 +1,8 @@
 use std::collections::{HashMap, VecDeque};
-use std::ffi::CStr;
-use std::io::Read;
+use std::fs;
+use std::io::{BufReader, Read};
+use std::path::Path;
+use std::str::from_utf8;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
@@ -8,7 +10,7 @@ use crate::types::{
     EnumConstruct, Function, Native, ObjField, ObjProto, RefField, RefFloat, RefInt, RefString,
     RefType, Type, TypeFun, TypeObj,
 };
-use crate::{Bytecode, ConstantDef, Opcode, RefFun, RefFunKnown, RefGlobal};
+use crate::{Bytecode, ConstantDef, Opcode, RefFun, RefFunKnown, RefGlobal, Str};
 use crate::{Error, Result};
 
 impl Bytecode {
@@ -182,7 +184,7 @@ impl Bytecode {
             fnames.insert(strings[f.name.0].clone(), i);
         }
         fnames.insert(
-            "init".to_string(),
+            Str::from("init"),
             match findexes[entrypoint.0] {
                 RefFunKnown::Fun(x) => x,
                 _ => 0,
@@ -216,6 +218,10 @@ impl Bytecode {
             fnames,
             globals_initializers,
         })
+    }
+
+    pub fn from_file(path: impl AsRef<Path>) -> Result<Self> {
+        Self::deserialize(&mut BufReader::new(fs::File::open(path)?))
     }
 }
 
@@ -511,7 +517,7 @@ pub(crate) fn read_varu(r: &mut impl Read) -> Result<u32> {
     }
 }
 
-fn read_strings(r: &mut impl Read, nstrings: usize) -> Result<Vec<String>> {
+fn read_strings(r: &mut impl Read, nstrings: usize) -> Result<Vec<Str>> {
     let mut strings = Vec::with_capacity(nstrings);
     let mut string_data = vec![0u8; r.read_i32::<LittleEndian>()? as usize];
     r.read_exact(&mut string_data)?;
@@ -519,9 +525,47 @@ fn read_strings(r: &mut impl Read, nstrings: usize) -> Result<Vec<String>> {
     for _ in 0..nstrings {
         let ssize = read_varu(r)? as usize + 1;
         //println!("size: {ssize} {:?}", &string_data[acc..(acc + ssize)]);
-        let cstr = unsafe { CStr::from_bytes_with_nul_unchecked(&string_data[acc..(acc + ssize)]) };
-        strings.push(cstr.to_string_lossy().to_string());
+        //let cstr = unsafe { CStr::from_bytes_with_nul_unchecked(&string_data[acc..(acc + ssize)]) };
+        strings.push(Str::from_ref(from_utf8(
+            &string_data[acc..(acc + ssize - 1)],
+        )?));
         acc += ssize;
     }
     Ok(strings)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use crate::fmt::EnhancedFmt;
+    use crate::types::RefFun;
+    use crate::{Bytecode, Resolve};
+
+    #[test]
+    fn test_deserialize_all() {
+        for entry in fs::read_dir("../../data").unwrap() {
+            let path = entry.unwrap().path();
+            if let Some(ext) = path.extension() {
+                if ext == "hl" {
+                    let code = Bytecode::from_file(&path);
+                    assert!(code.is_ok());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_deserialize_wartales() {
+        let path = "E:\\Games\\Wartales\\hlboot.dat";
+        let code = Bytecode::from_file(path);
+        assert!(code.is_ok());
+    }
+
+    #[test]
+    fn test_deserialize_northgard() {
+        let path = "E:\\Games\\Northgard\\hlboot.dat";
+        let code = Bytecode::from_file(path);
+        assert!(code.is_ok());
+    }
 }

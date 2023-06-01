@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::Index;
 
-use crate::{Bytecode, Opcode, Resolve};
+use crate::{Bytecode, Opcode, Resolve, Str};
 
 /// A register argument
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Hash)]
@@ -48,7 +48,7 @@ pub struct ObjField {
 }
 
 impl ObjField {
-    pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
+    pub fn name(&self, code: &Bytecode) -> Str {
         code.resolve(self.name)
     }
 }
@@ -69,7 +69,7 @@ pub struct ObjProto {
 }
 
 impl ObjProto {
-    pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
+    pub fn name(&self, code: &Bytecode) -> Str {
         code.resolve(self.name)
     }
 }
@@ -84,7 +84,7 @@ pub struct EnumConstruct {
 }
 
 impl EnumConstruct {
-    pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
+    pub fn name(&self, code: &Bytecode) -> Str {
         code.resolve(self.name)
     }
 }
@@ -119,7 +119,7 @@ pub struct TypeObj {
 }
 
 impl TypeObj {
-    pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
+    pub fn name(&self, code: &Bytecode) -> Str {
         code.resolve(self.name)
     }
 
@@ -231,7 +231,7 @@ impl RefType {
             11 => Type::Array,
             14 => Type::Bytes,
             _ => {
-                panic!("")
+                panic!("This not a known type")
             }
         }
     }
@@ -269,11 +269,11 @@ pub struct Native {
 }
 
 impl Native {
-    pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
+    pub fn name(&self, code: &Bytecode) -> Str {
         code.resolve(self.name)
     }
 
-    pub fn lib<'a>(&self, code: &'a Bytecode) -> &'a str {
+    pub fn lib(&self, code: &Bytecode) -> Str {
         code.resolve(self.lib)
     }
 
@@ -321,8 +321,8 @@ impl Function {
     }
 
     /// Convenience method to resolve the function name
-    pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
-        code.index(self.name)
+    pub fn name(&self, code: &Bytecode) -> Str {
+        code.resolve(self.name)
     }
 
     /// Get the function signature type
@@ -342,14 +342,14 @@ impl Function {
     }
 
     /// Uses the assigns to find the name of an argument
-    pub fn arg_name<'a>(&self, code: &'a Bytecode, pos: usize) -> Option<&'a str> {
+    pub fn arg_name(&self, code: &Bytecode, pos: usize) -> Option<Str> {
         self.assigns.as_ref().and_then(|a| {
             a.iter()
                 .filter(|&&(_, i)| i == 0)
                 .enumerate()
                 .find_map(|(j, &(s, _))| {
                     if j == pos {
-                        Some(code.resolve(s))
+                        Some(code[s].clone())
                     } else {
                         None
                     }
@@ -358,11 +358,11 @@ impl Function {
     }
 
     /// Uses the assigns to find the name of a variable
-    pub fn var_name(&self, code: &Bytecode, pos: usize) -> Option<String> {
+    pub fn var_name(&self, code: &Bytecode, pos: usize) -> Option<Str> {
         self.assigns.as_ref().and_then(|a| {
             a.iter().find_map(|&(s, i)| {
                 if pos + 1 == i {
-                    Some(code[s].to_owned())
+                    Some(code[s].clone())
                 } else {
                     None
                 }
@@ -397,7 +397,7 @@ impl RefFun {
         code.resolve(*self).as_fn()
     }
 
-    pub fn name<'a>(&self, code: &'a Bytecode) -> &'a str {
+    pub fn name(&self, code: &Bytecode) -> Str {
         match code.resolve(*self) {
             FunPtr::Fun(fun) => fun.name(code),
             FunPtr::Native(n) => n.name(code),
@@ -442,7 +442,7 @@ impl<'a> FunPtr<'a> {
         }
     }
 
-    pub fn name(&self, code: &'a Bytecode) -> &'a str {
+    pub fn name(&self, code: &Bytecode) -> Str {
         match *self {
             FunPtr::Fun(fun) => fun.name(code),
             FunPtr::Native(n) => n.name(code),

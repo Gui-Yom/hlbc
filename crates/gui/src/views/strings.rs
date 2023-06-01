@@ -21,7 +21,7 @@ impl AppView for StringsView {
             num,
             RefString,
             ItemSelection::String,
-            |ctx, s| ctx.code()[s].to_owned(),
+            |ctx, s| ctx.code()[s].to_string(),
             None::<&dyn Fn(&mut Ui, &AppCtxHandle, RefString)>,
         );
     }

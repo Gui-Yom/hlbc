@@ -32,6 +32,12 @@ pub mod types;
 /// All about writing bytecode
 mod write;
 
+/// Cheaply clonable with inline storage
+// pub type Str = smol_str::SmolStr;
+// pub type Str = kstring::KStringBase<kstring::backend::RcStr>;
+pub type Str = flexstr::SharedStr;
+// pub type Str = String;
+
 pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(thiserror::Error, Debug)]
@@ -44,6 +50,8 @@ pub enum Error {
     ValueOutOfBounds { value: i32, limit: u32 },
     #[error(transparent)]
     IoError(#[from] std::io::Error),
+    #[error(transparent)]
+    Utf8Error(#[from] core::str::Utf8Error),
 }
 
 /// Bytecode structure containing all the information.
@@ -61,13 +69,13 @@ pub struct Bytecode {
     /// f64 constant pool
     pub floats: Vec<f64>,
     /// String constant pool
-    pub strings: Vec<String>,
+    pub strings: Vec<Str>,
     /// Bytes constant pool
     ///
     /// *Since bytecode v5*
     pub bytes: Option<(Vec<u8>, Vec<usize>)>,
     /// *Debug* file names constant pool
-    pub debug_files: Option<Vec<String>>,
+    pub debug_files: Option<Vec<Str>>,
     /// Types, contains every possible types expressed in the program
     pub types: Vec<Type>,
     /// Globals, holding static variables and such
@@ -86,7 +94,7 @@ pub struct Bytecode {
     /// Acceleration structure mapping function references (findex) to functions indexes in the native or function pool.
     findexes: Vec<RefFunKnown>,
     /// Acceleration structure mapping function names to function indexes in the function pool
-    pub fnames: HashMap<String, usize>,
+    pub fnames: HashMap<Str, usize>,
     pub globals_initializers: HashMap<RefGlobal, usize>,
 }
 
@@ -172,13 +180,13 @@ impl Resolve<RefFloat> for Bytecode {
 }
 
 impl Resolve<RefString> for Bytecode {
-    type Output<'a> = &'a str;
+    type Output<'a> = Str;
 
     fn resolve(&self, index: RefString) -> Self::Output<'_> {
         if index.0 > 0 {
-            self.strings.index(index.0)
+            self.strings[index.0].clone()
         } else {
-            "<none>"
+            Str::from_static("<none>")
         }
     }
 }
@@ -223,7 +231,7 @@ impl Index<RefFloat> for Bytecode {
 }
 
 impl Index<RefString> for Bytecode {
-    type Output = String;
+    type Output = Str;
 
     fn index(&self, index: RefString) -> &Self::Output {
         self.strings.index(index.0)
@@ -239,32 +247,3 @@ impl Index<RefType> for Bytecode {
 }
 
 //endregion
-
-#[cfg(test)]
-mod tests {
-    use std::fs;
-    use std::io::BufReader;
-
-    use crate::Bytecode;
-
-    #[test]
-    fn test_deserialize_all() {
-        for entry in fs::read_dir("../../data").unwrap() {
-            let path = entry.unwrap().path();
-            if let Some(ext) = path.extension() {
-                if ext == "hl" {
-                    let code =
-                        Bytecode::deserialize(&mut BufReader::new(fs::File::open(&path).unwrap()));
-                    assert!(code.is_ok());
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_deserialize_wartales() {
-        let path = "E:\\Games\\Wartales\\hlboot.dat";
-        let code = Bytecode::deserialize(&mut BufReader::new(fs::File::open(path).unwrap()));
-        assert!(code.is_ok());
-    }
-}

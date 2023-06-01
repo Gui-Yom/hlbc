@@ -40,12 +40,12 @@ impl AppView for DecompilerView {
             self.output = match ctx.selected() {
                 ItemSelection::Fun(fun) => match code.resolve(fun) {
                     FunPtr::Fun(func) => decompile_function(code, func)
-                        .display(code, &FormatOptions::new("  "))
+                        .display(code, &FormatOptions::new(2))
                         .to_string(),
                     FunPtr::Native(n) => n.display::<EnhancedFmt>(code).to_string(),
                 },
                 ItemSelection::Class(t) => decompile_class(code, t.as_obj(code).unwrap())
-                    .display(code, &FormatOptions::new("  "))
+                    .display(code, &FormatOptions::new(2))
                     .to_string(),
                 _ => String::new(),
             };

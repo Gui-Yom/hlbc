@@ -190,7 +190,7 @@ fn class_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
                     .num_columns(3)
                     .show(ui, |ui| {
                         for (i, f) in obj.own_fields.iter().enumerate() {
-                            ui.label(f.name(code));
+                            ui.label(&*f.name(code));
                             ui.label(f.t.display::<EnhancedFmt>(code).to_string());
                             if let Some(&binding) = obj
                                 .bindings
@@ -217,7 +217,7 @@ fn class_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
                     .num_columns(2)
                     .show(ui, |ui| {
                         for f in &obj.protos {
-                            ui.label(f.name(code));
+                            ui.label(&*f.name(code));
                             inspector_link(ui, ctx.clone(), ItemSelection::Fun(f.findex));
                             ui.end_row();
                         }
@@ -251,7 +251,7 @@ fn string_inspector(ui: &mut Ui, ctx: AppCtxHandle, s: RefString) {
     ui.heading(format!("String@{}", s.0));
     ui.separator();
     ui.add_space(4.0);
-    TextEdit::multiline(&mut ctx.code().resolve(s))
+    TextEdit::multiline(&mut &*ctx.code()[s].to_string())
         .code_editor()
         .lock_focus(false)
         .show(ui);

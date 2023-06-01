@@ -9,7 +9,7 @@ use ast::*;
 use hlbc::fmt::EnhancedFmt;
 use hlbc::opcodes::Opcode;
 use hlbc::types::{Function, RefField, RefFun, RefString, Reg, Type, TypeObj};
-use hlbc::{Bytecode, Resolve};
+use hlbc::{Bytecode, Resolve, Str};
 use scopes::*;
 
 #[cfg(feature = "alt")]
@@ -44,7 +44,7 @@ struct DecompilerState<'c> {
     // TODO move this to another pass on the generated ast
     expr_ctx: Vec<ExprCtx>,
     // Variable names we already declared
-    seen: HashSet<String>,
+    seen: HashSet<Str>,
     f: &'c Function,
     code: &'c Bytecode,
 }
@@ -65,7 +65,7 @@ impl<'c> DecompilerState<'c> {
 
         // Initialize register state with the function arguments
         for i in start..f.ty(code).args.len() {
-            let name = f.arg_name(code, i - start).map(ToOwned::to_owned);
+            let name = f.arg_name(code, i - start);
             reg_state.insert(Reg(i as u32), Expr::Variable(Reg(i as u32), name.clone()));
             if let Some(name) = name {
                 seen.insert(name);
@@ -137,10 +137,7 @@ impl<'c> DecompilerState<'c> {
                 fun.as_fn(self.code).map(|func| (func, func.is_method()))
             {
                 call(
-                    Expr::Field(
-                        Box::new(self.expr(args[0])),
-                        func.name(self.code).to_owned(),
-                    ),
+                    Expr::Field(Box::new(self.expr(args[0])), func.name(self.code)),
                     self.args_expr(&args[1..]),
                 )
             } else {
@@ -456,7 +453,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
             Opcode::CallThis { dst, field, args } => {
                 let method = f.regs[0].method(field.0, code).unwrap();
                 let call = call(
-                    Expr::Field(Box::new(cst_this()), method.name(code).to_owned()),
+                    Expr::Field(Box::new(cst_this()), method.name(code)),
                     state.args_expr(args),
                 );
                 if method
@@ -514,10 +511,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         state.push_expr(
                             i,
                             dst,
-                            Expr::Field(
-                                Box::new(state.expr(obj)),
-                                fun.as_fn(code).unwrap().name(code).to_owned(),
-                            ),
+                            Expr::Field(Box::new(state.expr(obj)), fun.name(code)),
                         );
                     }
                 }
@@ -698,7 +692,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 state.push_expr(
                     i,
                     dst,
-                    Expr::Field(Box::new(state.expr(value)), "constructorIndex".to_owned()),
+                    Expr::Field(Box::new(state.expr(value)), Str::from("constructorIndex")),
                 );
                 //state.push_expr(i, dst, state.expr(value));
             }
@@ -711,14 +705,17 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 state.push_expr(
                     i,
                     dst,
-                    Expr::Field(Box::new(state.expr(value)), field.0.to_string()),
+                    Expr::Field(Box::new(state.expr(value)), Str::from(field.0.to_string())),
                 );
             }
             &Opcode::SetEnumField { value, field, src } => match state.expr(value) {
                 Expr::Variable(r, name) => {
                     state.push_stmt(Statement::Assign {
                         declaration: false,
-                        variable: Expr::Field(Box::new(state.expr(value)), field.0.to_string()),
+                        variable: Expr::Field(
+                            Box::new(state.expr(value)),
+                            Str::from(field.0.to_string()),
+                        ),
                         assign: state.expr(src),
                     });
                 }
@@ -726,7 +723,10 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     state.push_stmt(comment("closure capture"));
                     state.push_stmt(Statement::Assign {
                         declaration: false,
-                        variable: Expr::Field(Box::new(state.expr(value)), field.0.to_string()),
+                        variable: Expr::Field(
+                            Box::new(state.expr(value)),
+                            Str::from(field.0.to_string()),
+                        ),
                         assign: state.expr(src),
                     });
                 }
@@ -738,7 +738,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 state.push_expr(
                     i,
                     dst,
-                    Expr::Field(Box::new(state.expr(array)), "length".to_owned()),
+                    Expr::Field(Box::new(state.expr(array)), Str::from("length")),
                 );
             }
             &Opcode::GetArray { dst, array, index } => {
@@ -884,13 +884,11 @@ mod tests {
 
     #[test]
     fn decomp_code_all() {
-        for entry in fs::read_dir("../data").unwrap() {
+        for entry in fs::read_dir("../../data").unwrap() {
             let path = entry.unwrap().path();
             if let Some(ext) = path.extension() {
                 if ext == "hl" {
-                    let code =
-                        Bytecode::deserialize(&mut BufReader::new(fs::File::open(&path).unwrap()))
-                            .unwrap();
+                    let code = Bytecode::from_file(&path).unwrap();
                     for f in &code.functions {
                         black_box(decompile_code(&code, f));
                     }
@@ -901,13 +899,11 @@ mod tests {
 
     #[test]
     fn decomp_fn_all() {
-        for entry in fs::read_dir("../data").unwrap() {
+        for entry in fs::read_dir("../../data").unwrap() {
             let path = entry.unwrap().path();
             if let Some(ext) = path.extension() {
                 if ext == "hl" {
-                    let code =
-                        Bytecode::deserialize(&mut BufReader::new(fs::File::open(&path).unwrap()))
-                            .unwrap();
+                    let code = Bytecode::from_file(&path).unwrap();
                     for f in &code.functions {
                         black_box(decompile_function(&code, f));
                     }
@@ -918,18 +914,44 @@ mod tests {
 
     #[test]
     fn decomp_class_all() {
-        for entry in fs::read_dir("../data").unwrap() {
+        for entry in fs::read_dir("../../data").unwrap() {
             let path = entry.unwrap().path();
             if let Some(ext) = path.extension() {
                 if ext == "hl" {
-                    let code =
-                        Bytecode::deserialize(&mut BufReader::new(fs::File::open(&path).unwrap()))
-                            .unwrap();
+                    let code = Bytecode::from_file(&path).unwrap();
                     for t in code.types.iter().filter_map(|t| t.get_type_obj()) {
                         black_box(decompile_class(&code, t));
                     }
                 }
             }
+        }
+    }
+
+    #[test]
+    fn decomp_northgard() {
+        let code = Bytecode::from_file("E:\\Games\\Northgard\\hlboot.dat").unwrap();
+        for f in &code.functions {
+            black_box(decompile_code(&code, f));
+        }
+        for t in code.types.iter().filter_map(|t| t.get_type_obj()) {
+            black_box(decompile_class(&code, t));
+        }
+        for f in &code.functions {
+            black_box(decompile_function(&code, f));
+        }
+    }
+
+    #[test]
+    fn decomp_wartales() {
+        let code = Bytecode::from_file("E:\\Games\\Wartales\\hlboot.dat").unwrap();
+        for f in &code.functions {
+            black_box(decompile_code(&code, f));
+        }
+        for t in code.types.iter().filter_map(|t| t.get_type_obj()) {
+            black_box(decompile_class(&code, t));
+        }
+        for f in &code.functions {
+            black_box(decompile_function(&code, f));
         }
     }
 }

@@ -4,7 +4,7 @@ use std::io::Write;
 use byteorder::{LittleEndian, WriteBytesExt};
 
 use crate::types::{RefField, RefFloat, RefFun, RefGlobal, RefInt, RefString, RefType, TypeFun};
-use crate::{Bytecode, ConstantDef, Function, Native, ObjField, Type, TypeObj};
+use crate::{Bytecode, ConstantDef, Function, Native, ObjField, Str, Type, TypeObj};
 use crate::{Error, Result};
 
 impl Bytecode {
@@ -338,7 +338,7 @@ pub(crate) fn write_var(w: &mut impl Write, value: i32) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn write_strings(w: &mut impl Write, strings: &[String]) -> Result<()> {
+pub(crate) fn write_strings(w: &mut impl Write, strings: &[Str]) -> Result<()> {
     let cstr: Vec<CString> = strings
         .iter()
         .map(|s| CString::new(s.as_bytes()).unwrap())
@@ -379,4 +379,44 @@ fn flush_repeat(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use crate::fmt::EnhancedFmt;
+    use crate::types::RefFun;
+    use crate::{Bytecode, Resolve};
+
+    //#[test]
+    fn ser_eq_deser() {
+        let data = fs::read("../../data/Anonymous.hl").unwrap();
+        let code = Bytecode::deserialize(&mut data.as_slice()).unwrap();
+        let mut out = Vec::with_capacity(data.len());
+        code.serialize(&mut out).unwrap();
+        let new = Bytecode::deserialize(&mut out.as_slice()).unwrap();
+        assert_eq!(data, out);
+    }
+
+    //#[test]
+    fn ser_eq_deser_all() {
+        for entry in fs::read_dir("../../data").unwrap() {
+            let path = entry.unwrap().path();
+            if let Some(ext) = path.extension() {
+                if ext == "hl" {
+                    let data = fs::read(&path).unwrap();
+                    let code = Bytecode::deserialize(&mut data.as_slice()).unwrap();
+                    let mut out = Vec::with_capacity(data.len());
+                    code.serialize(&mut out).unwrap();
+                    let new = Bytecode::deserialize(&mut out.as_slice()).unwrap();
+                    fs::write("original.txt", format!("{:#?}", code)).unwrap();
+                    fs::write("new.txt", format!("{:#?}", new)).unwrap();
+                    assert_eq!(data, out);
+                    //assert_eq!(code, new);
+                    break;
+                }
+            }
+        }
+    }
 }

@@ -292,7 +292,7 @@ This is the same range notation as Rust and is supported with most commands."#
         }
         Command::SearchStr(str) => {
             for (i, s) in code.strings.iter().enumerate() {
-                if s.contains(&str) {
+                if s.contains(&*str) {
                     print_i!(i);
                     println!("{}", s);
                 }
@@ -308,7 +308,7 @@ This is the same range notation as Rust and is supported with most commands."#
         Command::SearchDebugfile(str) => {
             let debug_files = require_debug_info!();
             for (i, s) in debug_files.iter().enumerate() {
-                if s.contains(&str) {
+                if s.contains(&*str) {
                     print_i!(i);
                     println!("{}", s);
                 }
@@ -413,16 +413,16 @@ This is the same range notation as Rust and is supported with most commands."#
             }
         }
         Command::FunctionNamed(str) => {
-            if let Some(&i) = code.fnames.get(&str) {
-                println!("{}", code.functions[i].display::<EnhancedFmt>(code));
+            if let Some(f) = code.function_by_name(&str) {
+                println!("{}", f.display::<EnhancedFmt>(code));
             } else {
                 println!("unknown '{str}'");
             }
         }
         Command::SearchFunction(str) => {
             // TODO search for function
-            if let Some(&i) = code.fnames.get(&str) {
-                println!("{}", code.functions[i].display_header::<EnhancedFmt>(code));
+            if let Some(f) = code.function_by_name(&str) {
+                println!("{}", f.display_header::<EnhancedFmt>(code));
             } else {
                 println!("unknown");
             }
@@ -436,7 +436,7 @@ This is the same range notation as Rust and is supported with most commands."#
                             .iter()
                             .enumerate()
                             .find_map(
-                                |(i, d): (usize, &String)| {
+                                |(i, d): (usize, &Str)| {
                                     if d == &str {
                                         Some(i)
                                     } else {
@@ -488,7 +488,7 @@ This is the same range notation as Rust and is supported with most commands."#
             }
         }
         Command::SaveTo(file) => {
-            let mut w = BufWriter::new(fs::File::create(file)?);
+            let mut w = BufWriter::new(fs::File::create(&*file)?);
             code.serialize(&mut w)?;
         }
         Command::Callgraph(idx, depth) => {
@@ -593,7 +593,7 @@ This is the same range notation as Rust and is supported with most commands."#
                 println!(
                     "{}",
                     hlbc_decompiler::decompile_function(code, fun)
-                        .display(code, &hlbc_decompiler::fmt::FormatOptions::new("  "),)
+                        .display(code, &hlbc_decompiler::fmt::FormatOptions::new(2))
                 );
             }
         }
@@ -605,7 +605,7 @@ This is the same range notation as Rust and is supported with most commands."#
                     println!(
                         "{}",
                         hlbc_decompiler::decompile_class(code, obj)
-                            .display(code, &hlbc_decompiler::fmt::FormatOptions::new("  "))
+                            .display(code, &hlbc_decompiler::fmt::FormatOptions::new(2))
                     );
                 }
                 _ => println!("Type {idx} is not an obj"),

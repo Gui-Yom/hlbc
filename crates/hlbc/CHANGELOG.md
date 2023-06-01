@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/Gui-Yom/hlbc/compare/v0.6.1...HEAD)
 
+### Added
+
+- Use smart strings
+
 ### Fixed
 
 - Correctly serialize function debug info

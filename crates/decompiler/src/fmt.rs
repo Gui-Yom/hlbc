@@ -3,35 +3,31 @@ use std::fmt::{Display, Formatter};
 
 use hlbc::fmt::{BytecodeFmt, EnhancedFmt};
 use hlbc::types::{Function, RefField, Type};
+use hlbc::Str;
 use hlbc::{Bytecode, Resolve};
 
 use crate::ast::{Class, Constant, ConstructorCall, Expr, Method, Operation, Statement};
 
+const INDENT: &'static str = "                                                                ";
+
 #[derive(Clone)]
 pub struct FormatOptions {
-    indent: String,
-    inc_indent: String,
+    indent: &'static str,
+    inc_indent: usize,
 }
 
 impl FormatOptions {
-    pub fn new(inc_indent: &str) -> Self {
+    pub fn new(inc_indent: usize) -> Self {
         Self {
-            indent: String::new(),
-            inc_indent: inc_indent.to_string(),
-        }
-    }
-
-    pub fn with_base_indent(indent: &str, inc_indent: &str) -> Self {
-        Self {
-            indent: indent.to_string(),
-            inc_indent: inc_indent.to_string(),
+            indent: "",
+            inc_indent,
         }
     }
 
     pub fn inc_nesting(&self) -> Self {
         FormatOptions {
-            indent: format!("{}{}", self.indent, self.inc_indent),
-            inc_indent: self.inc_indent.clone(),
+            indent: &INDENT[..self.indent.len() + self.inc_indent],
+            ..*self
         }
     }
 }
@@ -45,15 +41,15 @@ impl Display for FormatOptions {
 fn to_haxe_type<'a>(ty: &Type, ctx: &'a Bytecode) -> impl Display + 'a {
     use crate::Type::*;
     match ty {
-        Void => "Void",
-        I32 => "Int",
-        F64 => "Float",
-        Bool => "Bool",
-        Bytes => "hl.Bytes",
-        Dyn => "Dynamic",
-        Fun(_) => "Function",
+        Void => Str::from_static("Void"),
+        I32 => Str::from_static("Int"),
+        F64 => Str::from_static("Float"),
+        Bool => Str::from_static("Bool"),
+        Bytes => Str::from_static("hl.Bytes"),
+        Dyn => Str::from_static("Dynamic"),
+        Fun(_) => Str::from_static("Function"),
         Obj(obj) => ctx.resolve(obj.name),
-        _ => "other",
+        _ => Str::from_static("other"),
     }
 }
 
@@ -83,7 +79,7 @@ impl Method {
             "function "{fun.name(ctx)}"("
             {fmtools::join(", ", fun.args(ctx).iter().enumerate().skip(if self.static_ { 0 } else { 1 })
                 .map(move |(i, arg)| fmtools::fmt! {move
-                    {fun.arg_name(ctx, i).unwrap_or("_")}": "{to_haxe_type(&ctx[*arg], ctx)}
+                    {fun.arg_name(ctx, i).unwrap_or(Str::from("_"))}": "{to_haxe_type(&ctx[*arg], ctx)}
                 }))}
             ")" if !fun.ty(ctx).ret.is_void() { ": "{to_haxe_type(fun.ret(ctx), ctx)} } " {"
 
@@ -109,7 +105,7 @@ impl Constant {
             Int(c) => EnhancedFmt.fmt_refint(f, code, c),
             Float(c) => EnhancedFmt.fmt_reffloat(f, code, c),
             String(c) => {
-                write!(f, "\"{}\"", c.display::<EnhancedFmt>(code))
+                write!(f, "\"{}\"", code[c])
             }
             Bool(c) => Display::fmt(&c, f),
             Null => f.write_str("null"),
@@ -199,7 +195,7 @@ impl Expr {
                     let fun = f.as_fn(code).unwrap();
                     "("{fmtools::join(", ", fun.ty(code).args.iter().enumerate().map(move |(i, arg)|
                         fmtools::fmt! { move
-                            {fun.arg_name(code, i).unwrap_or("_")}": "{to_haxe_type(&code[*arg], code)}
+                            {fun.arg_name(code, i).unwrap_or(Str::from("_"))}": "{to_haxe_type(&code[*arg], code)}
                         }
                     ))}") -> {\n"
                     let indent2 = indent.inc_nesting();
@@ -235,7 +231,7 @@ impl Expr {
                     if let Some(name) = name {
                         name.clone()
                     } else {
-                        x.to_string()
+                        Str::from(x.to_string())
                     }
                 }}
             }

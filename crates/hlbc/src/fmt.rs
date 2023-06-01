@@ -854,11 +854,12 @@ impl Opcode {
 
 #[cfg(test)]
 mod test {
-    use std::fmt::Write;
+    use std::fmt::{Display, Write};
     use std::fs;
     use std::io::BufReader;
+    use std::path::Path;
 
-    use crate::fmt::{fmt, EnhancedFmt};
+    use crate::fmt::{fmt, DisplayFmt, EnhancedFmt};
     use crate::fmt::{BytecodeFmt, DebugFmt};
     use crate::types::{FunPtr, Reg};
     use crate::Bytecode;
@@ -874,10 +875,45 @@ mod test {
     #[test]
     fn debug_formatter() {
         let ctx = Bytecode::default();
+        // TODO test all
         assert_eq!(
             format!("{:?}", Reg(0)),
             format!("{}", fmt(|f| DebugFmt.fmt_reg(f, &ctx, Reg(0))))
         )
+    }
+
+    #[test]
+    fn display_formatter() {
+        let ctx = Bytecode::default();
+        // TODO test all
+        assert_eq!(
+            format!("{}", Reg(0)),
+            format!("{}", fmt(|f| DisplayFmt.fmt_reg(f, &ctx, Reg(0))))
+        )
+    }
+
+    fn test_fmt(path: impl AsRef<Path>) {
+        let code = Bytecode::from_file(path).unwrap();
+        for f in code.functions() {
+            write!(Null, "{}", f.display_header::<EnhancedFmt>(&code)).unwrap();
+            write!(Null, "{}", f.display_header::<DisplayFmt>(&code)).unwrap();
+            match f {
+                FunPtr::Fun(fun) => {
+                    write!(Null, "{}", fun.display_header::<EnhancedFmt>(&code)).unwrap();
+                    write!(Null, "{}", fun.display::<EnhancedFmt>(&code)).unwrap();
+                    write!(Null, "{}", fun.display_header::<DisplayFmt>(&code)).unwrap();
+                    write!(Null, "{}", fun.display::<DisplayFmt>(&code)).unwrap();
+                }
+                FunPtr::Native(n) => {
+                    write!(Null, "{}", n.display::<EnhancedFmt>(&code)).unwrap();
+                    write!(Null, "{}", n.display::<DisplayFmt>(&code)).unwrap();
+                }
+            }
+        }
+        for t in &code.types {
+            write!(Null, "{}", t.display::<EnhancedFmt>(&code)).unwrap();
+            write!(Null, "{}", t.display::<DisplayFmt>(&code)).unwrap();
+        }
     }
 
     #[test]
@@ -886,22 +922,7 @@ mod test {
             let path = entry.unwrap().path();
             if let Some(ext) = path.extension() {
                 if ext == "hl" {
-                    let code =
-                        Bytecode::deserialize(&mut BufReader::new(fs::File::open(&path).unwrap()))
-                            .unwrap();
-                    for f in code.functions() {
-                        write!(Null, "{}", f.display_header::<EnhancedFmt>(&code)).unwrap();
-                        match f {
-                            FunPtr::Fun(fun) => {
-                                write!(Null, "{}", fun.display_header::<EnhancedFmt>(&code))
-                                    .unwrap();
-                                write!(Null, "{}", fun.display::<EnhancedFmt>(&code)).unwrap();
-                            }
-                            FunPtr::Native(n) => {
-                                write!(Null, "{}", n.display::<EnhancedFmt>(&code)).unwrap();
-                            }
-                        }
-                    }
+                    test_fmt(&path);
                 }
             }
         }
@@ -910,21 +931,12 @@ mod test {
     #[test]
     fn fmt_wartales() {
         let path = "E:\\Games\\Wartales\\hlboot.dat";
-        let code =
-            Bytecode::deserialize(&mut BufReader::new(fs::File::open(path).unwrap())).unwrap();
-        for f in code.functions() {
-            //dbg!(f.findex());
-            write!(Null, "{}", f.display_header::<EnhancedFmt>(&code)).unwrap();
-            match f {
-                FunPtr::Fun(fun) => {
-                    write!(Null, "{}", fun.display_header::<EnhancedFmt>(&code)).unwrap();
-                    write!(Null, "{}", fun.display::<EnhancedFmt>(&code)).unwrap();
-                }
-                FunPtr::Native(n) => {
-                    dbg!(n.findex);
-                    write!(Null, "{}", n.display::<EnhancedFmt>(&code)).unwrap();
-                }
-            }
-        }
+        test_fmt(path);
+    }
+
+    #[test]
+    fn fmt_northgard() {
+        let path = "E:\\Games\\Northgard\\hlboot.dat";
+        test_fmt(path);
     }
 }
