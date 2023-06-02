@@ -8,7 +8,6 @@ pub use petgraph;
 use petgraph::graphmap::DiGraphMap;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences, IntoNodeReferences, NodeIndexable, NodeRef};
 
-use crate::analysis::IsFromStd;
 use crate::types::{FunPtr, Function, RefFun};
 use crate::{Bytecode, Opcode, Resolve, Type};
 

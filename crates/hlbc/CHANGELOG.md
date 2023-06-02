@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Correctly serialize function debug info
 
+### Removed
+
+- Remove `IsFromStd` trait
+
 ## [0.6.1](https://github.com/Gui-Yom/hlbc/compare/v0.6.0...v0.6.1) - 2023-05-13
 
 ### Changed

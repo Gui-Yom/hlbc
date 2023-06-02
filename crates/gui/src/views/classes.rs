@@ -2,7 +2,6 @@ use std::ops::Deref;
 
 use eframe::egui::{Color32, RichText, Ui, WidgetText};
 
-use hlbc::analysis::IsFromStd;
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{RefType, Type};
 
