@@ -4,14 +4,18 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::{env, fs};
 
-use eframe::egui::Vec2;
+use eframe::egui::{Rounding, Style, Vec2, Visuals};
 use eframe::egui_wgpu::WgpuConfiguration;
+use eframe::epaint::Shadow;
 use eframe::wgpu;
 use eframe::wgpu::PowerPreference;
 use poll_promise::Promise;
 
+use crate::theme::build_style;
 use hlbc::Bytecode;
 use hlbc_gui::App;
+
+mod theme;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
@@ -42,6 +46,8 @@ fn main() -> eframe::Result<()> {
                 }))
             };
 
+            cc.egui_ctx.set_style(build_style());
+
             // Dock tabs styling
             let style = egui_dock::Style::from_egui(cc.egui_ctx.style().as_ref());
 
@@ -65,6 +71,8 @@ fn main() {
             "eframe_canvas", // hardcode it
             web_options,
             Box::new(|cc| {
+                cc.egui_ctx.set_style(build_style());
+
                 // Dock tabs styling
                 let mut style = egui_dock::Style::from_egui(cc.egui_ctx.style().as_ref());
 

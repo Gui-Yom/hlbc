@@ -4,7 +4,9 @@ use std::io::BufReader;
 use std::rc::Rc;
 
 use eframe::egui;
-use eframe::egui::{CentralPanel, Frame, Margin, TopBottomPanel};
+use eframe::egui::{
+    CentralPanel, Frame, Label, LayerId, Margin, ScrollArea, TopBottomPanel, Ui, Vec2,
+};
 use egui_dock::{DockArea, NodeIndex, Tree};
 use poll_promise::Promise;
 
@@ -29,6 +31,7 @@ pub struct App {
     style: egui_dock::Style,
     options_window_open: bool,
     about_window_open: bool,
+    status: String,
 }
 
 impl App {
@@ -43,6 +46,7 @@ impl App {
             style,
             options_window_open: false,
             about_window_open: false,
+            status: String::from("Loading bytecode ..."),
         }
     }
 }
@@ -55,7 +59,7 @@ impl eframe::App for App {
                     Ok(Ok(Some((file, code)))) => {
                         self.ctx = Some(AppCtxHandle::new(AppCtx::new_from_code(file, code)));
                         self.tree = default_tabs();
-                        println!("Loaded bytecode successfully");
+                        self.status = String::from("Loaded bytecode successfully");
                     }
                     Ok(Ok(None)) => {
                         // No file has been picked
@@ -150,12 +154,30 @@ impl eframe::App for App {
                 });
             });
 
+        TopBottomPanel::bottom("status bar")
+            .exact_height(20.0)
+            .show(ctx, |ui| {
+                ui.horizontal(|ui| {
+                    if let Some(appctx) = &self.ctx {
+                        let (id, rect) = ui.allocate_space(Vec2::new(120.0, 20.0));
+                        Ui::new(ctx.clone(), ui.layer_id(), id, rect, rect)
+                            .label(format!("{}", appctx.selected().name(appctx.code())));
+                        ui.separator();
+                    }
+                    ui.label(&self.status);
+                });
+            });
+
         egui::Window::new("Options")
             .open(&mut self.options_window_open)
             .show(ctx, |ui| {
-                ui.collapsing("Display", |_ui| {
+                ui.collapsing("Display", |ui| {
                     // TODO max fps
                     // TODO ui theme
+                    #[cfg(debug_assertions)]
+                    ScrollArea::vertical().show(ui, |ui| {
+                        ctx.style_ui(ui);
+                    });
                 });
                 ui.collapsing("Code display", |_ui| {
                     // TODO code font
