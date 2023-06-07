@@ -1,91 +1,153 @@
-use std::str::CharIndices;
-use std::time::Instant;
-
-use tantivy::collector::TopDocs;
-use tantivy::query::QueryParser;
-use tantivy::schema::{
-    Field, IndexRecordOption, NumericOptions, Schema, TextFieldIndexing, TextOptions, STORED, TEXT,
-};
-use tantivy::tokenizer::{
-    BoxTokenStream, Language, LowerCaser, NgramTokenizer, SimpleTokenizer, SplitCompoundWords,
-    Stemmer, TextAnalyzer, Token, TokenStream, Tokenizer,
-};
-use tantivy::{doc, Index};
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 
 use hlbc::types::RefFun;
 use hlbc::Bytecode;
 
-use crate::tokenizer::FunctionTokenizer;
+mod tantivy;
 
-mod tokenizer;
-
-pub struct BcIndex {
-    index: Index,
+pub trait Searcher {
+    fn search(&self, code: &Bytecode, needle: &str, limit: usize) -> Vec<RefFun>;
 }
 
-impl BcIndex {
-    pub fn build_functions(code: &Bytecode) -> Self {
-        let code_tokenizer = TextAnalyzer::from(FunctionTokenizer)
-            .filter(LowerCaser)
-            .filter(Stemmer::new(Language::English));
+struct Comp<T>(T, f32);
 
-        let mut schema_builder = Schema::builder();
-        let findex = schema_builder.add_u64_field("findex", NumericOptions::default() | STORED);
-        let name = schema_builder.add_text_field(
-            "name",
-            TextOptions::default().set_indexing_options(
-                TextFieldIndexing::default()
-                    .set_fieldnorms(true)
-                    .set_index_option(IndexRecordOption::WithFreqsAndPositions)
-                    .set_tokenizer("function"),
-            ),
-        );
-        let schema = schema_builder.build();
+impl<T> Eq for Comp<T> {}
 
-        let index = Index::create_in_ram(schema.clone());
-        index.tokenizers().register("function", code_tokenizer);
+impl<T> PartialEq<Self> for Comp<T> {
+    fn eq(&self, other: &Comp<T>) -> bool {
+        self.1.eq(&other.1)
+    }
+}
 
-        let mut writer = index.writer_with_num_threads(1, 10_000_000).unwrap();
-        let start = Instant::now();
-        for f in code.functions() {
-            writer
-                .add_document(doc!(
-                    findex => f.findex().0 as u64,
-                    name => f.name(code)
-                ))
-                .unwrap();
+impl<T> PartialOrd<Self> for Comp<T> {
+    fn partial_cmp(&self, other: &Comp<T>) -> Option<Ordering> {
+        other.1.partial_cmp(&self.1)
+    }
+}
+
+impl<T> Ord for Comp<T> {
+    fn cmp(&self, other: &Comp<T>) -> Ordering {
+        other.1.total_cmp(&self.1)
+    }
+}
+
+pub fn top_candidates<'a, T>(n: usize, results: impl Iterator<Item = (T, f32)>) -> Vec<(T, f32)> {
+    let mut top = BinaryHeap::with_capacity(n + 1);
+    for (c, score) in results {
+        if score > 0.0 {
+            top.push(Comp(c, score));
+            if top.len() > n {
+                top.pop();
+            }
         }
-        writer.commit().unwrap();
-        println!(
-            "Indexed all documents in {} ms",
-            start.elapsed().as_millis()
-        );
-
-        Self { index }
     }
+    top.into_sorted_vec()
+        .into_iter()
+        .map(|c| (c.0, c.1))
+        .collect()
+}
 
-    pub fn query(&self, query_text: &str) -> Vec<RefFun> {
-        let reader = self.index.reader().unwrap();
-        let searcher = reader.searcher();
-        let parser = QueryParser::for_index(&self.index, vec![Field::from_field_id(1)]);
-        let query = parser.parse_query(query_text).unwrap();
-        let top_docs = searcher.search(&query, &TopDocs::with_limit(10)).unwrap();
-        top_docs
-            .into_iter()
-            .map(|(_, d)| {
-                RefFun(
-                    searcher
-                        .doc(d)
-                        .unwrap()
-                        .get_first(Field::from_field_id(0))
-                        .unwrap()
-                        .as_u64()
-                        .unwrap() as usize,
+pub struct Contains;
+
+impl Searcher for Contains {
+    fn search(&self, code: &Bytecode, needle: &str, limit: usize) -> Vec<RefFun> {
+        let needle_len = needle.len() as f32;
+        top_candidates(
+            limit,
+            code.functions().map(|f| {
+                let name = f.name(code);
+                let len = name.len() as f32;
+                (
+                    f.findex(),
+                    if name.contains(needle) {
+                        needle_len / len
+                    } else if needle.contains(&*name) {
+                        len / needle_len
+                    } else {
+                        0.0
+                    },
                 )
-            })
-            .collect()
+            }),
+        )
+        .into_iter()
+        .map(|(c, s)| c)
+        .collect()
     }
 }
 
-#[cfg(test)]
-mod tests {}
+// pub struct Memchr;
+//
+// impl Searcher for Memchr {
+//     fn with_needle<'a>(&self, needle: &'a str) -> Box<dyn Matcher + 'a> {
+//         Box::new(MemchrMatcher(memchr::memmem::Finder::new(needle)))
+//     }
+// }
+//
+// pub struct MemchrMatcher<'a>(memchr::memmem::Finder<'a>);
+//
+// impl Matcher for MemchrMatcher<'_> {
+//     fn eval(&self, candidate: &str) -> f32 {
+//         if self.0.find(candidate.as_bytes()).is_some() {
+//             self.0.needle().len() as f32 / candidate.len() as f32
+//         } else if memchr::memmem::find(self.0.needle(), candidate.as_bytes()).is_some() {
+//             candidate.len() as f32 / self.0.needle().len() as f32
+//         } else {
+//             0.0
+//         }
+//     }
+// }
+
+pub struct ClangdSearcher(fuzzy_matcher::clangd::ClangdMatcher);
+
+impl ClangdSearcher {
+    pub fn new() -> Self {
+        Self(fuzzy_matcher::clangd::ClangdMatcher::default().ignore_case())
+    }
+}
+
+impl Searcher for ClangdSearcher {
+    fn search(&self, code: &Bytecode, needle: &str, limit: usize) -> Vec<RefFun> {
+        top_candidates(
+            limit,
+            code.functions().map(|f| {
+                (
+                    f.findex(),
+                    fuzzy_matcher::FuzzyMatcher::fuzzy_match(&self.0, &f.name(code), needle)
+                        .map(|s| s as f32)
+                        .unwrap_or(0.0),
+                )
+            }),
+        )
+        .into_iter()
+        .map(|(c, s)| c)
+        .collect()
+    }
+}
+
+pub struct SkimSearcher(fuzzy_matcher::skim::SkimMatcherV2);
+
+impl SkimSearcher {
+    pub fn new() -> Self {
+        Self(fuzzy_matcher::skim::SkimMatcherV2::default().ignore_case())
+    }
+}
+
+impl Searcher for SkimSearcher {
+    fn search(&self, code: &Bytecode, needle: &str, limit: usize) -> Vec<RefFun> {
+        top_candidates(
+            limit,
+            code.functions().map(|f| {
+                (
+                    f.findex(),
+                    fuzzy_matcher::FuzzyMatcher::fuzzy_match(&self.0, &f.name(code), needle)
+                        .map(|s| s as f32)
+                        .unwrap_or(0.0),
+                )
+            }),
+        )
+        .into_iter()
+        .map(|(c, s)| c)
+        .collect()
+    }
+}

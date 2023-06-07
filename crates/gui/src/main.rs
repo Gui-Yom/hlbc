@@ -4,16 +4,16 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::{env, fs};
 
-use eframe::egui::{Rounding, Style, Vec2, Visuals};
+use eframe::egui::Vec2;
 use eframe::egui_wgpu::WgpuConfiguration;
-use eframe::epaint::Shadow;
 use eframe::wgpu;
 use eframe::wgpu::PowerPreference;
 use poll_promise::Promise;
 
-use crate::theme::build_style;
 use hlbc::Bytecode;
 use hlbc_gui::App;
+
+use crate::theme::build_style;
 
 mod theme;
 

@@ -4,9 +4,7 @@ use std::io::BufReader;
 use std::rc::Rc;
 
 use eframe::egui;
-use eframe::egui::{
-    CentralPanel, Frame, Label, LayerId, Margin, ScrollArea, TopBottomPanel, Ui, Vec2,
-};
+use eframe::egui::{CentralPanel, Frame, Margin, ScrollArea, TopBottomPanel, Ui, Vec2};
 use egui_dock::{DockArea, NodeIndex, Tree};
 use poll_promise::Promise;
 
@@ -129,12 +127,12 @@ impl eframe::App for App {
                                     .append_tab(Box::<FunctionsView>::default());
                             }
                             if ui.button("Info").clicked() {
-                                self.tree[NodeIndex::root().left()]
+                                self.tree[NodeIndex::root().right()]
                                     .append_tab(Box::<InfoView>::default());
                             }
                             #[cfg(feature = "search")]
                             if ui.button("Search").clicked() {
-                                self.tree[NodeIndex::root().left()]
+                                self.tree[NodeIndex::root().right()]
                                     .append_tab(Box::new(views::SearchView::new(ctx.code())));
                             }
                         });

@@ -1,5 +1,5 @@
 use eframe::egui::text::LayoutJob;
-use eframe::egui::{Color32, ScrollArea, TextStyle, Ui, WidgetText};
+use eframe::egui::{Color32, FontId, ScrollArea, TextStyle, Ui, WidgetText};
 use eframe::epaint::text::TextWrapping;
 use egui_dock::TabViewer;
 
@@ -67,17 +67,14 @@ pub(crate) fn list_view<Elem: Copy>(
         |ui, range| {
             for elem in range.map(item) {
                 let checked = ctx.selected() == create_selection(elem);
-                let mut job = LayoutJob::simple_singleline(
-                    display(&ctx, elem),
-                    TextStyle::Button.resolve(ui.style().as_ref()),
-                    Color32::WHITE,
+                let mut label = ui.selectable_label(
+                    checked,
+                    singleline(
+                        display(&ctx, elem),
+                        TextStyle::Button.resolve(ui.style().as_ref()),
+                        Color32::WHITE,
+                    ),
                 );
-                job.wrap = TextWrapping {
-                    break_anywhere: true,
-                    max_rows: 1,
-                    ..TextWrapping::default()
-                };
-                let mut label = ui.selectable_label(checked, job);
                 if let Some(context_menu) = &context_menu {
                     label = label.context_menu(|ui| context_menu(ui, &ctx, elem));
                 }
@@ -87,4 +84,22 @@ pub(crate) fn list_view<Elem: Copy>(
             }
         },
     );
+}
+
+pub(crate) fn singleline_simple(ui: &Ui, text: impl Into<String>) -> LayoutJob {
+    singleline(
+        text,
+        TextStyle::Body.resolve(ui.style().as_ref()),
+        Color32::WHITE,
+    )
+}
+
+pub(crate) fn singleline(text: impl Into<String>, font_id: FontId, color: Color32) -> LayoutJob {
+    let mut job = LayoutJob::simple_singleline(text.into(), font_id, color);
+    job.wrap = TextWrapping {
+        break_anywhere: true,
+        max_rows: 1,
+        ..TextWrapping::default()
+    };
+    job
 }
