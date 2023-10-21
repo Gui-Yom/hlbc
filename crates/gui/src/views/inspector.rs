@@ -37,6 +37,10 @@ impl AppView for SyncInspectorView {
         .color(Color32::WHITE);
         inspector_ui(ui, ctx, selected)
     }
+
+    fn closeable(&self) -> bool {
+        false
+    }
 }
 
 pub(crate) struct InspectorView {

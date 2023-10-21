@@ -3,8 +3,6 @@ use eframe::egui::{Color32, FontId, ScrollArea, TextStyle, Ui, WidgetText};
 use eframe::epaint::text::TextWrapping;
 use egui_dock::TabViewer;
 
-#[cfg(feature = "callgraph")]
-pub(crate) use callgraph::*;
 pub(crate) use classes::*;
 pub(crate) use decompiler::*;
 pub(crate) use functions::*;
@@ -35,12 +33,20 @@ pub(crate) struct DynamicTabViewer(pub(crate) AppCtxHandle);
 impl TabViewer for DynamicTabViewer {
     type Tab = Box<dyn AppView>;
 
+    fn title(&mut self, tab: &mut Self::Tab) -> WidgetText {
+        tab.title()
+    }
+
     fn ui(&mut self, ui: &mut Ui, tab: &mut Self::Tab) {
         tab.ui(ui, self.0.clone());
     }
 
-    fn title(&mut self, tab: &mut Self::Tab) -> WidgetText {
-        tab.title()
+    fn closeable(&mut self, tab: &mut Self::Tab) -> bool {
+        tab.closeable()
+    }
+
+    fn scroll_bars(&self, tab: &Self::Tab) -> [bool; 2] {
+        [false, false]
     }
 }
 
@@ -49,6 +55,10 @@ pub(crate) trait AppView {
     fn title(&self) -> WidgetText;
 
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle);
+
+    fn closeable(&self) -> bool {
+        true
+    }
 }
 
 pub(crate) fn list_view<Elem: Copy>(
