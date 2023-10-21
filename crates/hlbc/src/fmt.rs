@@ -70,34 +70,35 @@ impl Display for RefEnumConstruct {
 
 impl Display for Type {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        use crate::types::Type::*;
         write!(
             f,
             "{}",
             fmtools::fmt! {
                 match self {
-                    Type::Void => "void",
-                    Type::UI8 => "i8",
-                    Type::UI16 => "i16",
-                    Type::I32 => "i32",
-                    Type::I64 => "i64",
-                    Type::F32 => "f32",
-                    Type::F64 => "f64",
-                    Type::Bool => "bool",
-                    Type::Bytes => "bytes",
-                    Type::Dyn => "dynamic",
-                    Type::Fun(_) => "<fun>",
-                    Type::Obj(_) => "<obj>",
-                    Type::Array => "array",
-                    Type::Type => "type",
-                    Type::Ref(reftype) =>"ref<"{ reftype }">",
-                    Type::Virtual { .. } => "<virtual>",
-                    Type::DynObj => "dynobj",
-                    Type::Abstract { .. } => "<abstract>",
-                    Type::Enum { .. } => "<enum>",
-                    Type::Null(reftype) => "null<"{ reftype }">",
-                    Type::Method(_) => "<method>",
-                    Type::Struct(_) => "<struct>",
-                    Type::Packed(reftype) => "packed<"{ reftype }">",
+                    Void => "void",
+                    UI8 => "i8",
+                    UI16 => "i16",
+                    I32 => "i32",
+                    I64 => "i64",
+                    F32 => "f32",
+                    F64 => "f64",
+                    Bool => "bool",
+                    Bytes => "bytes",
+                    Dyn => "dynamic",
+                    Fun(_) => "<fun>",
+                    Obj(_) => "<obj>",
+                    Array => "array",
+                    Type => "type",
+                    Ref(reftype) =>"ref<"{ reftype }">",
+                    Virtual { .. } => "<virtual>",
+                    DynObj => "dynobj",
+                    Abstract { .. } => "<abstract>",
+                    Enum { .. } => "<enum>",
+                    Null(reftype) => "null<"{ reftype }">",
+                    Method(_) => "<method>",
+                    Struct(_) => "<struct>",
+                    Packed(reftype) => "packed<"{ reftype }">",
                 }
             }
         )
@@ -133,6 +134,24 @@ impl Display for Function {
 }
 
 //endregion
+
+/*trait BcVisitor {
+    type Input;
+    type Output;
+
+    fn visit_reg(&mut self, i: Self::Input, v: Reg) -> Self::Output;
+}
+
+struct DebugVisitor;
+
+impl BcVisitor for DebugVisitor {
+    type Input = ();
+    type Output = impl Display;
+
+    fn visit_reg(&mut self, i: Self::Input, v: Reg) -> Self::Output {
+        fmtools::fmt(move |f| Debug::fmt(&v, f))
+    }
+}*/
 
 #[allow(unused_variables)]
 pub trait BytecodeFmt {
@@ -537,7 +556,7 @@ impl RefFun {
         bcfmt: Fmt,
         ctx: &'a Bytecode,
     ) -> impl Display + 'a {
-        fmt(move |f| match ctx.resolve(*self) {
+        fmt(move |f| match ctx.get(*self) {
             FunPtr::Fun(fun) => bcfmt.fmt_function_header(f, ctx, fun),
             FunPtr::Native(n) => bcfmt.fmt_native(f, ctx, n),
         })
@@ -674,10 +693,10 @@ impl Opcode {
                 op!("{dst} = {fun}({})", fmtools::join(", ", args))
             }
             Opcode::StaticClosure { dst, fun } => {
-                op!("{dst} = {:?}", ctx.resolve(*fun))
+                op!("{dst} = {:?}", ctx.get(*fun))
             }
             Opcode::InstanceClosure { dst, fun, obj } => {
-                op!("{dst} = {obj}.{:?}", ctx.resolve(*fun))
+                op!("{dst} = {obj}.{:?}", ctx.get(*fun))
             }
             Opcode::GetGlobal { dst, global } => {
                 op!("{dst} = global@{}", global.0)
@@ -847,6 +866,7 @@ impl Opcode {
             Opcode::SetEnumField { value, field, src } => {
                 op!("{value}.{} = {src}", field.0)
             }
+            // Fallback to debug impl
             _ => format!("{self:?}"),
         }
     }
@@ -856,7 +876,6 @@ impl Opcode {
 mod test {
     use std::fmt::{Display, Write};
     use std::fs;
-    use std::io::BufReader;
     use std::path::Path;
 
     use crate::fmt::{fmt, DisplayFmt, EnhancedFmt};

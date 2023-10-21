@@ -12,9 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use smart strings
 
+### Changed
+
+- Renamed `Resolve::resolve` to the shorter `Resolve::get`
+
 ### Fixed
 
 - Correctly serialize function debug info
+- Correctly serialize indexes (thanks @turuslan)
 
 ### Removed
 

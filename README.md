@@ -20,10 +20,11 @@
     <img src="crates/gui/screenshot.png" width="354" height="249">
 </div>
 
-## About Hashlink
+## About
 
-Hashlink is a VM used as a compilation target for the Haxe language. Hashlink is successfully used to run popular games
-from developer [**Shiro Games**](https://shirogames.com/) like **Northgard**, **Dune: Spice Wars** and **Wartales**.
+[Hashlink](https://hashlink.haxe.org/) is a VM used as a compilation target for the Haxe language. Hashlink is
+successfully used to run popular games from developer [**Shiro Games**](https://shirogames.com/) like **Northgard**, *
+*Dune: Spice Wars** and **Wartales**.
 
 *hlbc* intends to help the motivated to develop mods and tools for those games.
 
@@ -51,10 +52,24 @@ using the command `wiki` in the CLI.
 
 ## Planned
 
+- Finishing the decompiler (for loops mainly)
 - C API
 
 ## Credits
 
 Development of this project would not have been possible without
-the [hashlink](https://github.com/HaxeFoundation/hashlink) source code. Some algorithms are directly derived from the
-original C code reading bytecode files.
+the [hashlink](https://github.com/HaxeFoundation/hashlink) source code. Most of the deserialization code is directly
+adapted from the original C code reading bytecode files.
+
+## Why Rust
+
+I should probably have used Haxe in the first place, that would have been the logical choice as tooling for a language
+is best done (I suppose) in that same language. But Rust makes it a joy to develop with its enums, match statements and
+macros (I think those features are present in Haxe too, although I'm not at all familiar with this language).
+Also, the Rust ecosystem feels much more alive.
+
+One of the downside of using Rust here is that I can't pass references everywhere. The bytecode is a large graph where
+every element can reference another, this by definition does not play well with Rust borrow-checking rules. To cope with
+this, bytecode handling is working with the arena pattern. The `Bytecode` struct owns every element and we use indexes (
+wrapped in custom types) throughout the codebase. This might be a bit cumbersome to pass `code: &Bytecode` and
+calling `code.get()` everywhere but it works without ever dealing with lifetimes anywhere.

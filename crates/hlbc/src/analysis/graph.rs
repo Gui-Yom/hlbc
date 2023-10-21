@@ -86,7 +86,7 @@ pub fn find_calls<'a>(
 
 pub fn call_graph(code: &Bytecode, f: RefFun, max_depth: usize) -> Callgraph {
     let mut g = Callgraph::new();
-    match code.resolve(f) {
+    match code.get(f) {
         FunPtr::Fun(f) => {
             g.add_node(f.findex);
             build_graph_rec(code, &mut g, f, &RegCtx::new(), max_depth);
@@ -104,7 +104,7 @@ fn build_graph_rec(code: &Bytecode, g: &mut Callgraph, f: &Function, ctx: &RegCt
     }
     for (call, fun, ctx) in find_calls(code, f, ctx) {
         if fun.is_from_std(code) {
-            match code.resolve(fun) {
+            match code.get(fun) {
                 FunPtr::Fun(fun) => {
                     if !g.contains_node(fun.findex) {
                         g.add_node(fun.findex);
@@ -156,7 +156,7 @@ impl Display for GraphDisplay<'_> {
                 "{}{} [ label = \"{:?}\" fontsize=18 shape=box color=\"#b20400\" fillcolor=\"#edd6d5\" ]",
                 INDENT,
                 self.g.to_index(node.id()),
-                self.code.resolve(*node.weight())
+                self.code.get(*node.weight())
             )?;
         }
         // output all edges

@@ -49,7 +49,7 @@ pub struct ObjField {
 
 impl ObjField {
     pub fn name(&self, code: &Bytecode) -> Str {
-        code.resolve(self.name)
+        code.get(self.name)
     }
 }
 
@@ -70,7 +70,7 @@ pub struct ObjProto {
 
 impl ObjProto {
     pub fn name(&self, code: &Bytecode) -> Str {
-        code.resolve(self.name)
+        code.get(self.name)
     }
 }
 
@@ -85,7 +85,7 @@ pub struct EnumConstruct {
 
 impl EnumConstruct {
     pub fn name(&self, code: &Bytecode) -> Str {
-        code.resolve(self.name)
+        code.get(self.name)
     }
 }
 
@@ -120,7 +120,7 @@ pub struct TypeObj {
 
 impl TypeObj {
     pub fn name(&self, code: &Bytecode) -> Str {
-        code.resolve(self.name)
+        code.get(self.name)
     }
 
     /// Get the static part of this class
@@ -237,7 +237,7 @@ impl RefType {
     }
 
     pub fn as_fun<'a>(&self, ctx: &'a Bytecode) -> Option<&'a TypeFun> {
-        match ctx.resolve(*self) {
+        match ctx.get(*self) {
             Type::Fun(fun) => Some(fun),
             Type::Method(fun) => Some(fun),
             _ => None,
@@ -245,7 +245,7 @@ impl RefType {
     }
 
     pub fn as_obj<'a>(&self, ctx: &'a Bytecode) -> Option<&'a TypeObj> {
-        ctx.resolve(*self).get_type_obj()
+        ctx.get(*self).get_type_obj()
     }
 
     pub fn field<'a>(&self, field: RefField, ctx: &'a Bytecode) -> Option<&'a ObjField> {
@@ -270,11 +270,11 @@ pub struct Native {
 
 impl Native {
     pub fn name(&self, code: &Bytecode) -> Str {
-        code.resolve(self.name)
+        code.get(self.name)
     }
 
     pub fn lib(&self, code: &Bytecode) -> Str {
-        code.resolve(self.lib)
+        code.get(self.lib)
     }
 
     /// Get the native function signature type
@@ -288,7 +288,7 @@ impl Native {
     }
 
     pub fn ret<'a>(&self, code: &'a Bytecode) -> &'a Type {
-        code.resolve(self.ty(code).ret)
+        code.get(self.ty(code).ret)
     }
 }
 
@@ -322,7 +322,7 @@ impl Function {
 
     /// Convenience method to resolve the function name
     pub fn name(&self, code: &Bytecode) -> Str {
-        code.resolve(self.name)
+        code.get(self.name)
     }
 
     /// Get the function signature type
@@ -394,18 +394,18 @@ pub struct RefFun(pub usize);
 impl RefFun {
     /// Useful when you already know you should be getting a Function
     pub fn as_fn<'a>(&self, code: &'a Bytecode) -> Option<&'a Function> {
-        code.resolve(*self).as_fn()
+        code.get(*self).as_fn()
     }
 
     pub fn name(&self, code: &Bytecode) -> Str {
-        match code.resolve(*self) {
+        match code.get(*self) {
             FunPtr::Fun(fun) => fun.name(code),
             FunPtr::Native(n) => n.name(code),
         }
     }
 
     pub fn ty<'a>(&self, code: &'a Bytecode) -> &'a TypeFun {
-        match code.resolve(*self) {
+        match code.get(*self) {
             FunPtr::Fun(fun) => fun.ty(code),
             FunPtr::Native(n) => n.ty(code),
         }
@@ -416,7 +416,7 @@ impl RefFun {
     }
 
     pub fn ret<'a>(&self, code: &'a Bytecode) -> &'a Type {
-        code.resolve(self.ty(code).ret)
+        code.get(self.ty(code).ret)
     }
 }
 

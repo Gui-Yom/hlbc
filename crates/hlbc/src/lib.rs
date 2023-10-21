@@ -17,7 +17,6 @@ use crate::types::{
     RefString, RefType, Type, TypeObj,
 };
 
-/// Analysis functions and callgraph generation
 pub mod analysis;
 pub mod fmt;
 /// Opcodes definitions.
@@ -46,7 +45,7 @@ pub enum Error {
     MalformedBytecode(String),
     #[error("Unsupported bytecode version {version} (expected {min} <= version <= {max})")]
     UnsupportedVersion { version: u8, min: u8, max: u8 },
-    #[error("Value '{value}' is too big to be serialized (expected < {limit})")]
+    #[error("Value '{value}' is too big to be serialized (|expected| < {limit})")]
     ValueOutOfBounds { value: i32, limit: u32 },
     #[error(transparent)]
     IoError(#[from] std::io::Error),
@@ -94,14 +93,14 @@ pub struct Bytecode {
     /// Acceleration structure mapping function references (findex) to functions indexes in the native or function pool.
     findexes: Vec<RefFunKnown>,
     /// Acceleration structure mapping function names to function indexes in the function pool
-    pub fnames: HashMap<Str, usize>,
+    fnames: HashMap<Str, usize>,
     pub globals_initializers: HashMap<RefGlobal, usize>,
 }
 
 impl Bytecode {
     /// Get the entrypoint function.
     pub fn entrypoint(&self) -> &Function {
-        self.resolve(self.entrypoint).as_fn().unwrap()
+        self.get(self.entrypoint).as_fn().unwrap()
     }
 
     /// Get the main function.
@@ -120,7 +119,7 @@ impl Bytecode {
     }
 
     pub fn functions<'a>(&'a self) -> impl Iterator<Item = FunPtr<'a>> + 'a {
-        (0..self.findex_max()).map(RefFun).map(|r| self.resolve(r))
+        (0..self.findex_max()).map(RefFun).map(|r| self.get(r))
     }
 }
 
@@ -155,18 +154,19 @@ enum RefFunKnown {
 
 //region Resolve
 
+/// Like the [Index] trait but allows returning any type.
 pub trait Resolve<I> {
     type Output<'a>
     where
         Self: 'a;
 
-    fn resolve(&self, index: I) -> Self::Output<'_>;
+    fn get(&self, index: I) -> Self::Output<'_>;
 }
 
 impl Resolve<RefInt> for Bytecode {
     type Output<'a> = i32;
 
-    fn resolve(&self, index: RefInt) -> Self::Output<'_> {
+    fn get(&self, index: RefInt) -> Self::Output<'_> {
         self.ints[index.0]
     }
 }
@@ -174,7 +174,7 @@ impl Resolve<RefInt> for Bytecode {
 impl Resolve<RefFloat> for Bytecode {
     type Output<'a> = f64;
 
-    fn resolve(&self, index: RefFloat) -> Self::Output<'_> {
+    fn get(&self, index: RefFloat) -> Self::Output<'_> {
         self.floats[index.0]
     }
 }
@@ -182,7 +182,7 @@ impl Resolve<RefFloat> for Bytecode {
 impl Resolve<RefString> for Bytecode {
     type Output<'a> = Str;
 
-    fn resolve(&self, index: RefString) -> Self::Output<'_> {
+    fn get(&self, index: RefString) -> Self::Output<'_> {
         if index.0 > 0 {
             self.strings[index.0].clone()
         } else {
@@ -194,7 +194,7 @@ impl Resolve<RefString> for Bytecode {
 impl Resolve<RefType> for Bytecode {
     type Output<'a> = &'a Type;
 
-    fn resolve(&self, index: RefType) -> Self::Output<'_> {
+    fn get(&self, index: RefType) -> Self::Output<'_> {
         &self.types[index.0]
     }
 }
@@ -202,7 +202,7 @@ impl Resolve<RefType> for Bytecode {
 impl Resolve<RefFun> for Bytecode {
     type Output<'a> = FunPtr<'a>;
 
-    fn resolve(&self, index: RefFun) -> Self::Output<'_> {
+    fn get(&self, index: RefFun) -> Self::Output<'_> {
         match self.findexes[index.0] {
             RefFunKnown::Fun(fun) => FunPtr::Fun(&self.functions[fun]),
             RefFunKnown::Native(n) => FunPtr::Native(&self.natives[n]),

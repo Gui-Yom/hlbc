@@ -536,11 +536,11 @@ fn read_strings(r: &mut impl Read, nstrings: usize) -> Result<Vec<Str>> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
     use std::fs;
+    use std::io::{BufWriter, Write};
 
-    use crate::fmt::EnhancedFmt;
-    use crate::types::RefFun;
-    use crate::{Bytecode, Resolve};
+    use crate::Bytecode;
 
     #[test]
     fn test_deserialize_all() {
@@ -567,5 +567,30 @@ mod tests {
         let path = "E:\\Games\\Northgard\\hlboot.dat";
         let code = Bytecode::from_file(path);
         assert!(code.is_ok());
+    }
+
+    //#[test]
+    fn list_strings() {
+        let code = Bytecode::from_file("E:\\Games\\Northgard\\hlboot.dat").unwrap();
+        let code2 = Bytecode::from_file("E:\\Games\\Wartales\\hlboot.dat").unwrap();
+        let mut file = BufWriter::new(
+            fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open("strings.txt")
+                .unwrap(),
+        );
+        let mut set = HashSet::with_capacity(code.strings.len() + code2.strings.len());
+        for s in code.strings {
+            set.insert(s);
+        }
+        for s in code2.strings {
+            set.insert(s);
+        }
+        for s in &set {
+            file.write(s.as_bytes()).unwrap();
+            file.write(b"\n").unwrap();
+        }
     }
 }

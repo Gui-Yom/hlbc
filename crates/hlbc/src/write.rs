@@ -302,38 +302,40 @@ impl ConstantDef {
     }
 }
 
+// https://github.com/HaxeFoundation/haxe/blob/613b0291c4976a8169aa643cdcc408c7d6b69da9/src/generators/genhl.ml#L3698
+/// Write an index with a variable size encoding
 pub(crate) fn write_var(w: &mut impl Write, value: i32) -> Result<()> {
     if value < 0 {
         let value = -value;
         if value < 0x2000 {
             w.write_u8(((value >> 8) | 0xA0) as u8)?;
             w.write_u8((value & 0xFF) as u8)?;
-        } else if value >= 20000000 {
-            return Err(Error::ValueOutOfBounds {
-                value,
-                limit: 20000000,
-            });
-        } else {
+        } else if value < 20000000 {
             w.write_u8(((value >> 24) | 0xE0) as u8)?;
             w.write_u8(((value >> 16) & 0xFF) as u8)?;
             w.write_u8(((value >> 8) & 0xFF) as u8)?;
             w.write_u8((value & 0xFF) as u8)?;
+        } else {
+            return Err(Error::ValueOutOfBounds {
+                value,
+                limit: 20000000,
+            });
         }
     } else if value < 0x80 {
         w.write_u8(value as u8)?;
     } else if value < 0x2000 {
         w.write_u8(((value >> 8) | 0x80) as u8)?;
         w.write_u8((value & 0xFF) as u8)?;
-    } else if value >= 0x20000000 {
-        return Err(Error::ValueOutOfBounds {
-            value,
-            limit: 20000000,
-        });
-    } else {
+    } else if value < 0x20000000 {
         w.write_u8(((value >> 24) | 0xC0) as u8)?;
         w.write_u8(((value >> 16) & 0xFF) as u8)?;
         w.write_u8(((value >> 8) & 0xFF) as u8)?;
         w.write_u8((value & 0xFF) as u8)?;
+    } else {
+        return Err(Error::ValueOutOfBounds {
+            value,
+            limit: 20000000,
+        });
     }
     Ok(())
 }
@@ -385,17 +387,19 @@ fn flush_repeat(
 mod tests {
     use std::fs;
 
-    use crate::fmt::EnhancedFmt;
-    use crate::types::RefFun;
-    use crate::{Bytecode, Resolve};
+    use crate::Bytecode;
 
-    //#[test]
+    #[test]
     fn ser_eq_deser() {
         let data = fs::read("../../data/Anonymous.hl").unwrap();
+        // Deserialize
         let code = Bytecode::deserialize(&mut data.as_slice()).unwrap();
+
         let mut out = Vec::with_capacity(data.len());
+        // Then serialize back again
         code.serialize(&mut out).unwrap();
-        let new = Bytecode::deserialize(&mut out.as_slice()).unwrap();
+
+        // Test bytes
         assert_eq!(data, out);
     }
 
