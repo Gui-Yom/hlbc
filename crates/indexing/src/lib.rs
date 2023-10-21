@@ -4,6 +4,7 @@ use std::collections::BinaryHeap;
 use hlbc::types::RefFun;
 use hlbc::Bytecode;
 
+#[cfg(feature = "tantivy")]
 mod tantivy;
 
 pub trait Searcher {

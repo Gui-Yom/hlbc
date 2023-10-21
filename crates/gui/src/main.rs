@@ -13,10 +13,6 @@ use poll_promise::Promise;
 use hlbc::Bytecode;
 use hlbc_gui::App;
 
-use crate::theme::build_style;
-
-mod theme;
-
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
     eframe::run_native(
@@ -46,7 +42,8 @@ fn main() -> eframe::Result<()> {
                 }))
             };
 
-            cc.egui_ctx.set_style(build_style());
+            cc.egui_ctx.set_fonts(egui_ui_refresh::fonts());
+            cc.egui_ctx.set_style(egui_ui_refresh::style());
 
             // Dock tabs styling
             let style = egui_dock::Style::from_egui(cc.egui_ctx.style().as_ref());
@@ -71,19 +68,13 @@ fn main() {
             "eframe_canvas", // hardcode it
             web_options,
             Box::new(|cc| {
-                cc.egui_ctx.set_style(build_style());
+                cc.egui_ctx.set_fonts(egui_ui_refresh::fonts());
+                cc.egui_ctx.set_style(egui_ui_refresh::style());
 
                 // Dock tabs styling
                 let mut style = egui_dock::Style::from_egui(cc.egui_ctx.style().as_ref());
 
-                Box::new(App {
-                    loader: None,
-                    ctx: None,
-                    tree: Tree::new(vec![]),
-                    style,
-                    options_window_open: false,
-                    about_window_open: false,
-                })
+                Box::new(App::new(None, style))
             }),
         )
         .await

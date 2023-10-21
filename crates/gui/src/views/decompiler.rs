@@ -38,7 +38,7 @@ impl AppView for DecompilerView {
             let code = code.deref();
 
             self.output = match ctx.selected() {
-                ItemSelection::Fun(fun) => match code.resolve(fun) {
+                ItemSelection::Fun(fun) => match code.get(fun) {
                     FunPtr::Fun(func) => decompile_function(code, func)
                         .display(code, &FormatOptions::new(2))
                         .to_string(),

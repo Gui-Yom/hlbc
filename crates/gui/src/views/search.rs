@@ -64,7 +64,8 @@ impl AppView for SearchView {
                         &mut self.searcher.0,
                         SearchMethod::Contains,
                         SearchMethod::Contains.name(),
-                    );
+                    )
+                    .on_hover_text("'contains' is fast but case sensitive and exact matching");
                     ui.selectable_value(
                         &mut self.searcher.0,
                         SearchMethod::Clangd,

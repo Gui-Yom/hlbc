@@ -15,25 +15,26 @@ include = ["src/**/*", "README.md", "CHANGELOG.md", "assets/Haxe.sublime-syntax"
 
 [dependencies]
 # AIO GUI framework
-eframe = { version = "0.22", default-features = false, features = ["default_fonts"] }
+eframe = { version = "0.23", default-features = false }
 # Docking tabs
-egui_dock = { version = "0.6" }
+egui_dock = { version = "0.8" }
+egui_ui_refresh = { version = "0.1", path = "../../../egui_ui_refresh" }
 # Core library
 hlbc = { version = "0.7", path = "../hlbc", default-features = false }
 # Decompiler
 hlbc-decompiler = { version = "0.7", path = "../decompiler", default-features = false }
 hlbc-indexing = { version = "0.7", path = "../indexing", optional = true }
 # Open file dialogs
-rfd = { version = "0.11", features = ["file-handle-inner"] }
+rfd = { version = "0.12", features = ["file-handle-inner"] }
 webbrowser = "0.8"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-poll-promise = { version = "0.2" }
+poll-promise = { version = "0.3" }
 syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes", "regex-onig"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1"
-poll-promise = { version = "0.2", features = ["web"] }
+poll-promise = { version = "0.3", features = ["web"] }
 syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes", "regex-fancy"] }
 wasm-bindgen-futures = "0.4"
 

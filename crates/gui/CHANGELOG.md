@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/Gui-Yom/hlbc/compare/gui-v0.2.1...HEAD)
 
+### Added
+
+- Full text search with `hlbc-indexing`.
+- Status bar
+
+### Changed
+
+- Better gui styling
+
 ## [0.2.1](https://github.com/Gui-Yom/hlbc/compare/gui-v0.2.0...gui-v0.2.1) - 2023-05-13
 
 ### Added

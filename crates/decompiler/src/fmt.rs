@@ -48,7 +48,7 @@ fn to_haxe_type<'a>(ty: &Type, ctx: &'a Bytecode) -> impl Display + 'a {
         Bytes => Str::from_static("hl.Bytes"),
         Dyn => Str::from_static("Dynamic"),
         Fun(_) => Str::from_static("Function"),
-        Obj(obj) => ctx.resolve(obj.name),
+        Obj(obj) => ctx.get(obj.name),
         _ => Str::from_static("other"),
     }
 }

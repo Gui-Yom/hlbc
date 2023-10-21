@@ -1,3 +1,4 @@
+use anyhow::Context;
 use std::fs;
 use std::io::{stdin, BufReader, BufWriter, Write};
 use std::iter::repeat;
@@ -125,7 +126,7 @@ fn main() -> anyhow::Result<()> {
 
         let (tx, rx) = mpsc::channel();
 
-        let mut debouncer = new_debouncer(Duration::from_millis(200), None, tx)?;
+        let mut debouncer = new_debouncer(Duration::from_millis(200), tx)?;
 
         debouncer
             .watcher()
@@ -209,6 +210,16 @@ fn process_command(
         };
     }
 
+    fn require_debug_info(code: &Bytecode) -> anyhow::Result<&[Str]> {
+        if let Some(debug_files) = &code.debug_files {
+            Some(&debug_files[..])
+        } else {
+            println!("No debug info in this binary");
+            None
+        }
+        .context("No debug info")
+    }
+
     match cmd {
         Command::Exit => unreachable!(),
         Command::Help => {
@@ -248,7 +259,7 @@ This is the same range notation as Rust and is supported with most commands."#
         }
         Command::Explain(s) => {
             if let Some(o) = Opcode::from_name(&s) {
-                print!("{} :\n{}", o.name(), o.description());
+                println!("{} :\n{}", o.name(), o.description());
                 println!("Example : {}", o.display(code, &code.functions[0], 0, 0));
             } else {
                 println!("No opcode named '{s}' exists.");
@@ -299,14 +310,14 @@ This is the same range notation as Rust and is supported with most commands."#
             }
         }
         Command::Debugfile(range) => {
-            let debug_files = require_debug_info!();
+            let debug_files = require_debug_info(code)?;
             for i in range {
                 print_i!(i);
                 println!("{}", debug_files[i]);
             }
         }
         Command::SearchDebugfile(str) => {
-            let debug_files = require_debug_info!();
+            let debug_files = require_debug_info(code)?;
             for (i, s) in debug_files.iter().enumerate() {
                 if s.contains(&*str) {
                     print_i!(i);
@@ -341,7 +352,7 @@ This is the same range notation as Rust and is supported with most commands."#
                                 println!(
                                     "  {}: {} ({})",
                                     p.name.display::<EnhancedFmt>(code),
-                                    code.resolve(p.findex).display_header::<EnhancedFmt>(code),
+                                    code.get(p.findex).display_header::<EnhancedFmt>(code),
                                     p.pindex
                                 );
                             }
@@ -397,7 +408,7 @@ This is the same range notation as Rust and is supported with most commands."#
         Command::FunctionHeader(range) => {
             for findex in range {
                 print_i!(findex);
-                match code.resolve(RefFun(findex)) {
+                match code.get(RefFun(findex)) {
                     FunPtr::Fun(f) => println!("{}", f.display_header::<EnhancedFmt>(code)),
                     FunPtr::Native(n) => println!("{}", n.display::<EnhancedFmt>(code)),
                 }
@@ -406,7 +417,7 @@ This is the same range notation as Rust and is supported with most commands."#
         Command::Function(range) => {
             for findex in range {
                 print_i!(findex);
-                match code.resolve(RefFun(findex)) {
+                match code.get(RefFun(findex)) {
                     FunPtr::Fun(f) => println!("{}", f.display::<EnhancedFmt>(code)),
                     FunPtr::Native(n) => println!("{}", n.display::<EnhancedFmt>(code)),
                 }
@@ -428,7 +439,7 @@ This is the same range notation as Rust and is supported with most commands."#
             }
         }
         Command::InFile(foi) => {
-            let debug_files = require_debug_info!();
+            let debug_files = require_debug_info(code)?;
             match foi {
                 FileOrIndex::File(str) => {
                     if let Some(idx) =
@@ -468,8 +479,8 @@ This is the same range notation as Rust and is supported with most commands."#
             }
         }
         Command::FileOf(idx) => {
-            let debug_files = require_debug_info!();
-            match code.resolve(RefFun(idx)) {
+            let debug_files = require_debug_info(code)?;
+            match code.get(RefFun(idx)) {
                 FunPtr::Fun(f) => {
                     let idx = f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0;
                     println!(

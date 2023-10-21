@@ -32,7 +32,7 @@ hlbc = { version = "0.7", path = "../hlbc", default-features = false }
 hlbc-decompiler = { version = "0.7", path = "../decompiler" }
 # File system watching
 notify = { version = "6", optional = true, default-features = false, features = ["macos_fsevent"] }
-notify-debouncer-mini = { version = "0.3", optional = true, default-features = false }
+notify-debouncer-mini = { version = "0.4", optional = true, default-features = false }
 # cli colors
 termcolor = "1"
 # Temporary directory for compilation

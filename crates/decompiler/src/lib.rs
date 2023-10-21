@@ -58,7 +58,7 @@ impl<'c> DecompilerState<'c> {
 
         let mut start = 0;
         // First argument / First register is 'this'
-        if f.is_method() || code.resolve(f.name) == "__constructor__" {
+        if f.is_method() || code.get(f.name) == "__constructor__" {
             reg_state.insert(Reg(0), cst_this());
             start = 1;
         }

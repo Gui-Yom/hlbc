@@ -102,10 +102,13 @@ fn inspector_link(ui: &mut Ui, ctx: AppCtxHandle, item: ItemSelection) {
 
 fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
     let code = ctx.code();
-    match code.resolve(fun) {
+    match code.get(fun) {
         FunPtr::Fun(f) => {
             ui.heading(format!("Function : {}@{}", f.name(code), f.findex.0));
-            if let Some(parent) = f.parent {
+
+            if fun == code.entrypoint {
+                ui.label("Compiler generated entrypoint function");
+            } else if let Some(parent) = f.parent {
                 ui.horizontal(|ui| {
                     ui.label("static/instance method of");
                     inspector_link(ui, ctx.clone(), ItemSelection::Class(parent));
@@ -113,6 +116,7 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
             } else {
                 ui.label("Probably a closure.");
             }
+
             ui.separator();
             ui.collapsing("Registers", |ui| {
                 Grid::new("inspector::function::registers")

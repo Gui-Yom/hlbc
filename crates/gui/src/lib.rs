@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use eframe::egui;
 use eframe::egui::{CentralPanel, Frame, Margin, ScrollArea, TopBottomPanel, Ui, Vec2};
-use egui_dock::{DockArea, NodeIndex, Tree};
+use egui_dock::{DockArea, DockState, Node, NodeIndex, Split, SurfaceIndex};
 use poll_promise::Promise;
 
 use hlbc::fmt::EnhancedFmt;
@@ -25,7 +25,7 @@ pub struct App {
     /// Some when a file is loaded
     ctx: Option<AppCtxHandle>,
     // Dock
-    tree: Tree<Box<dyn AppView>>,
+    dock_state: DockState<Box<dyn AppView>>,
     style: egui_dock::Style,
     options_window_open: bool,
     about_window_open: bool,
@@ -40,7 +40,7 @@ impl App {
         Self {
             loader,
             ctx: None,
-            tree: Tree::new(Vec::new()),
+            dock_state: DockState::new(Vec::new()),
             style,
             options_window_open: false,
             about_window_open: false,
@@ -56,7 +56,7 @@ impl eframe::App for App {
                 match loader.try_take() {
                     Ok(Ok(Some((file, code)))) => {
                         self.ctx = Some(AppCtxHandle::new(AppCtx::new_from_code(file, code)));
-                        self.tree = default_tabs();
+                        self.dock_state = default_tabs();
                         self.status = String::from("Loaded bytecode successfully");
                     }
                     Ok(Ok(None)) => {
@@ -73,7 +73,7 @@ impl eframe::App for App {
             }
 
             if let Some(tab) = self.ctx.as_ref().and_then(|app| app.take_tab_to_open()) {
-                self.tree[NodeIndex::root().right()].append_tab(tab);
+                self.dock_state.main_surface_mut()[NodeIndex::root().right()].append_tab(tab);
             }
         }
 
@@ -117,22 +117,22 @@ impl eframe::App for App {
                         }
                         if ui.button("Close").clicked() {
                             self.ctx = None;
-                            self.tree = Tree::new(vec![]);
+                            self.dock_state = DockState::new(Vec::new())
                         }
                     });
                     if let Some(ctx) = &self.ctx {
                         ui.menu_button("Views", |ui| {
                             if ui.button("Functions").clicked() {
-                                self.tree[NodeIndex::root().right()]
+                                self.dock_state.main_surface_mut()[NodeIndex::root().right()]
                                     .append_tab(Box::<FunctionsView>::default());
                             }
                             if ui.button("Info").clicked() {
-                                self.tree[NodeIndex::root().right()]
+                                self.dock_state.main_surface_mut()[NodeIndex::root().right()]
                                     .append_tab(Box::<InfoView>::default());
                             }
                             #[cfg(feature = "search")]
                             if ui.button("Search").clicked() {
-                                self.tree[NodeIndex::root().right()]
+                                self.dock_state.main_surface_mut()[NodeIndex::root().right()]
                                     .append_tab(Box::new(views::SearchView::new(ctx.code())));
                             }
                         });
@@ -192,8 +192,7 @@ impl eframe::App for App {
             });
 
         if let Some(appctx) = self.ctx.clone() {
-            DockArea::new(&mut self.tree)
-                .scroll_area_in_tabs(false)
+            DockArea::new(&mut self.dock_state)
                 .style(self.style.clone())
                 .show(ctx, &mut DynamicTabViewer(appctx));
         } else {
@@ -208,33 +207,36 @@ impl eframe::App for App {
     }
 }
 
-fn default_tabs() -> Tree<Box<dyn AppView>> {
-    let mut tree: Tree<Box<dyn AppView>> = Tree::new(vec![
-        Box::<SyncInspectorView>::default(),
+fn default_tabs() -> DockState<Box<dyn AppView>> {
+    let mut dock_state: DockState<Box<dyn AppView>> = DockState::new(vec![
         Box::<InfoView>::default(),
+        Box::<SyncInspectorView>::default(),
     ]);
 
-    tree.split_left(
-        NodeIndex::root(),
+    dock_state.split(
+        (SurfaceIndex::main(), NodeIndex::root()),
+        Split::Left,
         0.2,
-        vec![
+        Node::leaf_with(vec![
             Box::<FunctionsView>::default(),
             Box::<ClassesView>::default(),
-        ],
-    );
-    tree.split_below(
-        NodeIndex::root().left(),
-        0.5,
-        vec![Box::<StringsView>::default(), Box::<GlobalsView>::default()],
+        ]),
     );
 
-    tree
+    dock_state.split(
+        (SurfaceIndex::main(), NodeIndex::root().left()),
+        Split::Below,
+        0.5,
+        Node::leaf_with(vec![
+            Box::<StringsView>::default(),
+            Box::<GlobalsView>::default(),
+        ]),
+    );
+
+    dock_state
 }
 
 /// Cheaply cloneable, for single threaded usage.
-///
-/// Usage warning ! The methods 'lock' the inner RefCell immutably and mutably (RW lock).
-/// Be careful of guards (Ref<> and RefMut<>) lifetimes.
 #[derive(Clone)]
 struct AppCtxHandle(Rc<AppCtx>);
 
@@ -251,7 +253,6 @@ impl AppCtxHandle {
         &self.0.code
     }
 
-    /// mut lock
     fn open_tab(&self, tab: impl AppView + 'static) {
         self.0.new_tab.set(Some(Box::new(tab)));
     }
