@@ -315,8 +315,8 @@ pub(crate) fn write_var(w: &mut impl Write, value: i32) -> Result<()> {
             });
         } else {
             w.write_u8(((value >> 24) | 0xE0) as u8)?;
-            w.write_u8(((value >> 16) | 0xFF) as u8)?;
-            w.write_u8(((value >> 8) | 0xFF) as u8)?;
+            w.write_u8(((value >> 16) & 0xFF) as u8)?;
+            w.write_u8(((value >> 8) & 0xFF) as u8)?;
             w.write_u8((value & 0xFF) as u8)?;
         }
     } else if value < 0x80 {
@@ -331,8 +331,8 @@ pub(crate) fn write_var(w: &mut impl Write, value: i32) -> Result<()> {
         });
     } else {
         w.write_u8(((value >> 24) | 0xC0) as u8)?;
-        w.write_u8(((value >> 16) | 0xFF) as u8)?;
-        w.write_u8(((value >> 8) | 0xFF) as u8)?;
+        w.write_u8(((value >> 16) & 0xFF) as u8)?;
+        w.write_u8(((value >> 8) & 0xFF) as u8)?;
         w.write_u8((value & 0xFF) as u8)?;
     }
     Ok(())
