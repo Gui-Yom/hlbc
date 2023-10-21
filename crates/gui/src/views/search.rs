@@ -50,7 +50,7 @@ impl SearchView {
 }
 
 impl AppView for SearchView {
-    fn title(&self) -> WidgetText {
+    fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("Search").color(Color32::WHITE).into()
     }
 

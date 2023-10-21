@@ -23,8 +23,8 @@
 ## About
 
 [Hashlink](https://hashlink.haxe.org/) is a VM used as a compilation target for the Haxe language. Hashlink is
-successfully used to run popular games from developer [**Shiro Games**](https://shirogames.com/) like **Northgard**, *
-*Dune: Spice Wars** and **Wartales**.
+successfully used to run popular games from developer [**Shiro Games**](https://shirogames.com/) like **Northgard**, **Dune: Spice Wars**
+and **Wartales**.
 
 *hlbc* intends to help the motivated to develop mods and tools for those games.
 

@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use eframe::egui::{
-    Color32, Grid, Link, RichText, ScrollArea, TextEdit, TextStyle, Ui, WidgetText,
+    Color32, Grid, Key, Link, RichText, ScrollArea, TextEdit, TextStyle, Ui, WidgetText,
 };
 
 use hlbc::fmt::EnhancedFmt;
@@ -11,30 +11,34 @@ use hlbc::{Bytecode, Resolve};
 use crate::{AppCtxHandle, AppView, ItemSelection};
 
 /// View detailed information about a bytecode element.
-pub(crate) struct SyncInspectorView {
-    name: RichText,
-}
+pub(crate) struct SyncInspectorView;
 
 impl Default for SyncInspectorView {
     fn default() -> Self {
-        Self {
-            name: RichText::new("Inspector (sync)").color(Color32::WHITE),
-        }
+        Self
     }
 }
 
 impl AppView for SyncInspectorView {
-    fn title(&self) -> WidgetText {
-        self.name.clone().into()
-    }
-
-    fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
+    fn title(&self, ctx: AppCtxHandle) -> WidgetText {
         let selected = ctx.selected();
-        self.name = RichText::new(format!(
+        RichText::new(format!(
             "Inspector (sync) : {}",
             selected.name(ctx.code().deref())
         ))
-        .color(Color32::WHITE);
+        .color(Color32::WHITE)
+        .into()
+    }
+
+    fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
+        // Only triggers when in view
+        if ui.input(|i| i.key_pressed(Key::ArrowLeft) && i.modifiers.alt) {
+            ctx.navigate_back();
+        } else if ui.input(|i| i.key_pressed(Key::ArrowRight) && i.modifiers.alt) {
+            ctx.navigate_forward();
+        }
+
+        let selected = ctx.selected();
         inspector_ui(ui, ctx, selected)
     }
 
@@ -58,7 +62,7 @@ impl InspectorView {
 }
 
 impl AppView for InspectorView {
-    fn title(&self) -> WidgetText {
+    fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         self.name.clone().into()
     }
 
@@ -69,7 +73,7 @@ impl AppView for InspectorView {
 
 fn inspector_ui(ui: &mut Ui, ctx: AppCtxHandle, item: ItemSelection) {
     ScrollArea::vertical()
-        .id_source("functions_scroll_area")
+        .id_source("inspector_scroll_area")
         .auto_shrink([false, false])
         .show(ui, |ui| match item {
             ItemSelection::Fun(fun) => {
@@ -127,9 +131,9 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
                     .striped(true)
                     .num_columns(2)
                     .show(ui, |ui| {
-                        for (i, reg) in f.regs.iter().enumerate() {
+                        for (i, regty) in f.regs.iter().enumerate() {
                             ui.label(format!("reg{i}"));
-                            ui.label(reg.display::<EnhancedFmt>(code).to_string());
+                            inspector_link(ui, ctx.clone(), ItemSelection::Class(*regty));
                             ui.end_row();
                         }
                     });
@@ -151,8 +155,10 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
                             .skip(range.start)
                             .take(range.end - range.start)
                         {
-                            // TODO syntax highlighting here
-                            ui.monospace(format!("{i:>3}: {}", o.display(code, f, i as i32, 11)));
+                            // TODO syntax highlighting
+                            // TODO linking (requires bytecode visitor)
+                            ui.monospace(format!("{i:>3}: {}", o.display(code, f, i as i32, 11)))
+                                .on_hover_text(o.description());
                         }
                     },
                 );
@@ -256,7 +262,7 @@ fn global_inspector(ui: &mut Ui, ctx: AppCtxHandle, g: RefGlobal) {
 }
 
 fn string_inspector(ui: &mut Ui, ctx: AppCtxHandle, s: RefString) {
-    ui.heading(format!("String@{}", s.0));
+    ui.heading(format!("string@{}", s.0));
     ui.separator();
     ui.add_space(4.0);
     TextEdit::multiline(&mut &*ctx.code()[s].to_string())

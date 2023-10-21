@@ -9,7 +9,7 @@ use crate::{AppCtxHandle, AppView, ItemSelection};
 pub(crate) struct GlobalsView;
 
 impl AppView for GlobalsView {
-    fn title(&self) -> WidgetText {
+    fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("Globals").color(Color32::WHITE).into()
     }
 

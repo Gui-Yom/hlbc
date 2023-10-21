@@ -9,7 +9,7 @@ use crate::AppCtxHandle;
 pub(crate) struct InfoView;
 
 impl AppView for InfoView {
-    fn title(&self) -> WidgetText {
+    fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("🛈 Info").color(Color32::WHITE).into()
     }
 

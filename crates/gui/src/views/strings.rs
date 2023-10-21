@@ -9,7 +9,7 @@ use crate::{AppCtxHandle, AppView, ItemSelection};
 pub(crate) struct StringsView;
 
 impl AppView for StringsView {
-    fn title(&self) -> WidgetText {
+    fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("Strings").color(Color32::WHITE).into()
     }
 

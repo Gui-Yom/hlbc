@@ -34,7 +34,7 @@ impl TabViewer for DynamicTabViewer {
     type Tab = Box<dyn AppView>;
 
     fn title(&mut self, tab: &mut Self::Tab) -> WidgetText {
-        tab.title()
+        tab.title(self.0.clone())
     }
 
     fn ui(&mut self, ui: &mut Ui, tab: &mut Self::Tab) {
@@ -52,7 +52,7 @@ impl TabViewer for DynamicTabViewer {
 
 /// The actual trait that needs to be implemented by a view
 pub(crate) trait AppView {
-    fn title(&self) -> WidgetText;
+    fn title(&self, ctx: AppCtxHandle) -> WidgetText;
 
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle);
 

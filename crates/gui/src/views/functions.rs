@@ -17,7 +17,7 @@ pub(crate) struct FunctionsView {
 }
 
 impl AppView for FunctionsView {
-    fn title(&self) -> WidgetText {
+    fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("ƒ Functions").color(Color32::WHITE).into()
     }
 

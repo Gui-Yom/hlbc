@@ -16,7 +16,7 @@ pub(crate) struct ClassesView {
 }
 
 impl AppView for ClassesView {
-    fn title(&self) -> WidgetText {
+    fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("Classes").color(Color32::WHITE).into()
     }
 

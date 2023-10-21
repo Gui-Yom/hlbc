@@ -26,7 +26,7 @@ pub(crate) struct DecompilerView {
 }
 
 impl AppView for DecompilerView {
-    fn title(&self) -> WidgetText {
+    fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("Decompilation output")
             .color(Color32::WHITE)
             .into()

@@ -1,4 +1,5 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::collections::VecDeque;
 use std::fs;
 use std::io::BufReader;
 use std::rc::Rc;
@@ -262,18 +263,31 @@ impl AppCtxHandle {
     }
 
     fn selected(&self) -> ItemSelection {
-        self.0.selected.get()
+        self.0.selected()
     }
 
     fn set_selected(&self, s: ItemSelection) {
-        self.0.selected.set(s);
+        self.0.navigate_to(s)
+    }
+
+    fn navigate_back(&self) {
+        self.0.navigate_back();
+    }
+
+    fn navigate_forward(&self) {
+        self.0.navigate_forward();
     }
 }
+
+const NAVIGATION_HISTORY_MAX: usize = 64;
 
 struct AppCtx {
     file: String,
     code: Bytecode,
-    selected: Cell<ItemSelection>,
+    /// Selection index in the navigation history buffer
+    selection: Cell<usize>,
+    /// Ring buffer of navigation history
+    navigation_history: RefCell<VecDeque<ItemSelection>>,
     /// To open a tab from another tab.
     /// This can't be done directly because this would need a mutable reference to a tree and the tree owns the tab.
     new_tab: Cell<Option<Box<dyn AppView>>>,
@@ -284,9 +298,55 @@ impl AppCtx {
         Self {
             file,
             code,
-            selected: Cell::new(ItemSelection::None),
+            selection: Cell::new(0),
             new_tab: Cell::new(None),
+            navigation_history: RefCell::new(VecDeque::with_capacity(NAVIGATION_HISTORY_MAX)),
         }
+    }
+
+    /// Navigate to a new selection
+    fn navigate_to(&self, item: ItemSelection) {
+        if matches!(item, ItemSelection::None) {
+            panic!("Cannot navigate to ItemSelection::None");
+        }
+        let mut nav_history = self.navigation_history.borrow_mut();
+        let len = nav_history.len();
+
+        // Remove future elements
+        if len > 0 && self.selection.get() < len - 1 {
+            nav_history.drain((self.selection.get() + 1)..len);
+        }
+
+        // Do not grow past the limit
+        if nav_history.len() == nav_history.capacity() {
+            nav_history.pop_front();
+        }
+
+        nav_history.push_back(item);
+        self.selection.set(nav_history.len() - 1)
+    }
+
+    /// Navigate back in selection history
+    fn navigate_back(&self) {
+        if self.selection.get() > 0 {
+            self.selection.set(self.selection.get() - 1);
+        }
+    }
+
+    /// Navigate forward in selection history
+    fn navigate_forward(&self) {
+        if self.selection.get() < self.navigation_history.borrow().len() - 1 {
+            self.selection.set(self.selection.get() + 1);
+        }
+    }
+
+    /// Return the currently selected element
+    fn selected(&self) -> ItemSelection {
+        self.navigation_history
+            .borrow()
+            .get(self.selection.get())
+            .copied()
+            .unwrap_or(ItemSelection::None)
     }
 }
 

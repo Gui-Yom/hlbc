@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Full text search with `hlbc-indexing`.
 - Status bar
+- View any type in the inspector
+- Clickable register types in inspector
+- Opcode description on hover in inspector
+- Navigation history for the sync inspector
 
 ### Changed
 
