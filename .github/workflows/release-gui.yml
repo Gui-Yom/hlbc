@@ -11,16 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install rust stable
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          default: true
-          profile: minimal
-
-      - uses: Swatinem/rust-cache@v2
+        uses: dtolnay/rust-toolchain@stable
 
       - run: sudo apt-get install libgtk-3-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
 
@@ -38,16 +32,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install rust stable
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          default: true
-          profile: minimal
-
-      - uses: Swatinem/rust-cache@v2
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Build release
         working-directory: crates/gui

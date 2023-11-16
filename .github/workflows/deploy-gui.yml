@@ -9,37 +9,44 @@ on:
 permissions:
   contents: write
 
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+env:
+  # web_sys_unstable_apis is required to enable the web_sys clipboard API which eframe web uses,
+  # as well as by the wasm32-backend of the wgpu crate.
+  # https://rustwasm.github.io/wasm-bindgen/api/web_sys/struct.Clipboard.html
+  # https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html
+  RUSTFLAGS: --cfg=web_sys_unstable_apis
+
 jobs:
   build:
     name: Build wasm
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install latest rust stable
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          default: true
-          profile: minimal
-          target: wasm32-unknown-unknown
-          override: true
-
-      - uses: Swatinem/rust-cache@v2
+          targets: wasm32-unknown-unknown
 
       - uses: jetli/wasm-bindgen-action@v0.2.0
         with:
           version: 'latest'
 
       - name: Install wasm-opt
-        run: wget -qO- https://github.com/WebAssembly/binaryen/releases/download/version_112/binaryen-version_112-x86_64-linux.tar.gz | tar xvz -C /home/runner/.cargo/bin/ binaryen-version_112/bin/wasm-opt --strip=2
+        run: wget -qO- https://github.com/WebAssembly/binaryen/releases/download/version_116/binaryen-version_116-x86_64-linux.tar.gz | tar xvz -C /home/runner/.cargo/bin/ binaryen-version_116/bin/wasm-opt --strip=2
 
       - name: Build
         working-directory: crates/gui/web
         run: sh build.sh
 
       - name: Upload artifact 🚀
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v2
         with:
           path: crates/gui/web/dist/
 

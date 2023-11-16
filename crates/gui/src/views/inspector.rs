@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use eframe::egui::{
     Color32, Grid, Key, Link, RichText, ScrollArea, TextEdit, TextStyle, Ui, WidgetText,
 };
@@ -22,12 +20,9 @@ impl Default for SyncInspectorView {
 impl AppView for SyncInspectorView {
     fn title(&self, ctx: AppCtxHandle) -> WidgetText {
         let selected = ctx.selected();
-        RichText::new(format!(
-            "Inspector (sync) : {}",
-            selected.name(ctx.code().deref())
-        ))
-        .color(Color32::WHITE)
-        .into()
+        RichText::new(format!("Inspector (sync) : {}", selected.name(ctx.code())))
+            .color(Color32::WHITE)
+            .into()
     }
 
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
@@ -95,14 +90,12 @@ fn inspector_ui(ui: &mut Ui, ctx: AppCtxHandle, item: ItemSelection) {
 }
 
 fn inspector_link(ui: &mut Ui, ctx: AppCtxHandle, item: ItemSelection) {
-    let res = ui
-        .add(Link::new(item.name(ctx.code().deref())))
-        .context_menu(|ui| {
-            if ui.button("Open in inspector").clicked() {
-                ctx.open_tab(InspectorView::new(item, ctx.code().deref()));
-                ui.close_menu();
-            }
-        });
+    let res = ui.add(Link::new(item.name(ctx.code()))).context_menu(|ui| {
+        if ui.button("Open in inspector").clicked() {
+            ctx.open_tab(InspectorView::new(item, ctx.code()));
+            ui.close_menu();
+        }
+    });
     if res.clicked() {
         ctx.set_selected(item);
     }
@@ -247,7 +240,7 @@ fn global_inspector(ui: &mut Ui, ctx: AppCtxHandle, g: RefGlobal) {
     ui.heading(format!("Global@{}", g.0));
     ui.label(format!(
         "Type : {}",
-        ctx.code().globals[g.0].display::<EnhancedFmt>(ctx.code().deref())
+        ctx.code().globals[g.0].display::<EnhancedFmt>(ctx.code())
     ));
 
     if let (Some(&cst), Some(constants)) = (

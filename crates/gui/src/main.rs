@@ -5,9 +5,6 @@ use std::path::PathBuf;
 use std::{env, fs};
 
 use eframe::egui::Vec2;
-use eframe::egui_wgpu::WgpuConfiguration;
-use eframe::wgpu;
-use eframe::wgpu::PowerPreference;
 use poll_promise::Promise;
 
 use hlbc::Bytecode;
@@ -15,6 +12,10 @@ use hlbc_gui::App;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
+    use eframe::egui_wgpu::WgpuConfiguration;
+    use eframe::wgpu;
+    use eframe::wgpu::PowerPreference;
+
     eframe::run_native(
         "hlbc gui",
         eframe::NativeOptions {
@@ -55,29 +56,27 @@ fn main() -> eframe::Result<()> {
 
 #[cfg(target_arch = "wasm32")]
 fn main() {
-    // Make sure panics are logged using `console.error`.
-    console_error_panic_hook::set_once();
-
-    // Redirect tracing to console.log and friends:
-    //tracing_wasm::set_as_global_default();
+    // Redirect `log` message to `console.log` and friends:
+    // eframe::WebLogger::init(log::LevelFilter::Debug).ok();
 
     let web_options = eframe::WebOptions::default();
 
     wasm_bindgen_futures::spawn_local(async {
-        eframe::start_web(
-            "eframe_canvas", // hardcode it
-            web_options,
-            Box::new(|cc| {
-                cc.egui_ctx.set_fonts(egui_ui_refresh::fonts());
-                cc.egui_ctx.set_style(egui_ui_refresh::style());
+        eframe::WebRunner::new()
+            .start(
+                "eframe_canvas", // hardcode it
+                web_options,
+                Box::new(|cc| {
+                    cc.egui_ctx.set_fonts(egui_ui_refresh::fonts());
+                    cc.egui_ctx.set_style(egui_ui_refresh::style());
 
-                // Dock tabs styling
-                let mut style = egui_dock::Style::from_egui(cc.egui_ctx.style().as_ref());
+                    // Dock tabs styling
+                    let mut style = egui_dock::Style::from_egui(cc.egui_ctx.style().as_ref());
 
-                Box::new(App::new(None, style))
-            }),
-        )
-        .await
-        .expect("failed to start eframe");
+                    Box::new(App::new(None, style))
+                }),
+            )
+            .await
+            .expect("failed to start eframe");
     });
 }

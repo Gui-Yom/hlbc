@@ -1,10 +1,10 @@
-use anyhow::Context;
 use std::fs;
 use std::io::{stdin, BufReader, BufWriter, Write};
 use std::iter::repeat;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use anyhow::Context;
 use clap::Parser as ClapParser;
 use temp_dir::TempDir;
 use termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor};
@@ -196,17 +196,6 @@ fn process_command(
             stdout.set_color(ColorSpec::new().set_fg(Some(Color::Ansi256(242))))?;
             write!(stdout, "{:<3}: ", $i)?;
             stdout.reset()?;
-        };
-    }
-
-    macro_rules! require_debug_info {
-        () => {
-            if let Some(debug_files) = &code.debug_files {
-                debug_files
-            } else {
-                println!("No debug info in this binary");
-                return Ok(());
-            }
         };
     }
 

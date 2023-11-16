@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use eframe::egui::{Color32, RichText, Ui, WidgetText};
 
 use hlbc::fmt::EnhancedFmt;
@@ -61,13 +59,10 @@ impl AppView for FunctionsView {
             self.cache.len(),
             |i| self.cache[i],
             ItemSelection::Fun,
-            |ctx, f| {
-                f.display_header::<EnhancedFmt>(ctx.code().deref())
-                    .to_string()
-            },
+            |ctx, f| f.display_header::<EnhancedFmt>(ctx.code()).to_string(),
             Some(|ui: &mut Ui, ctx: &AppCtxHandle, f| {
                 if ui.small_button("Open in inspector").clicked() {
-                    let tab = InspectorView::new(ItemSelection::Fun(f), ctx.code().deref());
+                    let tab = InspectorView::new(ItemSelection::Fun(f), ctx.code());
                     ctx.open_tab(tab);
                 }
                 if ui.small_button("Decompile").clicked() {

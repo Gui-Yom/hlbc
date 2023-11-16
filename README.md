@@ -55,6 +55,10 @@ using the command `wiki` in the CLI.
 - Finishing the decompiler (for loops mainly)
 - C API
 
+## Contact
+
+Questions ? Inquiries ? Help ? Use GitHub discussions, send an email or Discord : limelion.
+
 ## Credits
 
 Development of this project would not have been possible without

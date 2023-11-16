@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use eframe::egui::{Color32, Grid, RichText, ScrollArea, Ui, WidgetText};
 
 use crate::views::AppView;
@@ -26,7 +24,6 @@ impl AppView for InfoView {
                         ui.label(ctx.file());
                         ui.end_row();
                         let code = ctx.code();
-                        let code = code.deref();
                         ui.label("Bytecode version")
                             .on_hover_text("Bytecode file version");
                         ui.label(code.version.to_string());

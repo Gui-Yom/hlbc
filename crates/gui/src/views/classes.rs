@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use eframe::egui::{Color32, RichText, Ui, WidgetText};
 
 use hlbc::fmt::EnhancedFmt;
@@ -23,7 +21,6 @@ impl AppView for ClassesView {
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
         if !self.cache_valid {
             let code = ctx.code();
-            let code = code.deref();
 
             self.cache = Vec::new();
             for (i, t) in code.types.iter().enumerate() {
@@ -55,7 +52,7 @@ impl AppView for ClassesView {
             |ctx, t| t.display::<EnhancedFmt>(ctx.code()).to_string(),
             Some(|ui: &mut Ui, ctx: &AppCtxHandle, t| {
                 if ui.small_button("Open in inspector").clicked() {
-                    let tab = InspectorView::new(ItemSelection::Class(t), ctx.code().deref());
+                    let tab = InspectorView::new(ItemSelection::Class(t), ctx.code());
                     ctx.open_tab(tab);
                 }
                 if ui.small_button("Decompile").clicked() {

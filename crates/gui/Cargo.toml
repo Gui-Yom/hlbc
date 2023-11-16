@@ -3,7 +3,7 @@ name = "hlbc-gui"
 version = "0.3.0"
 authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
 edition = "2021"
-rust-version = "1.65"
+rust-version = "1.70"
 description = "Hashlink bytecode disassembler, analyzer and decompiler gui"
 repository = "https://github.com/Gui-Yom/hlbc"
 license = "MIT"
@@ -39,7 +39,7 @@ syntect = { version = "5", default-features = false, features = ["parsing", "yam
 wasm-bindgen-futures = "0.4"
 
 [features]
-default = ["callgraph", "search", "wgpu"]
+default = ["search", "wgpu"]
 callgraph = ["hlbc/graph"]
 search = ["hlbc-indexing"]
 wgpu = ["eframe/wgpu"]

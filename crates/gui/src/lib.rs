@@ -86,17 +86,17 @@ impl eframe::App for App {
                         if ui.button("Open").clicked() {
                             #[cfg(target_arch = "wasm32")]
                             {
-                                self.loader = Some(Promise::spawn_async(async {
+                                self.loader = Some(Promise::spawn_local(async {
                                     if let Some(file) =
                                         rfd::AsyncFileDialog::new().pick_file().await
                                     {
-                                        Some((
+                                        Ok(Some((
                                             file.file_name(),
                                             Bytecode::deserialize(&mut &file.read().await[..])
                                                 .unwrap(),
-                                        ))
+                                        )))
                                     } else {
-                                        None
+                                        Ok(None)
                                     }
                                 }));
                             }
@@ -187,9 +187,23 @@ impl eframe::App for App {
 
         egui::Window::new("About")
             .open(&mut self.about_window_open)
+            .resizable(false)
+            .collapsible(false)
+            .fixed_size((300., 200.))
             .show(ctx, |ui| {
-                ui.heading("Hashlink bytecode tools");
-                // TODO about page
+                ui.vertical_centered(|ui| {
+                    ui.heading("Hashlink bytecode tools");
+                    ui.hyperlink("https://github.com/Gui-Yom/hlbc");
+                    ui.horizontal(|ui| {
+                        ui.label("Made by");
+                        ui.hyperlink_to("Gui-Yom", "https://github.com/Gui-Yom");
+                        ui.label("and");
+                        ui.hyperlink_to(
+                            "contributors",
+                            "https://github.com/Gui-Yom/hlbc/graphs/contributors",
+                        );
+                    });
+                });
             });
 
         if let Some(appctx) = self.ctx.clone() {

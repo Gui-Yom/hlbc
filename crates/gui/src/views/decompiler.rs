@@ -1,18 +1,16 @@
-use std::ops::Deref;
-
 use eframe::egui::text::{LayoutJob, LayoutSection};
 use eframe::egui::util::cache::{ComputerMut, FrameCache};
 use eframe::egui::{
     Color32, FontId, RichText, ScrollArea, Stroke, TextEdit, TextFormat, Ui, WidgetText,
 };
-use hlbc::fmt::EnhancedFmt;
-use hlbc::Resolve;
 use syntect::easy::HighlightLines;
 use syntect::highlighting::{FontStyle, ThemeSet};
 use syntect::parsing::{SyntaxDefinition, SyntaxSet, SyntaxSetBuilder};
 use syntect::util::LinesWithEndings;
 
+use hlbc::fmt::EnhancedFmt;
 use hlbc::types::FunPtr;
+use hlbc::Resolve;
 use hlbc_decompiler::fmt::FormatOptions;
 use hlbc_decompiler::{decompile_class, decompile_function};
 
@@ -35,7 +33,6 @@ impl AppView for DecompilerView {
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
         if ctx.selected() != self.cache_selected {
             let code = ctx.code();
-            let code = code.deref();
 
             self.output = match ctx.selected() {
                 ItemSelection::Fun(fun) => match code.get(fun) {
