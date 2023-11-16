@@ -843,6 +843,8 @@ dependencies = [
 [[package]]
 name = "egui_ui_refresh"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94d5848c4a2b70fd527d572fa4655a5e62b7a3231889d0dc9ef529991fc8c01c"
 dependencies = [
  "egui",
 ]

@@ -18,7 +18,7 @@ include = ["src/**/*", "README.md", "CHANGELOG.md", "assets/Haxe.sublime-syntax"
 eframe = { version = "0.23", default-features = false }
 # Docking tabs
 egui_dock = { version = "0.8" }
-egui_ui_refresh = { version = "0.1", path = "../../../egui_ui_refresh" }
+egui_ui_refresh = { version = "0.1" } #, path = "../../../egui_ui_refresh" }
 # Core library
 hlbc = { version = "0.7", path = "../hlbc", default-features = false }
 # Decompiler
