@@ -14,6 +14,7 @@ use hlbc::Resolve;
 use hlbc_decompiler::fmt::FormatOptions;
 use hlbc_decompiler::{decompile_class, decompile_function};
 
+use crate::views::{make_id_method, unique_id};
 use crate::{AppCtxHandle, AppView, ItemSelection};
 
 #[derive(Default)]
@@ -23,7 +24,11 @@ pub(crate) struct DecompilerView {
     cache_selected: ItemSelection,
 }
 
+unique_id!(DecompilerView, "decompiler");
+
 impl AppView for DecompilerView {
+    make_id_method!(unique);
+
     fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("Decompilation output")
             .color(Color32::WHITE)

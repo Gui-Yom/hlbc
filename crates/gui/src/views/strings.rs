@@ -2,13 +2,17 @@ use eframe::egui::{Color32, RichText, Ui, WidgetText};
 
 use hlbc::types::RefString;
 
-use crate::views::list_view;
+use crate::views::{list_view, make_id_method, unique_id};
 use crate::{AppCtxHandle, AppView, ItemSelection};
 
 #[derive(Default)]
 pub(crate) struct StringsView;
 
+unique_id!(StringsView, "strings");
+
 impl AppView for StringsView {
+    make_id_method!(unique);
+
     fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("Strings").color(Color32::WHITE).into()
     }

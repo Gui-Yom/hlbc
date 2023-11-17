@@ -3,7 +3,7 @@ use eframe::egui::{Color32, RichText, Ui, WidgetText};
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{RefType, Type};
 
-use crate::views::{list_view, DecompilerView, InspectorView};
+use crate::views::{list_view, make_id_method, unique_id, DecompilerView, InspectorView};
 use crate::{AppCtxHandle, AppView, ItemSelection};
 
 #[derive(Default)]
@@ -13,7 +13,11 @@ pub(crate) struct ClassesView {
     cache_valid: bool,
 }
 
+unique_id!(ClassesView, "classes");
+
 impl AppView for ClassesView {
+    make_id_method!(unique);
+
     fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("Classes").color(Color32::WHITE).into()
     }

@@ -6,10 +6,13 @@ use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{FunPtr, RefField, RefFun, RefGlobal, RefString, RefType};
 use hlbc::{Bytecode, Resolve};
 
+use crate::views::{make_id_method, not_unique, unique_id, ViewId};
 use crate::{AppCtxHandle, AppView, ItemSelection};
 
 /// View detailed information about a bytecode element.
 pub(crate) struct SyncInspectorView;
+
+unique_id!(SyncInspectorView, "syncinspector");
 
 impl Default for SyncInspectorView {
     fn default() -> Self {
@@ -18,6 +21,8 @@ impl Default for SyncInspectorView {
 }
 
 impl AppView for SyncInspectorView {
+    make_id_method!(unique);
+
     fn title(&self, ctx: AppCtxHandle) -> WidgetText {
         let selected = ctx.selected();
         RichText::new(format!("Inspector (sync) : {}", selected.name(ctx.code())))
@@ -43,13 +48,17 @@ impl AppView for SyncInspectorView {
 }
 
 pub(crate) struct InspectorView {
+    id: ViewId,
     item: ItemSelection,
     name: RichText,
 }
 
+not_unique!(InspectorView);
+
 impl InspectorView {
     pub(crate) fn new(item: ItemSelection, code: &Bytecode) -> Self {
         Self {
+            id: ViewId::default(),
             item,
             name: RichText::new(item.name(code)).color(Color32::WHITE),
         }
@@ -57,6 +66,8 @@ impl InspectorView {
 }
 
 impl AppView for InspectorView {
+    make_id_method!();
+
     fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         self.name.clone().into()
     }

@@ -5,14 +5,17 @@ use hlbc::types::RefFun;
 use hlbc::Bytecode;
 use hlbc_indexing::{ClangdSearcher, Contains, Searcher, SkimSearcher};
 
-use crate::views::{singleline_simple, AppView};
+use crate::views::{make_id_method, not_unique, singleline_simple, AppView, ViewId};
 use crate::AppCtxHandle;
 
 pub(crate) struct SearchView {
+    id: ViewId,
     searcher: (SearchMethod, Box<dyn Searcher>),
     query_text: String,
     matches: Vec<RefFun>,
 }
+
+not_unique!(SearchView);
 
 #[derive(PartialEq, Copy, Clone)]
 enum SearchMethod {
@@ -42,6 +45,7 @@ impl SearchMethod {
 impl SearchView {
     pub fn new(code: &Bytecode) -> Self {
         Self {
+            id: ViewId::default(),
             searcher: (SearchMethod::Contains, SearchMethod::Contains.searcher()),
             query_text: String::new(),
             matches: Vec::new(),
@@ -50,6 +54,8 @@ impl SearchView {
 }
 
 impl AppView for SearchView {
+    make_id_method!();
+
     fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("Search").color(Color32::WHITE).into()
     }

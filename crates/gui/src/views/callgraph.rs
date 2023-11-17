@@ -7,10 +7,11 @@ use eframe::epaint::CubicBezierShape;
 
 use hlbc::analysis::graph::petgraph::visit::EdgeRef;
 use hlbc::analysis::graph::petgraph::visit::IntoEdgeReferences;
-use hlbc::analysis::graph::{call_graph, Callgraph};
+use hlbc::analysis::graph::Callgraph;
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::RefFun;
 
+use crate::views::unique_id;
 use crate::AppCtxHandle;
 
 #[derive(Default)]
@@ -26,7 +27,11 @@ pub struct CallgraphView {
     pan: Vec2,
 }
 
+unique_id!(CallgraphView);
+
 impl CallgraphView {
+    make_id_method!(unique);
+
     fn title(&self) -> &str {
         "Callgraph"
     }
