@@ -39,7 +39,7 @@ syntect = { version = "5", default-features = false, features = ["parsing", "yam
 wasm-bindgen-futures = "0.4"
 
 [features]
-default = ["search", "wgpu"]
+default = ["search", "glow"]
 callgraph = ["hlbc/graph"]
 search = ["hlbc-indexing"]
 wgpu = ["eframe/wgpu"]

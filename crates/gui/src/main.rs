@@ -12,20 +12,16 @@ use hlbc_gui::App;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
-    use eframe::egui_wgpu::WgpuConfiguration;
-    use eframe::wgpu;
-    use eframe::wgpu::PowerPreference;
-
     eframe::run_native(
         "hlbc gui",
         eframe::NativeOptions {
             vsync: true,
             initial_window_size: Some(Vec2::new(1280.0, 720.0)),
             #[cfg(feature = "wgpu")]
-            wgpu_options: WgpuConfiguration {
-                power_preference: wgpu::util::power_preference_from_env()
-                    .unwrap_or(PowerPreference::LowPower),
-                ..WgpuConfiguration::default()
+            wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
+                power_preference: eframe::wgpu::util::power_preference_from_env()
+                    .unwrap_or(eframe::wgpu::PowerPreference::LowPower),
+                ..eframe::egui_wgpu::WgpuConfiguration::default()
             },
             ..Default::default()
         },
