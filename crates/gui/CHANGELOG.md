@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased](https://github.com/Gui-Yom/hlbc/compare/gui-v0.3.0...HEAD)
 
+### Added
+
+- Load bundled examples for a quick evaluation of the tool
+
 ### Changed
 
 - Use glow instead of wgpu by default on desktop (halves the binary size)

@@ -1,0 +1,7 @@
+set windows-shell := ["cmd", "/c"]
+
+build-examples:
+    just build Basic
+
+build file:
+    haxe -hl {{file}}.hl -main {{file}}.hx

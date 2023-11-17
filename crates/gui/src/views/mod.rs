@@ -11,10 +11,13 @@ pub(crate) use classes::*;
 pub(crate) use decompiler::*;
 pub(crate) use functions::*;
 pub(crate) use globals::*;
+pub(crate) use haxe_source_view::*;
 pub(crate) use info::*;
 pub(crate) use inspector::*;
 #[cfg(feature = "search")]
 pub(crate) use search::*;
+#[cfg(feature = "examples")]
+pub(crate) use source::*;
 pub(crate) use strings::*;
 
 use crate::{AppCtxHandle, ItemSelection};
@@ -25,10 +28,13 @@ mod classes;
 mod decompiler;
 mod functions;
 mod globals;
+mod haxe_source_view;
 mod info;
 mod inspector;
 #[cfg(feature = "search")]
 mod search;
+#[cfg(feature = "examples")]
+mod source;
 mod strings;
 
 /// Tab viewer with dynamic dispatch because I don't care

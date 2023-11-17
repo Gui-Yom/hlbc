@@ -19,6 +19,8 @@ use crate::views::{
     StringsView, SyncInspectorView, UniqueAppView,
 };
 
+#[cfg(feature = "examples")]
+mod examples;
 mod views;
 
 pub struct App {
@@ -144,6 +146,27 @@ impl App {
         }
     }
 
+    #[cfg(feature = "examples")]
+    fn load_examples_button(&mut self, ui: &mut Ui) {
+        ui.menu_button("Load example", |ui| {
+            for example in examples::EXAMPLES {
+                if ui.button(example.name).clicked() {
+                    let mut cursor = std::io::Cursor::new(example.data);
+                    let code = Bytecode::deserialize(&mut cursor).unwrap();
+                    self.ctx = Some(AppCtxHandle::new(AppCtx::new_from_code(
+                        example.name.to_owned(),
+                        code,
+                    )));
+                    self.dock_state = default_tabs();
+                    self.dock_state.main_surface_mut()[NodeIndex::root().right()].append_tab(
+                        Box::new(views::SourceView::new(example.name, example.source)),
+                    );
+                    self.status = Cow::Borrowed("Loaded example successfully");
+                }
+            }
+        });
+    }
+
     fn menu_bar(&mut self, ctx: &egui::Context) {
         TopBottomPanel::top("menu bar")
             .frame(Frame::none().outer_margin(Margin::same(4.0)))
@@ -183,9 +206,12 @@ impl App {
                                 }));
                             }
                         }
+
+                        #[cfg(feature = "examples")]
+                        self.load_examples_button(ui);
+
                         if ui.button("Close").clicked() {
-                            self.ctx = None;
-                            self.dock_state = DockState::new(Vec::new())
+                            self.close_file();
                         }
                     });
                     if let Some(ctx) = &self.ctx {
@@ -314,6 +340,10 @@ impl App {
                     });
                 });
             });
+    }
+    fn close_file(&mut self) {
+        self.ctx = None;
+        self.dock_state = DockState::new(Vec::new())
     }
 }
 
