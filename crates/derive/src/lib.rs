@@ -148,12 +148,14 @@ fn read_variant(enum_name: &Ident, v: &Variant) -> TokenStream {
     let vname = &v.ident;
     let fname = v.fields.iter().map(|f| &f.ident);
     let fvalue = v.fields.iter().map(|f| match ident(&f.ty).as_str() {
-        "usize" => quote!(#rvi32 as usize),
-        "i32" => quote! {
-            #rvi32 as JumpOffset
+        "InlineBool" => quote! {
+            #rvi32 == 1
+        },
+        "InlineInt" => quote! {
+            #rvi32
         },
         "JumpOffset" => quote! {
-            #rvi32 as JumpOffset
+            #rvi32
         },
         "Vec<JumpOffset>" => quote! {
             {
@@ -190,9 +192,6 @@ fn read_variant(enum_name: &Ident, v: &Variant) -> TokenStream {
         },
         "RefType" => quote! {
             RefType::read(r)?
-        },
-        "ValBool" => quote! {
-            ValBool(#rvi32 == 1)
         },
         "RefFun" => quote! {
             RefFun::read(r)?

@@ -593,4 +593,11 @@ mod tests {
             file.write(b"\n").unwrap();
         }
     }
+
+    #[test]
+    fn test_special_opcodes() -> crate::Result<()> {
+        let code = Bytecode::from_file("../../data/SpecialOpcodes.hl")?;
+        dbg!(&code.function_by_name("main").unwrap().ops);
+        Ok(())
+    }
 }

@@ -3,6 +3,12 @@ use std::ops::Index;
 
 use crate::{Bytecode, Opcode, Resolve, Str};
 
+/// Offset for a jump instruction. Can be negative, indicating a backward jump.
+pub type JumpOffset = i32;
+
+pub type InlineInt = i32;
+pub type InlineBool = bool;
+
 /// A register argument
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Hash)]
 pub struct Reg(pub u32);
@@ -29,10 +35,6 @@ impl RefString {
         self.0 == 0
     }
 }
-
-/// An inline bool value
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
-pub struct ValBool(pub bool);
 
 /// A reference to a global
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Hash)]

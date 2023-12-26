@@ -1,10 +1,7 @@
 use crate::types::{
-    RefBytes, RefEnumConstruct, RefField, RefFloat, RefFun, RefGlobal, RefInt, RefString, RefType,
-    Reg, ValBool,
+    InlineBool, InlineInt, JumpOffset, RefBytes, RefEnumConstruct, RefField, RefFloat, RefFun,
+    RefGlobal, RefInt, RefString, RefType, Reg,
 };
-
-/// Offset for a jump instruction. Can be negative, indicating a backward jump.
-pub type JumpOffset = i32;
 
 /// Opcodes definitions. The fields are the opcode arguments.
 ///
@@ -41,7 +38,7 @@ pub enum Opcode {
     /// `dst = <true|false>`
     Bool {
         dst: Reg,
-        value: ValBool,
+        value: InlineBool,
     },
     /// Get a byte array from the constant pool
     ///
@@ -256,7 +253,6 @@ pub enum Opcode {
         args: Vec<Reg>,
     },
     /// Call a function with N arguments.
-    /// *this* = *reg0*.
     ///
     /// `dst = this.field(arg0, arg1, ...)`
     CallThis {
@@ -733,6 +729,25 @@ pub enum Opcode {
     },
     /// No-op, useful to mark removed opcodes without breaking jump offsets.
     Nop,
+    /// x86 prefetch. Move data closer to the processor using hints.
+    Prefetch {
+        /// Value to prefetch
+        value: Reg,
+        /// Non-zero if we are accessing a field in value.
+        field: RefField,
+        /// https://github.com/HaxeFoundation/hashlink/blob/733b6a14a0a7e7cfba6c21cdf0ee03595cafafb4/src/jit.c#L4310
+        /// https://www.felixcloutier.com/x86/prefetchh
+        /// https://www.felixcloutier.com/x86/prefetchw
+        mode: InlineInt,
+    },
+    /// Inline x86 assembly
+    Asm {
+        /// https://github.com/HaxeFoundation/hashlink/blob/733b6a14a0a7e7cfba6c21cdf0ee03595cafafb4/src/jit.c#L4334
+        mode: InlineInt,
+        value: InlineInt,
+        /// Warning ! Only non-zero values indicates valid reg. Register index is reg-1.
+        reg: Reg,
+    },
 }
 
 #[cfg(test)]
