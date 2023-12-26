@@ -6,8 +6,9 @@ use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{FunPtr, RefField, RefFun, RefGlobal, RefString, RefType};
 use hlbc::{Bytecode, Resolve};
 
+use crate::model::{AppCtxHandle, Item};
 use crate::views::{make_id_method, not_unique, unique_id, ViewId};
-use crate::{AppCtxHandle, AppView, ItemSelection};
+use crate::AppView;
 
 /// View detailed information about a bytecode element.
 pub(crate) struct SyncInspectorView;
@@ -49,14 +50,14 @@ impl AppView for SyncInspectorView {
 
 pub(crate) struct InspectorView {
     id: ViewId,
-    item: ItemSelection,
+    item: Item,
     name: RichText,
 }
 
 not_unique!(InspectorView);
 
 impl InspectorView {
-    pub(crate) fn new(item: ItemSelection, code: &Bytecode) -> Self {
+    pub(crate) fn new(item: Item, code: &Bytecode) -> Self {
         Self {
             id: ViewId::default(),
             item,
@@ -77,21 +78,21 @@ impl AppView for InspectorView {
     }
 }
 
-fn inspector_ui(ui: &mut Ui, ctx: AppCtxHandle, item: ItemSelection) {
+fn inspector_ui(ui: &mut Ui, ctx: AppCtxHandle, item: Item) {
     ScrollArea::vertical()
         .id_source("inspector_scroll_area")
         .auto_shrink([false, false])
         .show(ui, |ui| match item {
-            ItemSelection::Fun(fun) => {
+            Item::Fun(fun) => {
                 function_inspector(ui, ctx, fun);
             }
-            ItemSelection::Class(t) => {
+            Item::Class(t) => {
                 class_inspector(ui, ctx, t);
             }
-            ItemSelection::Global(g) => {
+            Item::Global(g) => {
                 global_inspector(ui, ctx, g);
             }
-            ItemSelection::String(s) => {
+            Item::String(s) => {
                 string_inspector(ui, ctx, s);
             }
             _ => {
@@ -100,7 +101,7 @@ fn inspector_ui(ui: &mut Ui, ctx: AppCtxHandle, item: ItemSelection) {
         });
 }
 
-fn inspector_link(ui: &mut Ui, ctx: AppCtxHandle, item: ItemSelection) {
+fn inspector_link(ui: &mut Ui, ctx: AppCtxHandle, item: Item) {
     let res = ui.add(Link::new(item.name(ctx.code()))).context_menu(|ui| {
         if ui.button("Open in inspector").clicked() {
             ctx.open_tab(InspectorView::new(item, ctx.code()));
@@ -123,7 +124,7 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
             } else if let Some(parent) = f.parent {
                 ui.horizontal(|ui| {
                     ui.label("static/instance method of");
-                    inspector_link(ui, ctx.clone(), ItemSelection::Class(parent));
+                    inspector_link(ui, ctx.clone(), Item::Class(parent));
                 });
             } else {
                 ui.label("Probably a closure.");
@@ -137,7 +138,7 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
                     .show(ui, |ui| {
                         for (i, regty) in f.regs.iter().enumerate() {
                             ui.label(format!("reg{i}"));
-                            inspector_link(ui, ctx.clone(), ItemSelection::Class(*regty));
+                            inspector_link(ui, ctx.clone(), Item::Class(*regty));
                             ui.end_row();
                         }
                     });
@@ -184,17 +185,13 @@ fn class_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
         if let Some(super_) = obj.super_ {
             ui.horizontal(|ui| {
                 ui.label("extends");
-                inspector_link(ui, ctx.clone(), ItemSelection::Class(super_));
+                inspector_link(ui, ctx.clone(), Item::Class(super_));
             });
         }
         if obj.global.0 >= 1 {
             ui.horizontal(|ui| {
                 ui.label("initialized by global");
-                inspector_link(
-                    ui,
-                    ctx.clone(),
-                    ItemSelection::Global(RefGlobal(obj.global.0 - 1)),
-                );
+                inspector_link(ui, ctx.clone(), Item::Global(RefGlobal(obj.global.0 - 1)));
             });
         }
 
@@ -215,7 +212,7 @@ fn class_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
                                 .get(&RefField(i + obj.fields.len() - obj.own_fields.len()))
                             {
                                 ui.monospace("bound to");
-                                inspector_link(ui, ctx.clone(), ItemSelection::Fun(binding));
+                                inspector_link(ui, ctx.clone(), Item::Fun(binding));
                             } else {
                                 ui.monospace("variable");
                             }
@@ -236,7 +233,7 @@ fn class_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
                     .show(ui, |ui| {
                         for f in &obj.protos {
                             ui.label(&*f.name(code));
-                            inspector_link(ui, ctx.clone(), ItemSelection::Fun(f.findex));
+                            inspector_link(ui, ctx.clone(), Item::Fun(f.findex));
                             ui.end_row();
                         }
                     });

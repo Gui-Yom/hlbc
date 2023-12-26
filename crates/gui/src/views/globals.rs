@@ -2,8 +2,9 @@ use eframe::egui::{Color32, RichText, Ui, WidgetText};
 
 use hlbc::types::RefGlobal;
 
+use crate::model::{AppCtxHandle, Item};
 use crate::views::{list_view, make_id_method, unique_id};
-use crate::{AppCtxHandle, AppView, ItemSelection};
+use crate::AppView;
 
 #[derive(Default)]
 pub(crate) struct GlobalsView;
@@ -24,7 +25,7 @@ impl AppView for GlobalsView {
             ctx,
             num,
             RefGlobal,
-            ItemSelection::Global,
+            Item::Global,
             |_, g| format!("global@{}", g.0),
             None::<&dyn Fn(&mut Ui, &AppCtxHandle, RefGlobal)>,
         );

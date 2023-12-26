@@ -2,8 +2,9 @@ use eframe::egui::{Color32, RichText, Ui, WidgetText};
 
 use hlbc::types::RefString;
 
+use crate::model::{AppCtxHandle, Item};
 use crate::views::{list_view, make_id_method, unique_id};
-use crate::{AppCtxHandle, AppView, ItemSelection};
+use crate::AppView;
 
 #[derive(Default)]
 pub(crate) struct StringsView;
@@ -24,7 +25,7 @@ impl AppView for StringsView {
             ctx,
             num,
             RefString,
-            ItemSelection::String,
+            Item::String,
             |ctx, s| ctx.code()[s].to_string(),
             None::<&dyn Fn(&mut Ui, &AppCtxHandle, RefString)>,
         );

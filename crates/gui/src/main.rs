@@ -4,7 +4,7 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::{env, fs};
 
-use eframe::egui::Vec2;
+use eframe::egui::{Vec2, ViewportBuilder};
 use poll_promise::Promise;
 
 use hlbc::Bytecode;
@@ -16,7 +16,7 @@ fn main() -> eframe::Result<()> {
         "hlbc gui",
         eframe::NativeOptions {
             vsync: true,
-            initial_window_size: Some(Vec2::new(1280.0, 720.0)),
+            viewport: ViewportBuilder::default().with_inner_size(Vec2::new(1280.0, 720.0)),
             #[cfg(feature = "wgpu")]
             wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
                 power_preference: eframe::wgpu::util::power_preference_from_env()

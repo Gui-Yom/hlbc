@@ -20,7 +20,7 @@ pub(crate) use search::*;
 pub(crate) use source::*;
 pub(crate) use strings::*;
 
-use crate::{AppCtxHandle, ItemSelection};
+use crate::model::{AppCtxHandle, Item};
 
 #[cfg(feature = "callgraph")]
 mod callgraph;
@@ -163,7 +163,7 @@ pub(crate) fn list_view<Elem: Copy>(
     ctx: AppCtxHandle,
     num: usize,
     item: impl Fn(usize) -> Elem,
-    create_selection: impl Fn(Elem) -> ItemSelection,
+    create_selection: impl Fn(Elem) -> Item,
     display: impl Fn(&AppCtxHandle, Elem) -> String,
     context_menu: Option<impl Fn(&mut Ui, &AppCtxHandle, Elem)>,
 ) {

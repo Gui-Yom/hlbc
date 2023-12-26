@@ -6,14 +6,15 @@ use hlbc::Resolve;
 use hlbc_decompiler::fmt::FormatOptions;
 use hlbc_decompiler::{decompile_class, decompile_function};
 
+use crate::model::{AppCtxHandle, Item};
 use crate::views::{haxe_source_view, make_id_method, unique_id};
-use crate::{AppCtxHandle, AppView, ItemSelection};
+use crate::AppView;
 
 #[derive(Default)]
 pub(crate) struct DecompilerView {
     output: String,
     // Cache key for decompilation
-    cache_selected: ItemSelection,
+    cache_selected: Item,
 }
 
 unique_id!(DecompilerView, "decompiler");
@@ -32,13 +33,13 @@ impl AppView for DecompilerView {
             let code = ctx.code();
 
             self.output = match ctx.selected() {
-                ItemSelection::Fun(fun) => match code.get(fun) {
+                Item::Fun(fun) => match code.get(fun) {
                     FunPtr::Fun(func) => decompile_function(code, func)
                         .display(code, &FormatOptions::new(2))
                         .to_string(),
                     FunPtr::Native(n) => n.display::<EnhancedFmt>(code).to_string(),
                 },
-                ItemSelection::Class(t) => decompile_class(code, t.as_obj(code).unwrap())
+                Item::Class(t) => decompile_class(code, t.as_obj(code).unwrap())
                     .display(code, &FormatOptions::new(2))
                     .to_string(),
                 _ => String::new(),

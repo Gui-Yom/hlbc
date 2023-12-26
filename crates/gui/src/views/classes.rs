@@ -3,8 +3,9 @@ use eframe::egui::{Color32, RichText, Ui, WidgetText};
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{RefType, Type};
 
+use crate::model::{AppCtxHandle, Item};
 use crate::views::{list_view, make_id_method, unique_id, DecompilerView, InspectorView};
-use crate::{AppCtxHandle, AppView, ItemSelection};
+use crate::AppView;
 
 #[derive(Default)]
 pub(crate) struct ClassesView {
@@ -52,11 +53,11 @@ impl AppView for ClassesView {
             ctx,
             self.cache.len(),
             |i| self.cache[i],
-            ItemSelection::Class,
+            Item::Class,
             |ctx, t| t.display::<EnhancedFmt>(ctx.code()).to_string(),
             Some(|ui: &mut Ui, ctx: &AppCtxHandle, t| {
                 if ui.small_button("Open in inspector").clicked() {
-                    let tab = InspectorView::new(ItemSelection::Class(t), ctx.code());
+                    let tab = InspectorView::new(Item::Class(t), ctx.code());
                     ctx.open_tab(tab);
                 }
                 if ui.small_button("Decompile").clicked() {

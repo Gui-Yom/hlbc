@@ -1,19 +1,17 @@
 use std::borrow::Cow;
-use std::cell::{Cell, RefCell};
-use std::collections::VecDeque;
 use std::fs;
 use std::io::BufReader;
-use std::rc::Rc;
 
 use eframe::egui;
-use eframe::egui::{Button, CentralPanel, Frame, Margin, ScrollArea, TopBottomPanel, Ui, Vec2};
+use eframe::egui::{
+    Button, CentralPanel, Frame, Margin, RichText, ScrollArea, TopBottomPanel, Ui, Vec2,
+};
 use egui_dock::{DockArea, DockState, Node, NodeIndex, Split, SurfaceIndex};
 use poll_promise::Promise;
 
-use hlbc::fmt::EnhancedFmt;
-use hlbc::types::{RefFun, RefGlobal, RefString, RefType};
 use hlbc::Bytecode;
 
+use crate::model::{AppCtx, AppCtxHandle};
 use crate::views::{
     AppView, ClassesView, DefaultAppView, DynamicTabViewer, FunctionsView, GlobalsView, InfoView,
     StringsView, SyncInspectorView, UniqueAppView,
@@ -21,6 +19,8 @@ use crate::views::{
 
 #[cfg(feature = "examples")]
 mod examples;
+mod model;
+mod style;
 mod views;
 
 pub struct App {
@@ -83,33 +83,67 @@ impl eframe::App for App {
             }
 
             if let Some(tab) = self.ctx.as_ref().and_then(|app| app.take_tab_to_open()) {
+                // FIXME better tab locator
                 self.dock_state.main_surface_mut()[NodeIndex::root().right()].append_tab(tab);
             }
         }
 
         // UI
         self.menu_bar(ctx);
-        self.status_bar(ctx);
-        self.windows(ctx);
 
         if let Some(appctx) = self.ctx.clone() {
+            self.status_bar(ctx);
             DockArea::new(&mut self.dock_state)
                 .style(self.style.clone())
                 .show(ctx, &mut DynamicTabViewer(appctx));
         } else {
             // Blank panel if no file is loaded
             CentralPanel::default()
-                .frame(Frame::group(ctx.style().as_ref()).outer_margin(Margin::same(4.0)))
+                .frame(Frame::none())
                 .show(ctx, |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.label("Load a bytecode file to start");
-                    });
+                    self.homepage(ui);
                 });
         }
+
+        self.windows(ctx);
     }
 }
 
 impl App {
+    fn homepage(&mut self, ui: &mut Ui) {
+        ui.vertical_centered(|ui| {
+            ui.add_space(100.0);
+            ui.label(RichText::new("hlbc").font(style::get().heading_title.clone()));
+            ui.label(
+                RichText::new("Load a bytecode file to start")
+                    .font(style::get().heading_subtitle.clone()),
+            );
+            ui.add_space(10.0);
+
+            if ui
+                .button(style::text("File", style::get().homepage_button.clone()))
+                .on_hover_text("Load a bytecode file")
+                .clicked()
+            {
+                self.open_file();
+            }
+
+            #[cfg(feature = "examples")]
+            ui.menu_button(
+                style::text("Example", style::get().homepage_button.clone()),
+                |ui| {
+                    for example in examples::EXAMPLES {
+                        if ui.button(example.name).clicked() {
+                            self.load_example(example);
+                        }
+                    }
+                },
+            );
+        });
+    }
+
+    /// Create a button which opens a view.
+    /// If the view is supposed to be unique, focus the view instead.
     fn view_button<T: UniqueAppView + DefaultAppView>(
         dock: &mut DockState<Box<dyn AppView>>,
         ui: &mut Ui,
@@ -151,20 +185,54 @@ impl App {
         ui.menu_button("Load example", |ui| {
             for example in examples::EXAMPLES {
                 if ui.button(example.name).clicked() {
-                    let mut cursor = std::io::Cursor::new(example.data);
-                    let code = Bytecode::deserialize(&mut cursor).unwrap();
-                    self.ctx = Some(AppCtxHandle::new(AppCtx::new_from_code(
-                        example.name.to_owned(),
-                        code,
-                    )));
-                    self.dock_state = default_tabs();
-                    self.dock_state.main_surface_mut()[NodeIndex::root().right()].append_tab(
-                        Box::new(views::SourceView::new(example.name, example.source)),
-                    );
-                    self.status = Cow::Borrowed("Loaded example successfully");
+                    self.load_example(example);
                 }
             }
         });
+    }
+
+    #[cfg(feature = "examples")]
+    fn load_example(&mut self, example: examples::Example) {
+        let mut cursor = std::io::Cursor::new(example.data);
+        let code = Bytecode::deserialize(&mut cursor).unwrap();
+        self.ctx = Some(AppCtxHandle::new(AppCtx::new_from_code(
+            example.name.to_owned(),
+            code,
+        )));
+        self.dock_state = default_tabs();
+        self.dock_state.main_surface_mut()[NodeIndex::root().right()].append_tab(Box::new(
+            views::SourceView::new(example.name, example.source),
+        ));
+        self.status = Cow::Borrowed("Loaded example successfully");
+    }
+
+    fn open_file(&mut self) {
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.loader = Some(Promise::spawn_local(async {
+                if let Some(file) = rfd::AsyncFileDialog::new().pick_file().await {
+                    Ok(Some((
+                        file.file_name(),
+                        Bytecode::deserialize(&mut &file.read().await[..]).unwrap(),
+                    )))
+                } else {
+                    Ok(None)
+                }
+            }));
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.loader = Some(Promise::spawn_thread("bg_loader", || {
+                if let Some(file) = rfd::FileDialog::new().pick_file() {
+                    Ok(Some((
+                        file.display().to_string(),
+                        Bytecode::deserialize(&mut BufReader::new(fs::File::open(&file)?))?,
+                    )))
+                } else {
+                    Ok(None)
+                }
+            }));
+        }
     }
 
     fn menu_bar(&mut self, ctx: &egui::Context) {
@@ -174,37 +242,7 @@ impl App {
                 egui::menu::bar(ui, |ui| {
                     ui.menu_button("File", |ui| {
                         if ui.button("Open").clicked() {
-                            #[cfg(target_arch = "wasm32")]
-                            {
-                                self.loader = Some(Promise::spawn_local(async {
-                                    if let Some(file) =
-                                        rfd::AsyncFileDialog::new().pick_file().await
-                                    {
-                                        Ok(Some((
-                                            file.file_name(),
-                                            Bytecode::deserialize(&mut &file.read().await[..])
-                                                .unwrap(),
-                                        )))
-                                    } else {
-                                        Ok(None)
-                                    }
-                                }));
-                            }
-                            #[cfg(not(target_arch = "wasm32"))]
-                            {
-                                self.loader = Some(Promise::spawn_thread("bg_loader", || {
-                                    if let Some(file) = rfd::FileDialog::new().pick_file() {
-                                        Ok(Some((
-                                            file.display().to_string(),
-                                            Bytecode::deserialize(&mut BufReader::new(
-                                                fs::File::open(&file)?,
-                                            ))?,
-                                        )))
-                                    } else {
-                                        Ok(None)
-                                    }
-                                }));
-                            }
+                            self.open_file();
                         }
 
                         #[cfg(feature = "examples")]
@@ -237,14 +275,14 @@ impl App {
 
                         ui.menu_button("Navigate", |ui| {
                             if ui
-                                .add_enabled(ctx.0.can_navigate_back(), Button::new("Back"))
+                                .add_enabled(ctx.can_navigate_back(), Button::new("Back"))
                                 .clicked()
                             {
                                 ctx.navigate_back();
                             }
 
                             if ui
-                                .add_enabled(ctx.0.can_navigate_forward(), Button::new("Forward"))
+                                .add_enabled(ctx.can_navigate_forward(), Button::new("Forward"))
                                 .clicked()
                             {
                                 ctx.navigate_forward();
@@ -374,151 +412,4 @@ fn default_tabs() -> DockState<Box<dyn AppView>> {
     );
 
     dock_state
-}
-
-/// Cheaply cloneable, for single threaded usage.
-#[derive(Clone)]
-struct AppCtxHandle(Rc<AppCtx>);
-
-impl AppCtxHandle {
-    fn new(appctx: AppCtx) -> Self {
-        Self(Rc::new(appctx))
-    }
-
-    fn file(&self) -> String {
-        self.0.file.clone()
-    }
-
-    fn code(&self) -> &Bytecode {
-        &self.0.code
-    }
-
-    fn open_tab(&self, tab: impl AppView + 'static) {
-        self.0.new_tab.set(Some(Box::new(tab)));
-    }
-
-    fn take_tab_to_open(&self) -> Option<Box<dyn AppView>> {
-        self.0.new_tab.take()
-    }
-
-    fn selected(&self) -> ItemSelection {
-        self.0.selected()
-    }
-
-    fn set_selected(&self, s: ItemSelection) {
-        self.0.navigate_to(s)
-    }
-
-    fn navigate_back(&self) {
-        self.0.navigate_back();
-    }
-
-    fn navigate_forward(&self) {
-        self.0.navigate_forward();
-    }
-}
-
-/// Arbitrary value, should we let it grow indefinitely instead ?
-const NAVIGATION_HISTORY_MAX: usize = 64;
-
-struct AppCtx {
-    file: String,
-    code: Bytecode,
-    /// Selection index in the navigation history buffer
-    selection: Cell<usize>,
-    /// Ring buffer of navigation history
-    navigation_history: RefCell<VecDeque<ItemSelection>>,
-    /// To open a tab from another tab.
-    /// This can't be done directly because this would need a mutable reference to a tree and the tree owns the tab.
-    new_tab: Cell<Option<Box<dyn AppView>>>,
-}
-
-impl AppCtx {
-    fn new_from_code(file: String, code: Bytecode) -> Self {
-        Self {
-            file,
-            code,
-            selection: Cell::new(0),
-            new_tab: Cell::new(None),
-            navigation_history: RefCell::new(VecDeque::with_capacity(NAVIGATION_HISTORY_MAX)),
-        }
-    }
-
-    /// Navigate to a new selection
-    fn navigate_to(&self, item: ItemSelection) {
-        if matches!(item, ItemSelection::None) {
-            panic!("Cannot navigate to ItemSelection::None");
-        }
-        let mut nav_history = self.navigation_history.borrow_mut();
-        let len = nav_history.len();
-
-        // Remove future elements
-        if len > 0 && self.selection.get() < len - 1 {
-            nav_history.drain((self.selection.get() + 1)..len);
-        }
-
-        // Do not grow past the limit
-        if nav_history.len() == nav_history.capacity() {
-            nav_history.pop_front();
-        }
-
-        nav_history.push_back(item);
-        self.selection.set(nav_history.len() - 1)
-    }
-
-    fn can_navigate_back(&self) -> bool {
-        self.selection.get() > 0
-    }
-
-    /// Navigate back in selection history
-    fn navigate_back(&self) {
-        if self.can_navigate_back() {
-            self.selection.set(self.selection.get() - 1);
-        }
-    }
-
-    fn can_navigate_forward(&self) -> bool {
-        !self.navigation_history.borrow().is_empty()
-            && self.selection.get() < self.navigation_history.borrow().len() - 1
-    }
-
-    /// Navigate forward in selection history
-    fn navigate_forward(&self) {
-        if self.can_navigate_forward() {
-            self.selection.set(self.selection.get() + 1);
-        }
-    }
-
-    /// Return the currently selected element
-    fn selected(&self) -> ItemSelection {
-        self.navigation_history
-            .borrow()
-            .get(self.selection.get())
-            .copied()
-            .unwrap_or(ItemSelection::None)
-    }
-}
-
-#[derive(Clone, Default, Copy, Eq, PartialEq)]
-enum ItemSelection {
-    Fun(RefFun),
-    Class(RefType),
-    Global(RefGlobal),
-    String(RefString),
-    #[default]
-    None,
-}
-
-impl ItemSelection {
-    pub(crate) fn name(&self, code: &Bytecode) -> String {
-        match self {
-            ItemSelection::Fun(fun) => fun.display::<EnhancedFmt>(code).to_string(),
-            ItemSelection::Class(t) => t.display::<EnhancedFmt>(code).to_string(),
-            ItemSelection::Global(g) => format!("global@{}", g.0),
-            ItemSelection::String(s) => {
-                format!("string@{}", s.0)
-            }
-            _ => String::new(),
-        }
-    }
 }

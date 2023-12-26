@@ -3,8 +3,9 @@ use eframe::egui::{Color32, RichText, Ui, WidgetText};
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::RefFun;
 
+use crate::model::{AppCtxHandle, Item};
 use crate::views::{list_view, make_id_method, unique_id, DecompilerView, InspectorView};
-use crate::{AppCtxHandle, AppView, ItemSelection};
+use crate::AppView;
 
 #[derive(Default)]
 pub(crate) struct FunctionsView {
@@ -62,11 +63,11 @@ impl AppView for FunctionsView {
             ctx,
             self.cache.len(),
             |i| self.cache[i],
-            ItemSelection::Fun,
+            Item::Fun,
             |ctx, f| f.display_header::<EnhancedFmt>(ctx.code()).to_string(),
             Some(|ui: &mut Ui, ctx: &AppCtxHandle, f| {
                 if ui.small_button("Open in inspector").clicked() {
-                    let tab = InspectorView::new(ItemSelection::Fun(f), ctx.code());
+                    let tab = InspectorView::new(Item::Fun(f), ctx.code());
                     ctx.open_tab(tab);
                 }
                 if ui.small_button("Decompile").clicked() {
