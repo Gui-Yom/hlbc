@@ -4,10 +4,19 @@ pub(crate) struct Example {
     pub(crate) data: &'static [u8],
 }
 
-// TODO maybe build examples as part of the gui build ?
+macro_rules! examples {
+    ($n:literal; $($name:literal)+) => {
+        pub(crate) const EXAMPLES: [Example; $n] = [
+            $(
+            Example {
+                name: $name,
+                source: include_str!(concat!("../examples/", $name, ".hx")),
+                data: include_bytes!(concat!(env!("OUT_DIR"), "/", $name, ".hl")),
+            }
+            ),+
+        ];
+    };
+}
 
-pub(crate) const EXAMPLES: [Example; 1] = [Example {
-    name: "Basic",
-    source: include_str!("../examples/Basic.hx"),
-    data: include_bytes!("../examples/Basic.hl"),
-}];
+// Remember to add examples to build.rs
+examples!(2; "Basic" "BranchExpr");
