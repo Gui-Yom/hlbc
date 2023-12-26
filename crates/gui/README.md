@@ -6,6 +6,8 @@ A GUI for hlbc.
 
 The GUI also runs on the web ! The latest release is available at : https://gui-yom.github.io/hlbc
 
+No need to download anything and the web app is entirely client side, your bytecode file stays local.
+
 ---
 
 ## Installation

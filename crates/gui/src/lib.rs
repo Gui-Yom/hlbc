@@ -3,9 +3,7 @@ use std::fs;
 use std::io::BufReader;
 
 use eframe::egui;
-use eframe::egui::{
-    Button, CentralPanel, Frame, Margin, RichText, ScrollArea, TopBottomPanel, Ui, Vec2,
-};
+use eframe::egui::{Button, CentralPanel, Frame, Margin, ScrollArea, TopBottomPanel, Ui, Vec2};
 use egui_dock::{DockArea, DockState, Node, NodeIndex, Split, SurfaceIndex};
 use poll_promise::Promise;
 
@@ -20,6 +18,7 @@ use crate::views::{
 #[cfg(feature = "examples")]
 mod examples;
 mod model;
+mod shortcuts;
 mod style;
 mod views;
 
@@ -62,6 +61,12 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Update part
         {
+            if ctx.input_mut(|i| i.consume_shortcut(&shortcuts::OPEN)) {
+                self.open_file();
+            } else if ctx.input_mut(|i| i.consume_shortcut(&shortcuts::CLOSE)) {
+                self.close_file();
+            }
+
             if let Some(loader) = self.loader.take() {
                 match loader.try_take() {
                     Ok(Ok(Some((file, code)))) => {
@@ -83,8 +88,7 @@ impl eframe::App for App {
             }
 
             if let Some(tab) = self.ctx.as_ref().and_then(|app| app.take_tab_to_open()) {
-                // FIXME better tab locator
-                self.dock_state.main_surface_mut()[NodeIndex::root().right()].append_tab(tab);
+                self.dock_state.main_surface_mut().push_to_focused_leaf(tab);
             }
         }
 
@@ -113,16 +117,32 @@ impl App {
     fn homepage(&mut self, ui: &mut Ui) {
         ui.vertical_centered(|ui| {
             ui.add_space(100.0);
-            ui.label(RichText::new("hlbc").font(style::get().heading_title.clone()));
-            ui.label(
-                RichText::new("Load a bytecode file to start")
-                    .font(style::get().heading_subtitle.clone()),
-            );
+            ui.label(style::text("hlbc", style::get().heading_title.clone()));
+            ui.label(style::text(
+                "Load a bytecode file to start",
+                style::get().heading_subtitle.clone(),
+            ));
+            #[cfg(target_arch = "wasm32")]
+            ui.label(style::text(
+                "Your file stays local",
+                style::get().heading_subtitle.clone(),
+            ));
             ui.add_space(10.0);
 
+            // TODO homepage icons
             if ui
-                .button(style::text("File", style::get().homepage_button.clone()))
-                .on_hover_text("Load a bytecode file")
+                .add(
+                    Button::new(style::text(
+                        "Open file",
+                        style::get().homepage_button.clone(),
+                    ))
+                    .shortcut_text(ui.ctx().format_shortcut(&shortcuts::OPEN)),
+                )
+                .on_hover_text(if cfg!(target_arch = "wasm32") {
+                    "Load a bytecode file. Everything stays local."
+                } else {
+                    "Load a bytecode file"
+                })
                 .clicked()
             {
                 self.open_file();
@@ -241,14 +261,31 @@ impl App {
             .show(ctx, |ui| {
                 egui::menu::bar(ui, |ui| {
                     ui.menu_button("File", |ui| {
-                        if ui.button("Open").clicked() {
+                        if ui
+                            .add(
+                                Button::new("Open")
+                                    .shortcut_text(ctx.format_shortcut(&shortcuts::OPEN)),
+                            )
+                            .on_hover_text(if cfg!(target_arch = "wasm32") {
+                                "Load a bytecode file. Everything stays local."
+                            } else {
+                                "Load a bytecode file"
+                            })
+                            .clicked()
+                        {
                             self.open_file();
                         }
 
                         #[cfg(feature = "examples")]
                         self.load_examples_button(ui);
 
-                        if ui.button("Close").clicked() {
+                        if ui
+                            .add(
+                                Button::new("Close")
+                                    .shortcut_text(ctx.format_shortcut(&shortcuts::CLOSE)),
+                            )
+                            .clicked()
+                        {
                             self.close_file();
                         }
                     });
@@ -275,14 +312,24 @@ impl App {
 
                         ui.menu_button("Navigate", |ui| {
                             if ui
-                                .add_enabled(ctx.can_navigate_back(), Button::new("Back"))
+                                .add_enabled(
+                                    ctx.can_navigate_back(),
+                                    Button::new("Back").shortcut_text(
+                                        ui.ctx().format_shortcut(&shortcuts::NAV_BACK),
+                                    ),
+                                )
                                 .clicked()
                             {
                                 ctx.navigate_back();
                             }
 
                             if ui
-                                .add_enabled(ctx.can_navigate_forward(), Button::new("Forward"))
+                                .add_enabled(
+                                    ctx.can_navigate_forward(),
+                                    Button::new("Forward").shortcut_text(
+                                        ui.ctx().format_shortcut(&shortcuts::NAV_FORWARD),
+                                    ),
+                                )
                                 .clicked()
                             {
                                 ctx.navigate_forward();
@@ -344,7 +391,6 @@ impl App {
             .open(&mut self.options_window_open)
             .show(ctx, |ui| {
                 ui.collapsing("Display", |ui| {
-                    // TODO max fps
                     // TODO ui theme
                     #[cfg(debug_assertions)]
                     ScrollArea::vertical().show(ui, |ui| {

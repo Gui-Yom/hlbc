@@ -1,5 +1,5 @@
 use eframe::egui::{
-    Color32, Grid, Key, Link, RichText, ScrollArea, TextEdit, TextStyle, Ui, WidgetText,
+    Color32, Grid, Link, RichText, ScrollArea, TextEdit, TextStyle, Ui, WidgetText,
 };
 
 use hlbc::fmt::EnhancedFmt;
@@ -8,7 +8,7 @@ use hlbc::{Bytecode, Resolve};
 
 use crate::model::{AppCtxHandle, Item};
 use crate::views::{make_id_method, not_unique, unique_id, ViewId};
-use crate::AppView;
+use crate::{shortcuts, AppView};
 
 /// View detailed information about a bytecode element.
 pub(crate) struct SyncInspectorView;
@@ -33,9 +33,9 @@ impl AppView for SyncInspectorView {
 
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {
         // Only triggers when in view
-        if ui.input(|i| i.key_pressed(Key::ArrowLeft) && i.modifiers.alt) {
+        if ui.input_mut(|i| i.consume_shortcut(&shortcuts::NAV_BACK)) {
             ctx.navigate_back();
-        } else if ui.input(|i| i.key_pressed(Key::ArrowRight) && i.modifiers.alt) {
+        } else if ui.input_mut(|i| i.consume_shortcut(&shortcuts::NAV_FORWARD)) {
             ctx.navigate_forward();
         }
 
