@@ -297,8 +297,7 @@ impl Native {
 /// A function definition with its code.
 #[derive(Debug, Clone)]
 pub struct Function {
-    /// Functions have no name per se, this is the name of the field or method they are attached to
-    pub name: RefString,
+    /// Type of the function : args and return type. Guaranteed to be a [TypeFun].
     pub t: RefType,
     pub findex: RefFun,
     /// The types of the registers used by this function
@@ -307,10 +306,12 @@ pub struct Function {
     pub ops: Vec<Opcode>,
     /// *Debug* File and line information for each instruction
     pub debug_info: Option<Vec<(usize, usize)>>,
-    /// *Debug* Information about some variables names for some instructions
+    /// *Debug* Information about variable names. Correspond to variable assignments.
     pub assigns: Option<Vec<(RefString, usize)>>,
 
     // Fields below are not part of the bytecode
+    /// Functions have no name per se, this is the name of the field or method they are attached to
+    pub name: RefString,
     /// Parent type (Obj/Struct) this function is a member of.
     /// This does not mean it's a method
     pub parent: Option<RefType>,

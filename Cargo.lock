@@ -1425,7 +1425,7 @@ checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 
 [[package]]
 name = "hlbc"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "byteorder",
  "flexstr",
@@ -1437,7 +1437,7 @@ dependencies = [
 
 [[package]]
 name = "hlbc-cli"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "atty",
@@ -1454,7 +1454,7 @@ dependencies = [
 
 [[package]]
 name = "hlbc-decompiler"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "fmtools",
  "hlbc",
@@ -1463,7 +1463,7 @@ dependencies = [
 
 [[package]]
 name = "hlbc-derive"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1472,7 +1472,7 @@ dependencies = [
 
 [[package]]
 name = "hlbc-gui"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "console_error_panic_hook",
  "eframe",
@@ -1490,7 +1490,7 @@ dependencies = [
 
 [[package]]
 name = "hlbc-indexing"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "fuzzy-matcher",
  "hlbc",

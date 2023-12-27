@@ -1,15 +1,14 @@
 [package]
 name = "hlbc-gui"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.72"
 description = "Hashlink bytecode disassembler, analyzer and decompiler gui"
 repository = "https://github.com/Gui-Yom/hlbc"
 license = "MIT"
 categories = ["command-line-utilities", "parser-implementations", "visualization", "compilers"]
 keywords = ["hashlink", "bytecode", "haxe", "disassembler", "reverse-enginneering"]
-include = ["src/**/*", "README.md", "CHANGELOG.md", "assets/Haxe.sublime-syntax"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -20,10 +19,10 @@ eframe = { version = "0.24", default-features = false }
 egui_dock = { version = "0.9" }
 egui_ui_refresh = { version = "0.1", path = "../../../egui_ui_refresh" }
 # Core library
-hlbc = { version = "0.7", path = "../hlbc", default-features = false }
+hlbc = { version = "0.8", path = "../hlbc", default-features = false }
 # Decompiler
-hlbc-decompiler = { version = "0.7", path = "../decompiler", default-features = false }
-hlbc-indexing = { version = "0.7", path = "../indexing", optional = true }
+hlbc-decompiler = { version = "0.8", path = "../decompiler", default-features = false }
+hlbc-indexing = { version = "0.8", path = "../indexing", optional = true }
 # Open file dialogs
 rfd = { version = "0.12", features = ["file-handle-inner"] }
 webbrowser = "0.8"

@@ -9,7 +9,7 @@ extern crate core;
 
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::ops::Index;
+use std::ops::{Index, RangeBounds};
 
 use crate::opcodes::Opcode;
 use crate::types::{

@@ -8,6 +8,8 @@ use crate::{Bytecode, Function, Native, Opcode, RefFun, RefType, Resolve, Type, 
 #[cfg(feature = "graph")]
 pub mod graph;
 
+mod usage;
+
 impl Bytecode {
     /// Iterate on every instruction of every function
     pub fn ops(&self) -> impl Iterator<Item = (&Function, (usize, &Opcode))> {
