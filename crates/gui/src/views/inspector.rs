@@ -1,9 +1,13 @@
 use eframe::egui::{
-    Color32, Grid, Link, RichText, ScrollArea, TextEdit, TextStyle, Ui, WidgetText,
+    CollapsingHeader, Color32, Grid, Link, RichText, ScrollArea, TextEdit, TextStyle, Ui,
+    WidgetText,
 };
 
+use hlbc::analysis::usage::UsageString;
 use hlbc::fmt::EnhancedFmt;
-use hlbc::types::{FunPtr, RefField, RefFun, RefGlobal, RefString, RefType};
+use hlbc::types::{
+    EnumConstruct, FunPtr, RefField, RefFun, RefGlobal, RefString, RefType, Type, TypeObj,
+};
 use hlbc::{Bytecode, Resolve};
 
 use crate::model::{AppCtxHandle, Item};
@@ -81,8 +85,8 @@ fn inspector_ui(ui: &mut Ui, ctx: AppCtxHandle, item: Item) {
             Item::Fun(fun) => {
                 function_inspector(ui, ctx, fun);
             }
-            Item::Class(t) => {
-                class_inspector(ui, ctx, t);
+            Item::Type(t) => {
+                type_inspector(ui, ctx, t);
             }
             Item::Global(g) => {
                 global_inspector(ui, ctx, g);
@@ -119,7 +123,7 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
             } else if let Some(parent) = f.parent {
                 ui.horizontal(|ui| {
                     ui.label("static/instance method of");
-                    inspector_link(ui, ctx.clone(), Item::Class(parent));
+                    inspector_link(ui, ctx.clone(), Item::Type(parent));
                 });
             } else {
                 ui.label("Probably a closure.");
@@ -133,7 +137,7 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
                     .show(ui, |ui| {
                         for (i, regty) in f.regs.iter().enumerate() {
                             ui.label(format!("reg{i}"));
-                            inspector_link(ui, ctx.clone(), Item::Class(*regty));
+                            inspector_link(ui, ctx.clone(), Item::Type(*regty));
                             ui.end_row();
                         }
                     });
@@ -173,69 +177,114 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
     }
 }
 
-fn class_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
+fn type_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
+    match &ctx.code()[t] {
+        Type::Fun(_) => {}
+        Type::Obj(obj) => {
+            obj_inspector(ui, ctx.clone(), t, obj);
+        }
+        Type::Ref(_) => {}
+        Type::Virtual { .. } => {}
+        Type::Abstract { .. } => {}
+        Type::Enum { .. } => {
+            enum_inspector(ui, ctx.clone(), t);
+        }
+        Type::Null(_) => {}
+        Type::Method(_) => {}
+        Type::Struct(obj) => {
+            obj_inspector(ui, ctx.clone(), t, obj);
+        }
+        Type::Packed(_) => {}
+        _ => {
+            ui.label("Unsupported type in inspector");
+        }
+    }
+}
+
+fn obj_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType, obj: &TypeObj) {
     let code = ctx.code();
     ui.heading(format!("Class : {}", t.display::<EnhancedFmt>(code)));
-    if let Some(obj) = t.as_obj(code) {
-        if let Some(super_) = obj.super_ {
-            ui.horizontal(|ui| {
-                ui.label("extends");
-                inspector_link(ui, ctx.clone(), Item::Class(super_));
-            });
-        }
-        if obj.global.0 >= 1 {
-            ui.horizontal(|ui| {
-                ui.label("initialized by global");
-                inspector_link(ui, ctx.clone(), Item::Global(RefGlobal(obj.global.0 - 1)));
-            });
-        }
+    if let Some(super_) = obj.super_ {
+        ui.horizontal(|ui| {
+            ui.label("extends");
+            inspector_link(ui, ctx.clone(), Item::Type(super_));
+        });
+    }
+    if obj.global.0 >= 1 {
+        ui.horizontal(|ui| {
+            ui.label("initialized by global");
+            inspector_link(ui, ctx.clone(), Item::Global(RefGlobal(obj.global.0 - 1)));
+        });
+    }
 
-        if obj.own_fields.is_empty() {
-            ui.label("No fields");
-        } else {
-            ui.add_space(6.0);
-            ui.collapsing("Fields", |ui| {
-                Grid::new("inspector::class::fields")
-                    .striped(true)
-                    .num_columns(3)
-                    .show(ui, |ui| {
-                        for (i, f) in obj.own_fields.iter().enumerate() {
-                            ui.label(&*f.name(code));
-                            ui.label(f.t.display::<EnhancedFmt>(code).to_string());
-                            if let Some(&binding) = obj
-                                .bindings
-                                .get(&RefField(i + obj.fields.len() - obj.own_fields.len()))
-                            {
-                                ui.monospace("bound to");
-                                inspector_link(ui, ctx.clone(), Item::Fun(binding));
-                            } else {
-                                ui.monospace("variable");
-                            }
-                            ui.end_row();
-                        }
-                    });
-            });
-        }
-
-        if obj.protos.is_empty() {
-            ui.label("No methods");
-        } else {
-            ui.add_space(6.0);
-            ui.collapsing("Methods", |ui| {
-                Grid::new("inspector::class::methods")
-                    .striped(true)
-                    .num_columns(2)
-                    .show(ui, |ui| {
-                        for f in &obj.protos {
-                            ui.label(&*f.name(code));
-                            inspector_link(ui, ctx.clone(), Item::Fun(f.findex));
-                            ui.end_row();
-                        }
-                    });
-            });
-        }
+    if obj.own_fields.is_empty() {
+        ui.label("No fields");
     } else {
-        ui.label("Invalid type");
+        ui.add_space(6.0);
+        ui.collapsing("Fields", |ui| {
+            Grid::new("inspector::class::fields")
+                .striped(true)
+                .num_columns(3)
+                .show(ui, |ui| {
+                    for (i, f) in obj.own_fields.iter().enumerate() {
+                        ui.label(&*f.name(code));
+                        ui.label(f.t.display::<EnhancedFmt>(code).to_string());
+                        if let Some(&binding) = obj
+                            .bindings
+                            .get(&RefField(i + obj.fields.len() - obj.own_fields.len()))
+                        {
+                            ui.monospace("bound to");
+                            inspector_link(ui, ctx.clone(), Item::Fun(binding));
+                        } else {
+                            ui.monospace("variable");
+                        }
+                        ui.end_row();
+                    }
+                });
+        });
+    }
+
+    if obj.protos.is_empty() {
+        ui.label("No methods");
+    } else {
+        ui.add_space(6.0);
+        ui.collapsing("Methods", |ui| {
+            Grid::new("inspector::class::methods")
+                .striped(true)
+                .num_columns(2)
+                .show(ui, |ui| {
+                    for f in &obj.protos {
+                        ui.label(&*f.name(code));
+                        inspector_link(ui, ctx.clone(), Item::Fun(f.findex));
+                        ui.end_row();
+                    }
+                });
+        });
+    }
+}
+
+fn enum_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
+    let Type::Enum {
+        constructs, global, ..
+    } = &ctx.code()[t]
+    else {
+        unreachable!()
+    };
+
+    ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
+    ui.horizontal(|ui| {
+        ui.label("Initialized by global");
+        inspector_link(ui, ctx.clone(), Item::Global(*global));
+    });
+
+    ui.separator();
+    for EnumConstruct { name, params } in constructs {
+        ui.horizontal(|ui| {
+            ui.label(ctx.code()[*name].as_ref());
+            for p in params {
+                ui.label(p.display::<EnhancedFmt>(ctx.code()).to_string());
+            }
+        });
     }
 }
 
@@ -259,6 +308,46 @@ fn global_inspector(ui: &mut Ui, ctx: AppCtxHandle, g: RefGlobal) {
 
 fn string_inspector(ui: &mut Ui, ctx: AppCtxHandle, s: RefString) {
     ui.heading(format!("string@{}", s.0));
+    CollapsingHeader::new("Usage report")
+        .default_open(true)
+        .show(ui, |ui| {
+            for usage in &ctx.usage()[s] {
+                match usage {
+                    &UsageString::Type(ty) => {
+                        ui.horizontal(|ui| {
+                            ui.label("Name of type");
+                            inspector_link(ui, ctx.clone(), Item::Type(ty));
+                        });
+                    }
+                    &UsageString::EnumVariant(ty, _) => {
+                        ui.horizontal(|ui| {
+                            ui.label("Name of enum variant");
+                            inspector_link(ui, ctx.clone(), Item::Type(ty));
+                        });
+                    }
+                    &UsageString::Field(ty, _) => {
+                        ui.horizontal(|ui| {
+                            ui.label("Field name of type");
+                            inspector_link(ui, ctx.clone(), Item::Type(ty));
+                        });
+                    }
+                    &UsageString::Proto(ty, _) => {
+                        ui.horizontal(|ui| {
+                            ui.label("Method name of type");
+                            inspector_link(ui, ctx.clone(), Item::Type(ty));
+                        });
+                    }
+                    UsageString::Code(f, _) => {
+                        let display = f.display_header::<EnhancedFmt>(ctx.code());
+                        ui.label(format!("Code constant {display}"));
+                    }
+                    UsageString::Dyn(f, _) => {
+                        let display = f.display_header::<EnhancedFmt>(ctx.code());
+                        ui.label(format!("Dynamic access {display}"));
+                    }
+                }
+            }
+        });
     ui.separator();
     ui.add_space(4.0);
     TextEdit::multiline(&mut &*ctx.code()[s].to_string())

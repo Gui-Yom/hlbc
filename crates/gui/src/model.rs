@@ -2,6 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
 use std::rc::Rc;
 
+use hlbc::analysis::usage::{usage_report, FullUsageReport};
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{RefFun, RefGlobal, RefString, RefType};
 use hlbc::Bytecode;
@@ -38,6 +39,10 @@ impl AppCtxHandle {
         &self.0.code
     }
 
+    pub(crate) fn usage(&self) -> &FullUsageReport {
+        &self.0.usage
+    }
+
     pub(crate) fn open_tab(&self, tab: impl AppView + 'static) {
         self.0.new_tab.set(Some(Box::new(tab)));
     }
@@ -64,6 +69,7 @@ const NAVIGATION_HISTORY_MAX: usize = 64;
 pub(crate) struct AppCtx {
     file: String,
     code: Bytecode,
+    usage: FullUsageReport,
     /// Selection index in the navigation history buffer
     selection: Cell<usize>,
     /// Ring buffer of navigation history
@@ -75,9 +81,11 @@ pub(crate) struct AppCtx {
 
 impl AppCtx {
     pub(crate) fn new_from_code(file: String, code: Bytecode) -> Self {
+        let usage = usage_report(&code);
         Self {
             file,
             code,
+            usage,
             selection: Cell::new(0),
             new_tab: Cell::new(None),
             navigation_history: RefCell::new(VecDeque::with_capacity(NAVIGATION_HISTORY_MAX)),
@@ -142,7 +150,7 @@ impl AppCtx {
 #[derive(Clone, Default, Copy, Eq, PartialEq)]
 pub(crate) enum Item {
     Fun(RefFun),
-    Class(RefType),
+    Type(RefType),
     Global(RefGlobal),
     String(RefString),
     #[default]
@@ -153,7 +161,7 @@ impl Item {
     pub(crate) fn name(&self, code: &Bytecode) -> String {
         match self {
             Item::Fun(fun) => fun.display::<EnhancedFmt>(code).to_string(),
-            Item::Class(t) => t.display::<EnhancedFmt>(code).to_string(),
+            Item::Type(t) => t.display::<EnhancedFmt>(code).to_string(),
             Item::Global(g) => format!("global@{}", g.0),
             Item::String(s) => {
                 format!("string@{}", s.0)

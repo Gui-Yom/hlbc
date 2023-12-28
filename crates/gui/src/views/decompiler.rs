@@ -39,7 +39,7 @@ impl AppView for DecompilerView {
                         .to_string(),
                     FunPtr::Native(n) => n.display::<EnhancedFmt>(code).to_string(),
                 },
-                Item::Class(t) => decompile_class(code, t.as_obj(code).unwrap())
+                Item::Type(t) => decompile_class(code, t.as_obj(code).unwrap())
                     .display(code, &FormatOptions::new(2))
                     .to_string(),
                 _ => String::new(),

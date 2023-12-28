@@ -3,10 +3,12 @@
 //! This module contains functions that traverse this graph in reverse to find
 //! find where a bytecode element is used.
 
+use std::ops::Index;
+
 use crate::opcodes::Opcode;
 use crate::types::{
-    EnumConstruct, ObjField, ObjProto, RefEnumConstruct, RefField, RefFun, RefType, Reg, Type,
-    TypeFun, TypeObj,
+    EnumConstruct, ObjField, ObjProto, RefEnumConstruct, RefField, RefFun, RefString, RefType, Reg,
+    Type, TypeFun, TypeObj,
 };
 use crate::Bytecode;
 
@@ -46,8 +48,6 @@ pub enum UsageString {
     Field(RefType, usize),
     /// Name of method (Class)
     Proto(RefType, usize),
-    /// Name of function
-    Fun(RefFun),
     /// Used as a code constant
     Code(RefFun, usize),
     /// Dyn obj access
@@ -55,14 +55,14 @@ pub enum UsageString {
 }
 
 #[derive(Debug, Clone, Default)]
-struct FullUsageReport {
-    types: Vec<Vec<UsageType>>,
-    fun: Vec<Vec<UsageFun>>,
-    strings: Vec<Vec<UsageString>>,
+pub struct FullUsageReport {
+    pub types: Vec<Vec<UsageType>>,
+    pub fun: Vec<Vec<UsageFun>>,
+    pub strings: Vec<Vec<UsageString>>,
 }
 
 impl FullUsageReport {
-    pub fn new(code: &Bytecode) -> Self {
+    fn new(code: &Bytecode) -> Self {
         Self {
             types: vec![Vec::new(); code.types.len()],
             fun: vec![Vec::new(); code.findex_max()],
@@ -143,7 +143,7 @@ impl FullUsageReport {
         }
     }
 
-    pub fn compute_usage_all(&mut self, code: &Bytecode) {
+    fn compute_usage_all(&mut self, code: &Bytecode) {
         // Look through all types
         for ref_ty in (0..code.types.len()).map(RefType) {
             self.compute_usage_type(code, ref_ty);
@@ -184,6 +184,20 @@ impl FullUsageReport {
             }
         }
     }
+}
+
+impl Index<RefString> for FullUsageReport {
+    type Output = [UsageString];
+
+    fn index(&self, index: RefString) -> &Self::Output {
+        self.strings.index(index.0)
+    }
+}
+
+pub fn usage_report(code: &Bytecode) -> FullUsageReport {
+    let mut report = FullUsageReport::new(code);
+    report.compute_usage_all(code);
+    report
 }
 
 #[cfg(test)]
