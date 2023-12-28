@@ -4,7 +4,7 @@ use hlbc::fmt::EnhancedFmt;
 use hlbc::types::RefFun;
 
 use crate::model::{AppCtxHandle, Item};
-use crate::views::{list_view, make_id_method, unique_id, DecompilerView, InspectorView};
+use crate::views::{impl_id, impl_view_id, list_view, DecompilerView, InspectorView};
 use crate::AppView;
 
 #[derive(Default)]
@@ -15,10 +15,10 @@ pub(crate) struct FunctionsView {
     cache_valid: bool,
 }
 
-unique_id!(FunctionsView, "functions");
+impl_view_id!(FunctionsView: unique);
 
 impl AppView for FunctionsView {
-    make_id_method!(unique);
+    impl_id!(unique);
 
     fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("ƒ Functions").color(Color32::WHITE).into()

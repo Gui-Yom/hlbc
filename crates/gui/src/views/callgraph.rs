@@ -11,7 +11,7 @@ use hlbc::analysis::graph::Callgraph;
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::RefFun;
 
-use crate::views::unique_id;
+use crate::views::{impl_id, impl_view_id};
 use crate::AppCtxHandle;
 
 #[derive(Default)]
@@ -27,10 +27,10 @@ pub struct CallgraphView {
     pan: Vec2,
 }
 
-unique_id!(CallgraphView);
+impl_view_id!(CallgraphView: unique);
 
 impl CallgraphView {
-    make_id_method!(unique);
+    impl_id!(unique);
 
     fn title(&self) -> &str {
         "Callgraph"

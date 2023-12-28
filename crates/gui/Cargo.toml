@@ -17,14 +17,17 @@ keywords = ["hashlink", "bytecode", "haxe", "disassembler", "reverse-enginneerin
 eframe = { version = "0.24", default-features = false }
 # Docking tabs
 egui_dock = { version = "0.9" }
-egui_ui_refresh = { version = "0.1", path = "../../../egui_ui_refresh" }
+# UI theme
+egui_ui_refresh = { version = "0.2", path = "../../../egui_ui_refresh" }
 # Core library
 hlbc = { version = "0.8", path = "../hlbc", default-features = false }
 # Decompiler
 hlbc-decompiler = { version = "0.8", path = "../decompiler", default-features = false }
+# Search functionality
 hlbc-indexing = { version = "0.8", path = "../indexing", optional = true }
 # Open file dialogs
 rfd = { version = "0.12", features = ["file-handle-inner"] }
+# Open link in webbrowser
 webbrowser = "0.8"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

@@ -3,16 +3,16 @@ use eframe::egui::{Color32, RichText, Ui, WidgetText};
 use hlbc::types::RefGlobal;
 
 use crate::model::{AppCtxHandle, Item};
-use crate::views::{list_view, make_id_method, unique_id};
+use crate::views::{impl_id, impl_view_id, list_view};
 use crate::AppView;
 
 #[derive(Default)]
 pub(crate) struct GlobalsView;
 
-unique_id!(GlobalsView, "globals");
+impl_view_id!(GlobalsView: unique);
 
 impl AppView for GlobalsView {
-    make_id_method!(unique);
+    impl_id!(unique);
 
     fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("Globals").color(Color32::WHITE).into()

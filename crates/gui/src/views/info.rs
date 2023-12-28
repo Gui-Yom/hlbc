@@ -1,15 +1,15 @@
 use eframe::egui::{Color32, Grid, RichText, ScrollArea, Ui, WidgetText};
 
-use crate::views::{make_id_method, unique_id, AppView};
+use crate::views::{impl_id, impl_view_id, AppView};
 use crate::AppCtxHandle;
 
 #[derive(Default)]
 pub(crate) struct InfoView;
 
-unique_id!(InfoView, "info");
+impl_view_id!(InfoView: unique);
 
 impl AppView for InfoView {
-    make_id_method!(unique);
+    impl_id!(unique);
 
     fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("🛈 Info").color(Color32::WHITE).into()

@@ -11,8 +11,8 @@ use hlbc::Bytecode;
 
 use crate::model::{AppCtx, AppCtxHandle};
 use crate::views::{
-    AppView, ClassesView, DefaultAppView, DynamicTabViewer, FunctionsView, GlobalsView, InfoView,
-    StringsView, SyncInspectorView, UniqueAppView,
+    AppView, ClassesView, DefaultAppView, DynamicTabViewer, FilesView, FunctionsView, GlobalsView,
+    InfoView, StringsView, SyncInspectorView, ViewWithId,
 };
 
 #[cfg(feature = "examples")]
@@ -164,10 +164,19 @@ impl App {
 
     /// Create a button which opens a view.
     /// If the view is supposed to be unique, focus the view instead.
-    fn view_button<T: UniqueAppView + DefaultAppView>(
+    fn view_button_default<T: DefaultAppView + ViewWithId>(
         dock: &mut DockState<Box<dyn AppView>>,
         ui: &mut Ui,
         name: &str,
+    ) {
+        Self::view_button::<T>(dock, ui, name, || T::default_view())
+    }
+
+    fn view_button<T: ViewWithId>(
+        dock: &mut DockState<Box<dyn AppView>>,
+        ui: &mut Ui,
+        name: &str,
+        creator: impl FnOnce() -> Box<dyn AppView>,
     ) {
         let id = T::ID;
 
@@ -194,8 +203,7 @@ impl App {
                 };
                 dock.set_active_tab(locator);
             } else {
-                dock.main_surface_mut()
-                    .push_to_focused_leaf(T::default_view());
+                dock.main_surface_mut().push_to_focused_leaf(creator());
             }
         }
     }
@@ -291,15 +299,33 @@ impl App {
                     });
                     if let Some(ctx) = &self.ctx {
                         ui.menu_button("Views", |ui| {
-                            Self::view_button::<InfoView>(&mut self.dock_state, ui, "Info");
-                            Self::view_button::<ClassesView>(&mut self.dock_state, ui, "Classes");
-                            Self::view_button::<FunctionsView>(
+                            Self::view_button_default::<InfoView>(&mut self.dock_state, ui, "Info");
+                            Self::view_button_default::<ClassesView>(
+                                &mut self.dock_state,
+                                ui,
+                                "Classes",
+                            );
+                            Self::view_button_default::<FunctionsView>(
                                 &mut self.dock_state,
                                 ui,
                                 "Functions",
                             );
-                            Self::view_button::<GlobalsView>(&mut self.dock_state, ui, "Globals");
-                            Self::view_button::<StringsView>(&mut self.dock_state, ui, "Strings");
+                            Self::view_button::<FilesView>(
+                                &mut self.dock_state,
+                                ui,
+                                "Files",
+                                || Box::new(FilesView::new(ctx.code())),
+                            );
+                            Self::view_button_default::<GlobalsView>(
+                                &mut self.dock_state,
+                                ui,
+                                "Globals",
+                            );
+                            Self::view_button_default::<StringsView>(
+                                &mut self.dock_state,
+                                ui,
+                                "Strings",
+                            );
                             #[cfg(feature = "search")]
                             if ui.button("Search").clicked() {
                                 self.dock_state

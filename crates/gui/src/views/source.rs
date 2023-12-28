@@ -1,6 +1,6 @@
 use eframe::egui::{Ui, WidgetText};
 
-use crate::views::{haxe_source_view, make_id_method, unique_id, AppView};
+use crate::views::{haxe_source_view, impl_id, impl_view_id, AppView};
 use crate::AppCtxHandle;
 
 pub(crate) struct SourceView {
@@ -8,7 +8,7 @@ pub(crate) struct SourceView {
     source: &'static str,
 }
 
-unique_id!(SourceView, "source");
+impl_view_id!(SourceView: unique);
 
 impl SourceView {
     pub(crate) fn new(name: &'static str, source: &'static str) -> Self {
@@ -17,7 +17,7 @@ impl SourceView {
 }
 
 impl AppView for SourceView {
-    make_id_method!(unique);
+    impl_id!(unique);
 
     fn title(&self, ctx: AppCtxHandle) -> WidgetText {
         self.name.into()

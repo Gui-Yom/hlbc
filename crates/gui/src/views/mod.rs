@@ -1,6 +1,5 @@
-use std::collections::hash_map::DefaultHasher;
+use std::any::type_name;
 use std::hash::{Hash, Hasher};
-use std::time::Instant;
 
 use eframe::egui::text::LayoutJob;
 use eframe::egui::{Color32, FontId, ScrollArea, TextStyle, Ui, WidgetText};
@@ -9,6 +8,7 @@ use egui_dock::TabViewer;
 
 pub(crate) use classes::*;
 pub(crate) use decompiler::*;
+pub(crate) use files::*;
 pub(crate) use functions::*;
 pub(crate) use globals::*;
 pub(crate) use haxe_source_view::*;
@@ -26,6 +26,7 @@ use crate::model::{AppCtxHandle, Item};
 mod callgraph;
 mod classes;
 mod decompiler;
+mod files;
 mod functions;
 mod globals;
 mod haxe_source_view;
@@ -64,10 +65,7 @@ impl TabViewer for DynamicTabViewer {
 
 /// The actual trait that needs to be implemented by a view
 pub(crate) trait AppView {
-    /// If a view has an id, it has a chance to be unique
-    fn id(&self) -> ViewId {
-        ViewId::Instantiable(0)
-    }
+    fn id(&self) -> ViewId;
 
     fn title(&self, ctx: AppCtxHandle) -> WidgetText;
 
@@ -95,68 +93,80 @@ impl<T: AppView + Default + 'static> DefaultAppView for T {
     }
 }
 
+pub(crate) trait ViewWithId {
+    const ID: ViewId;
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub(crate) enum ViewId {
     /// The view is unique, it can only exist as one instance. The key is used to search for it.
     Unique(&'static str),
     /// The view can be instantiated many times. The id is to differentiate the UIs.
-    Instantiable(u64),
-}
-
-impl Default for ViewId {
-    fn default() -> Self {
-        // Yes I'm actually doing it
-        // poor man's rng
-        let mut hasher = DefaultHasher::new();
-        Instant::now().hash(&mut hasher);
-        ViewId::Instantiable(hasher.finish())
-    }
+    Instantiable(&'static str, u64),
 }
 
 impl ViewId {
+    pub(crate) fn new_instance<T: 'static>() -> Self {
+        use std::collections::hash_map::DefaultHasher;
+        use std::time::Instant;
+        // poor man's rng
+        let mut hasher = DefaultHasher::new();
+        Instant::now().hash(&mut hasher);
+        ViewId::Instantiable(
+            type_name::<T>().split("::").last().unwrap(),
+            hasher.finish(),
+        )
+    }
+
+    pub(crate) const fn new_instance_const(class: &'static str) -> Self {
+        ViewId::Instantiable(class, 0)
+    }
+
+    pub(crate) const fn new_unique(class: &'static str) -> Self {
+        ViewId::Unique(class)
+    }
+
     pub(crate) fn is_unique(&self) -> bool {
         matches!(self, ViewId::Unique(_))
     }
+
+    pub(crate) fn class(&self) -> &'static str {
+        match self {
+            ViewId::Unique(class) => class,
+            ViewId::Instantiable(class, _) => class,
+        }
+    }
 }
 
-pub(crate) trait UniqueAppView: AppView {
-    const ID: ViewId = ViewId::Instantiable(0);
-}
-
-macro_rules! unique_id {
-    ($view:ty, $id:literal) => {
-        crate::views::unique_id!($view, crate::views::ViewId::Unique($id));
+macro_rules! impl_view_id {
+    ($view:ty: unique) => {
+        impl crate::views::ViewWithId for $view {
+            const ID: crate::views::ViewId = crate::views::ViewId::new_unique(stringify!($view));
+        }
     };
-    ($view:ty, $id:expr) => {
-        impl crate::views::UniqueAppView for $view {
-            const ID: crate::views::ViewId = $id;
+    ($view:ty) => {
+        impl crate::views::ViewWithId for $view {
+            const ID: crate::views::ViewId =
+                crate::views::ViewId::new_instance_const(stringify!($view));
         }
     };
 }
 
-macro_rules! not_unique {
-    ($view:ty) => {
-        crate::views::unique_id!($view, crate::views::ViewId::Instantiable(0));
+macro_rules! impl_id {
+    (unique) => {
+        fn id(&self) -> crate::views::ViewId {
+            <Self as crate::views::ViewWithId>::ID
+        }
     };
-}
-
-macro_rules! make_id_method {
     () => {
         fn id(&self) -> crate::views::ViewId {
             self.id
         }
     };
-
-    (unique) => {
-        fn id(&self) -> crate::views::ViewId {
-            <Self as crate::views::UniqueAppView>::ID
-        }
-    };
 }
 
-pub(crate) use make_id_method;
-pub(crate) use not_unique;
-pub(crate) use unique_id;
+pub(crate) use impl_id;
+pub(crate) use impl_view_id;
 
 pub(crate) fn list_view<Elem: Copy>(
     ui: &mut Ui,
@@ -209,4 +219,16 @@ pub(crate) fn singleline(text: impl Into<String>, font_id: FontId, color: Color3
         ..TextWrapping::default()
     };
     job
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::views::ViewId;
+
+    struct A;
+
+    #[test]
+    fn test_type_name() {
+        assert_eq!(ViewId::new_instance::<A>().class(), stringify!(A));
+    }
 }

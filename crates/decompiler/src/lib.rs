@@ -311,7 +311,7 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 state.push_expr(i, dst, cst_float(ptr));
             }
             &Opcode::Bool { dst, value } => {
-                state.push_expr(i, dst, cst_bool(value.0));
+                state.push_expr(i, dst, cst_bool(value));
             }
             &Opcode::String { dst, ptr } => {
                 state.push_expr(i, dst, cst_string(ptr));

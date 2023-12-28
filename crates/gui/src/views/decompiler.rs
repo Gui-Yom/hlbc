@@ -7,7 +7,7 @@ use hlbc_decompiler::fmt::FormatOptions;
 use hlbc_decompiler::{decompile_class, decompile_function};
 
 use crate::model::{AppCtxHandle, Item};
-use crate::views::{haxe_source_view, make_id_method, unique_id};
+use crate::views::{haxe_source_view, impl_id, impl_view_id};
 use crate::AppView;
 
 #[derive(Default)]
@@ -17,10 +17,10 @@ pub(crate) struct DecompilerView {
     cache_selected: Item,
 }
 
-unique_id!(DecompilerView, "decompiler");
+impl_view_id!(DecompilerView: unique);
 
 impl AppView for DecompilerView {
-    make_id_method!(unique);
+    impl_id!(unique);
 
     fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         RichText::new("Decompilation output")

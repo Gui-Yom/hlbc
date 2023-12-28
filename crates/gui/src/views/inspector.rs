@@ -7,22 +7,17 @@ use hlbc::types::{FunPtr, RefField, RefFun, RefGlobal, RefString, RefType};
 use hlbc::{Bytecode, Resolve};
 
 use crate::model::{AppCtxHandle, Item};
-use crate::views::{make_id_method, not_unique, unique_id, ViewId};
+use crate::views::{impl_id, impl_view_id, ViewId};
 use crate::{shortcuts, AppView};
 
 /// View detailed information about a bytecode element.
+#[derive(Default)]
 pub(crate) struct SyncInspectorView;
 
-unique_id!(SyncInspectorView, "syncinspector");
-
-impl Default for SyncInspectorView {
-    fn default() -> Self {
-        Self
-    }
-}
+impl_view_id!(SyncInspectorView: unique);
 
 impl AppView for SyncInspectorView {
-    make_id_method!(unique);
+    impl_id!(unique);
 
     fn title(&self, ctx: AppCtxHandle) -> WidgetText {
         let selected = ctx.selected();
@@ -54,12 +49,12 @@ pub(crate) struct InspectorView {
     name: RichText,
 }
 
-not_unique!(InspectorView);
+impl_view_id!(InspectorView);
 
 impl InspectorView {
     pub(crate) fn new(item: Item, code: &Bytecode) -> Self {
         Self {
-            id: ViewId::default(),
+            id: ViewId::new_instance::<Self>(),
             item,
             name: RichText::new(item.name(code)).color(Color32::WHITE),
         }
@@ -67,7 +62,7 @@ impl InspectorView {
 }
 
 impl AppView for InspectorView {
-    make_id_method!();
+    impl_id!();
 
     fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
         self.name.clone().into()
