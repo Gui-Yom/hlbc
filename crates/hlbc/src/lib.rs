@@ -121,6 +121,10 @@ impl Bytecode {
     pub fn functions<'a>(&'a self) -> impl Iterator<Item = FunPtr<'a>> + 'a {
         (0..self.findex_max()).map(RefFun).map(|r| self.get(r))
     }
+
+    pub fn debug_file(&self, index: usize) -> Option<Str> {
+        self.debug_files.as_ref().map(|files| files[index].clone())
+    }
 }
 
 impl Default for Bytecode {
