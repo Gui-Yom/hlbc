@@ -4,11 +4,15 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <!-- Disable zooming: -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+    <base href="/hlbc/">
+    <link rel="icon" href="favicon.ico" sizes="256x256">
+    <link rel="icon" href="favicon.svg" sizes="any" type="image/svg+xml">
+
     <title>hlbc</title>
 
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="white">
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#404040">
-    <base href="/hlbc/">
 
     <style>
         html {
@@ -65,13 +69,13 @@
             text-align: center;
         }
     </style>
-    <link rel="preload" href="/hlbc/hlbc-gui_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
-    <link rel="modulepreload" href="/hlbc/hlbc-gui.js">
+    <link rel="preload" href="hlbc-gui_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
+    <link rel="modulepreload" href="hlbc-gui.js">
 </head>
 <body>
 <canvas id="eframe_canvas"></canvas>
 <script type="module">
-    import init from '/hlbc/hlbc-gui.js';init('/hlbc/hlbc-gui_bg.wasm');
+    import init from 'hlbc-gui.js';init('hlbc-gui_bg.wasm');
 </script>
 </body>
 </html>

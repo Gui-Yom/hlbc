@@ -2,21 +2,34 @@
 
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::{env, fs};
 
-use eframe::egui::{Vec2, ViewportBuilder};
+use eframe::egui::{IconData, Vec2, ViewportBuilder};
+use image::ImageFormat;
 use poll_promise::Promise;
 
 use hlbc::Bytecode;
-use hlbc_gui::App;
+use hlbc_gui::{App, HLBC_ICON};
+
+#[cfg(not(target_arch = "wasm32"))]
+mod image_loader;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> eframe::Result<()> {
+    let icon = image::load_from_memory_with_format(HLBC_ICON, ImageFormat::Ico).unwrap();
+    let icon_data = Arc::new(IconData {
+        width: icon.width(),
+        height: icon.height(),
+        rgba: icon.into_bytes(),
+    });
     eframe::run_native(
-        "hlbc gui",
+        "hlbc",
         eframe::NativeOptions {
             vsync: true,
-            viewport: ViewportBuilder::default().with_inner_size(Vec2::new(1280.0, 720.0)),
+            viewport: ViewportBuilder::default()
+                .with_inner_size(Vec2::new(1280.0, 720.0))
+                .with_icon(icon_data),
             #[cfg(feature = "wgpu")]
             wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
                 power_preference: eframe::wgpu::util::power_preference_from_env()
@@ -38,6 +51,8 @@ fn main() -> eframe::Result<()> {
                     )))
                 }))
             };
+            cc.egui_ctx
+                .add_image_loader(Arc::new(image_loader::ImageCrateLoader::default()));
 
             cc.egui_ctx.set_fonts(egui_ui_refresh::fonts());
             cc.egui_ctx.set_style(egui_ui_refresh::style());

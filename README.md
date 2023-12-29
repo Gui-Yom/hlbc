@@ -1,3 +1,5 @@
+<img src="assets/hlbc.svg" alt="hlbc" align="right" />
+
 <div align="center">
     <h1><b>H</b>ash<b>l</b>ink <b>b</b>yte<b>c</b>ode tools</h1>
     <a href="https://crates.io/crates/hlbc">
@@ -16,8 +18,12 @@
     This repository contains a collection of Rust crates and cli tools to load, disassemble, decompile and
     analyze <a href="https://hashlink.haxe.org/">Hashlink</a> bytecode.
     <br/>
+    <br/>
+    <br/>
+    <br/>
+    <br/>
     <img src="crates/cli/screenshot.png" width="318" height="215">
-    <img src="crates/gui/screenshot.png" width="354" height="249">
+    <img src="assets/gui_screenshot.png" width="354" height="249">
 </div>
 
 ## About
@@ -33,7 +39,6 @@ Those games are packaged with the following model :
 - `<game>.exe`: A very light executable that contains the Hashlink VM
 - `hlboot.dat`: The actual bytecode file Hashlink is configured to load on startup. This is the file you want to load in
   *hlbc*. It doesn't contain any game assets, this is just code.
-- `sdlboot.dat`: This is the same code, except it fallbacks to SDL.
 - `<lib>.hdll`: This is your average native code dll, except it can work with the VM.
 
 ## Repository structure
@@ -44,6 +49,7 @@ Those games are packaged with the following model :
 - `crates/decompiler/` : Decompiler library
 - `crates/derive/` : helper proc macros for hlbc
 - `crates/gui/` : GUI to explore bytecode visually
+- `crates/indexing/` : bits and pieces to search through the bytecode
 
 ## Wiki
 
@@ -54,16 +60,22 @@ using the command `wiki` in the CLI.
 
 - Finishing the decompiler (for loops mainly)
 - C API
+- Adding more features to the GUI and improving UX
+- Looking for a better GUI framework
 
 ## Contact
 
 Questions ? Inquiries ? Help ? Use GitHub discussions, send an email or Discord : limelion.
 
-## Credits
+## Credits & references
 
 Development of this project would not have been possible without
 the [hashlink](https://github.com/HaxeFoundation/hashlink) source code. Most of the deserialization code is directly
-adapted from the original C code reading bytecode files.
+adapted from the original C code reading bytecode files. There is no real documentation for the bytecode or the inner workings of Hashlink, so reading through the source code was the main source of information.
+
+There are also 2 blog articles on the Haxe website that proved to be interesting albeit a bit outdated :
+- https://haxe.org/blog/hashlink-indepth/
+- https://haxe.org/blog/hashlink-in-depth-p2/
 
 ## Why Rust
 

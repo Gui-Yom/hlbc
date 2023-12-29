@@ -3,7 +3,9 @@ use std::fs;
 use std::io::BufReader;
 
 use eframe::egui;
-use eframe::egui::{Button, CentralPanel, Frame, Margin, ScrollArea, TopBottomPanel, Ui, Vec2};
+use eframe::egui::{
+    include_image, Button, CentralPanel, Frame, Margin, ScrollArea, TopBottomPanel, Ui, Vec2,
+};
 use egui_dock::{DockArea, DockState, Node, NodeIndex, Split, SurfaceIndex};
 use poll_promise::Promise;
 
@@ -15,12 +17,15 @@ use crate::views::{
     InfoView, StringsView, SyncInspectorView, ViewWithId,
 };
 
+mod about;
 #[cfg(feature = "examples")]
 mod examples;
 mod model;
 mod shortcuts;
 mod style;
 mod views;
+
+pub const HLBC_ICON: &'static [u8] = include_bytes!("../../../assets/hlbc.ico");
 
 pub struct App {
     /// Asynchronous loader for bytecode
@@ -430,26 +435,7 @@ impl App {
                 });
             });
 
-        egui::Window::new("About")
-            .open(&mut self.about_window_open)
-            .resizable(false)
-            .collapsible(false)
-            .fixed_size((300., 200.))
-            .show(ctx, |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.heading("Hashlink bytecode tools");
-                    ui.hyperlink("https://github.com/Gui-Yom/hlbc");
-                    ui.horizontal(|ui| {
-                        ui.label("Made by");
-                        ui.hyperlink_to("Gui-Yom", "https://github.com/Gui-Yom");
-                        ui.label("and");
-                        ui.hyperlink_to(
-                            "contributors",
-                            "https://github.com/Gui-Yom/hlbc/graphs/contributors",
-                        );
-                    });
-                });
-            });
+        about::about_window(ctx, &mut self.about_window_open);
     }
     fn close_file(&mut self) {
         self.ctx = None;

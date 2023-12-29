@@ -30,6 +30,9 @@ rfd = { version = "0.12", features = ["file-handle-inner"] }
 # Open link in webbrowser
 webbrowser = "0.8"
 
+#[target.'cfg(not(target_os = "windows"))'.dependencies]
+image = { version = "0.24", default-features = false, features = ["ico"] }
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 poll-promise = { version = "0.3" }
 syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes", "regex-onig"] }
@@ -39,6 +42,9 @@ console_error_panic_hook = "0.1"
 poll-promise = { version = "0.3", features = ["web"] }
 syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes", "regex-fancy"] }
 wasm-bindgen-futures = "0.4"
+
+[target.'cfg(target_os = "windows")'.build-dependencies]
+winresource = "0.1"
 
 [features]
 default = ["glow", "search", "examples"]

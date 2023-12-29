@@ -1,10 +1,12 @@
+<img src="../../assets/hlbc.svg" alt="hlbc" align="right" />
+
 # hlbc-gui [![Crates.io](https://img.shields.io/crates/v/hlbc-gui?label=hlbc-gui)](https://crates.io/crates/hlbc-gui)
 
-A GUI for hlbc.
+A graphical user interface for hlbc.
 
-![screenshot](screenshot.png)
+![screenshot](../../assets/gui_screenshot.png)
 
-The GUI also runs on the web ! The latest release is available at : https://gui-yom.github.io/hlbc
+It also runs on the web ! The latest release is available at : https://gui-yom.github.io/hlbc
 
 No need to download anything and the web app is entirely client side, your bytecode file stays local.
 
