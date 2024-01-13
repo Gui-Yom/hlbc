@@ -1,5 +1,5 @@
 use eframe::egui::{
-    CollapsingHeader, Color32, Grid, Link, RichText, ScrollArea, TextEdit, TextStyle, Ui,
+    CollapsingHeader, Color32, Grid, Link, RichText, ScrollArea, TextEdit, TextStyle, Ui, Vec2,
     WidgetText,
 };
 
@@ -152,6 +152,7 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
                     ui.text_style_height(&TextStyle::Monospace),
                     f.ops.len(),
                     |ui, range| {
+                        ui.style_mut().spacing.item_spacing = Vec2::new(0.0, 0.0);
                         for (i, o) in f
                             .ops
                             .iter()
@@ -159,10 +160,18 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
                             .skip(range.start)
                             .take(range.end - range.start)
                         {
+                            ui.horizontal(|ui| {
+                                ui.label(
+                                    RichText::new(format!("{i:>3}"))
+                                        .color(Color32::GRAY)
+                                        .monospace(),
+                                );
+                                ui.add_space(10.0);
+                                ui.monospace(o.display(code, f, i as i32, 11).to_string())
+                                    .on_hover_text(o.description());
+                            });
                             // TODO syntax highlighting
                             // TODO linking (requires bytecode visitor)
-                            ui.monospace(format!("{i:>3}: {}", o.display(code, f, i as i32, 11)))
-                                .on_hover_text(o.description());
                         }
                     },
                 );

@@ -8,7 +8,7 @@ use hlbc::{Bytecode, Resolve};
 
 use crate::ast::{Class, Constant, ConstructorCall, Expr, Method, Operation, Statement};
 
-const INDENT: &'static str = "                                                                ";
+const INDENT: &str = "                                                                ";
 
 #[derive(Clone)]
 pub struct FormatOptions {

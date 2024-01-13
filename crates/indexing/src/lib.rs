@@ -33,7 +33,7 @@ impl<T> Ord for Comp<T> {
     }
 }
 
-pub fn top_candidates<'a, T>(n: usize, results: impl Iterator<Item = (T, f32)>) -> Vec<(T, f32)> {
+pub fn top_candidates<T>(n: usize, results: impl Iterator<Item = (T, f32)>) -> Vec<(T, f32)> {
     let mut top = BinaryHeap::with_capacity(n + 1);
     for (c, score) in results {
         if score > 0.0 {

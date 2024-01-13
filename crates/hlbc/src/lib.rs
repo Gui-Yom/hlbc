@@ -9,7 +9,7 @@ extern crate core;
 
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::ops::{Index, RangeBounds};
+use std::ops::Index;
 
 use crate::opcodes::Opcode;
 use crate::types::{
@@ -118,7 +118,7 @@ impl Bytecode {
         self.findexes.len()
     }
 
-    pub fn functions<'a>(&'a self) -> impl Iterator<Item = FunPtr<'a>> + 'a {
+    pub fn functions(&self) -> impl Iterator<Item = FunPtr<'_>> {
         (0..self.findex_max()).map(RefFun).map(|r| self.get(r))
     }
 

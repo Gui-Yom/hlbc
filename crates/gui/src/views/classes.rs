@@ -4,7 +4,7 @@ use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{RefType, Type};
 
 use crate::model::{AppCtxHandle, Item};
-use crate::views::{impl_id, impl_view_id, list_view, DecompilerView, InspectorView, ViewWithId};
+use crate::views::{impl_id, impl_view_id, list_view, DecompilerView, InspectorView};
 use crate::AppView;
 
 #[derive(Default)]

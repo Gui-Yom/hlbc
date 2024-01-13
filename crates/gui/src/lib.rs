@@ -3,9 +3,7 @@ use std::fs;
 use std::io::BufReader;
 
 use eframe::egui;
-use eframe::egui::{
-    include_image, Button, CentralPanel, Frame, Margin, ScrollArea, TopBottomPanel, Ui, Vec2,
-};
+use eframe::egui::{Button, CentralPanel, Frame, Margin, ScrollArea, TopBottomPanel, Ui, Vec2};
 use egui_dock::{DockArea, DockState, Node, NodeIndex, Split, SurfaceIndex};
 use poll_promise::Promise;
 
@@ -25,11 +23,13 @@ mod shortcuts;
 mod style;
 mod views;
 
-pub const HLBC_ICON: &'static [u8] = include_bytes!("../../../assets/hlbc.ico");
+pub const HLBC_ICON: &[u8] = include_bytes!("../../../assets/hlbc.ico");
+
+pub type BytecodeLoader = Promise<hlbc::Result<Option<(String, Bytecode)>>>;
 
 pub struct App {
     /// Asynchronous loader for bytecode
-    loader: Option<Promise<hlbc::Result<Option<(String, Bytecode)>>>>,
+    loader: Option<BytecodeLoader>,
     /// Some when a file is loaded
     ctx: Option<AppCtxHandle>,
     // Dock
@@ -41,10 +41,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(
-        loader: Option<Promise<hlbc::Result<Option<(String, Bytecode)>>>>,
-        style: egui_dock::Style,
-    ) -> Self {
+    pub fn new(loader: Option<BytecodeLoader>, style: egui_dock::Style) -> Self {
         let is_loading = loader.is_some();
         Self {
             loader,
@@ -191,14 +188,7 @@ impl App {
                 dock.main_surface()
                     .iter()
                     .filter(|n| n.tabs().is_some())
-                    .find_map(|n| {
-                        for tab in n.tabs().unwrap() {
-                            if tab.id() == id {
-                                return Some(tab);
-                            }
-                        }
-                        None
-                    })
+                    .find_map(|n| n.tabs().unwrap().iter().find(|&tab| tab.id() == id))
             } else {
                 None
             };
@@ -409,7 +399,7 @@ impl App {
                     if let Some(appctx) = &self.ctx {
                         let (id, rect) = ui.allocate_space(Vec2::new(120.0, 20.0));
                         Ui::new(ctx.clone(), ui.layer_id(), id, rect, rect)
-                            .label(format!("{}", appctx.selected().name(appctx.code())));
+                            .label(appctx.selected().name(appctx.code()));
                         ui.separator();
                     }
                     ui.label(self.status.clone());

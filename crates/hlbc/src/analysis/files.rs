@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::Range;
 
 use crate::types::{Function, RefFun};
-use crate::{Bytecode, Resolve, Str};
+use crate::{Bytecode, Str};
 
 /// Finds the function which are present in a given file.
 /// Only looks at the first instruction to determine the file.
@@ -15,7 +15,7 @@ pub fn functions_in_files(code: &Bytecode) -> HashMap<Str, Vec<RefFun>> {
         let file = f.debug_info.as_ref().unwrap()[0].0;
         funs[file].push(f.findex);
     }
-    df.iter().cloned().zip(funs.into_iter()).collect()
+    df.iter().cloned().zip(funs).collect()
 }
 
 /// Finds the files a function is present in. Usually there is only one except
@@ -28,7 +28,7 @@ pub fn files_in_function(code: &Bytecode, f: &Function) -> HashMap<Str, Vec<Rang
     let mut start = 0;
     let mut curr_file = dbg[0].0;
     let mut ranges = HashMap::<_, Vec<Range<usize>>>::new();
-    for (i, &(file, line)) in dbg.iter().enumerate() {
+    for (i, &(file, _)) in dbg.iter().enumerate() {
         if file != curr_file {
             ranges
                 .entry(code.debug_file(file).unwrap())

@@ -14,9 +14,9 @@ keywords = ["hashlink", "bytecode", "haxe", "disassembler", "reverse-enginneerin
 
 [dependencies]
 # AIO GUI framework
-eframe = { version = "0.24", default-features = false }
+eframe = { version = "0.25", default-features = false }
 # Docking tabs
-egui_dock = { version = "0.9" }
+egui_dock = { version = "0.10" }
 # UI theme
 egui_ui_refresh = { version = "0.2", path = "../../../egui_ui_refresh" }
 # Core library

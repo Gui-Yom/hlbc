@@ -40,7 +40,7 @@ impl AppView for FilesView {
                         for &f in funs {
                             let item = Item::Fun(f);
                             let checked = ctx.selected() == item;
-                            let mut label = ui
+                            let label = ui
                                 .selectable_label(
                                     checked,
                                     singleline(
