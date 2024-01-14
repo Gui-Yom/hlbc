@@ -2,7 +2,7 @@ use std::any::type_name;
 use std::hash::{Hash, Hasher};
 
 use eframe::egui::text::LayoutJob;
-use eframe::egui::{Color32, FontId, ScrollArea, TextStyle, Ui, WidgetText};
+use eframe::egui::{Color32, FontId, InnerResponse, ScrollArea, TextStyle, Ui, WidgetText};
 use eframe::epaint::text::TextWrapping;
 use egui_dock::TabViewer;
 
@@ -219,6 +219,16 @@ pub(crate) fn singleline(text: impl Into<String>, font_id: FontId, color: Color3
         ..TextWrapping::default()
     };
     job
+}
+
+pub(crate) fn text_stitch<R>(
+    ui: &mut Ui,
+    add_contents: impl FnOnce(&mut Ui) -> R,
+) -> InnerResponse<R> {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 4.0;
+        add_contents(ui)
+    })
 }
 
 #[cfg(test)]

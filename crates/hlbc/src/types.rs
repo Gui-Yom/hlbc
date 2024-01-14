@@ -10,6 +10,8 @@ pub type InlineInt = i32;
 pub type InlineBool = bool;
 
 /// A register argument
+///
+/// Registers are a function local variables.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default, Hash)]
 pub struct Reg(pub u32);
 
@@ -148,26 +150,38 @@ pub enum Type {
     Bool,
     Bytes,
     Dyn,
+    /// The type of a function
     Fun(TypeFun),
+    /// The type of an object (class)
     Obj(TypeObj),
+    /// Type of arrays, arrays are dynamic
     Array,
+    /// The type of a type object
     Type,
+    /// Reference to an inner type
     Ref(RefType),
+    /// The type of anonymous objects
     Virtual {
         fields: Vec<ObjField>,
     },
     DynObj,
+    /// Abstract class ?
     Abstract {
         name: RefString,
     },
+    /// Enum, algebraic data types
     Enum {
         name: RefString,
         global: RefGlobal,
         constructs: Vec<EnumConstruct>,
     },
+    /// Null wrapper
     Null(RefType),
+    /// Type of a method
     Method(TypeFun),
+    /// Type of a struct
     Struct(TypeObj),
+    /// Packed wrapper
     Packed(RefType),
 }
 
@@ -196,6 +210,14 @@ impl Type {
         match self {
             Type::Fun(fun) => Some(fun),
             Type::Method(fun) => Some(fun),
+            _ => None,
+        }
+    }
+
+    /// If this type is a wrapper type, return the inner type.
+    pub fn get_inner(&self) -> Option<RefType> {
+        match self {
+            &Type::Ref(inner) | &Type::Null(inner) | &Type::Packed(inner) => Some(inner),
             _ => None,
         }
     }
@@ -277,6 +299,11 @@ impl Native {
 
     pub fn lib(&self, code: &Bytecode) -> Str {
         code.get(self.lib)
+    }
+
+    /// If the lib name starts with '?', then it is lazily loaded.
+    pub fn lib_is_lazy(&self, code: &Bytecode) -> bool {
+        self.lib(code).starts_with('?')
     }
 
     /// Get the native function signature type

@@ -31,7 +31,7 @@ pub mod types;
 /// All about writing bytecode
 mod write;
 
-/// Cheaply clonable with inline storage
+/// Cheaply cloneable string with inline storage
 // pub type Str = smol_str::SmolStr;
 // pub type Str = kstring::KStringBase<kstring::backend::RcStr>;
 pub type Str = flexstr::SharedStr;

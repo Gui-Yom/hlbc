@@ -2,6 +2,7 @@ use eframe::egui;
 use eframe::egui::load::Bytes;
 use eframe::egui::{Context, ImageSource};
 
+use crate::views::text_stitch;
 use crate::HLBC_ICON;
 
 pub(crate) fn about_window(ctx: &Context, open: &mut bool) {
@@ -18,7 +19,7 @@ pub(crate) fn about_window(ctx: &Context, open: &mut bool) {
                 });
                 ui.heading("Hashlink bytecode tools");
                 ui.hyperlink("https://github.com/Gui-Yom/hlbc");
-                ui.horizontal(|ui| {
+                text_stitch(ui, |ui| {
                     ui.label("Made by");
                     ui.hyperlink_to("Gui-Yom", "https://github.com/Gui-Yom");
                     ui.label("and");

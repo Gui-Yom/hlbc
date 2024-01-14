@@ -1,17 +1,17 @@
 use eframe::egui::{
-    CollapsingHeader, Color32, Grid, Link, RichText, ScrollArea, TextEdit, TextStyle, Ui, Vec2,
+    CollapsingHeader, Color32, Grid, Link, RichText, ScrollArea, TextEdit, TextStyle, Ui,
     WidgetText,
 };
 
-use hlbc::analysis::usage::UsageString;
+use hlbc::analysis::usage::{UsageString, UsageType};
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{
-    EnumConstruct, FunPtr, RefField, RefFun, RefGlobal, RefString, RefType, Type, TypeObj,
+    EnumConstruct, FunPtr, ObjField, RefField, RefFun, RefGlobal, RefString, RefType, Type, TypeObj,
 };
 use hlbc::{Bytecode, Resolve};
 
 use crate::model::{AppCtxHandle, Item};
-use crate::views::{impl_id, impl_view_id, ViewId};
+use crate::views::{impl_id, impl_view_id, text_stitch, ViewId};
 use crate::{shortcuts, AppView};
 
 /// View detailed information about a bytecode element.
@@ -152,7 +152,6 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
                     ui.text_style_height(&TextStyle::Monospace),
                     f.ops.len(),
                     |ui, range| {
-                        ui.style_mut().spacing.item_spacing = Vec2::new(0.0, 0.0);
                         for (i, o) in f
                             .ops
                             .iter()
@@ -160,7 +159,7 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
                             .skip(range.start)
                             .take(range.end - range.start)
                         {
-                            ui.horizontal(|ui| {
+                            text_stitch(ui, |ui| {
                                 ui.label(
                                     RichText::new(format!("{i:>3}"))
                                         .color(Color32::GRAY)
@@ -187,27 +186,113 @@ fn function_inspector(ui: &mut Ui, ctx: AppCtxHandle, fun: RefFun) {
 }
 
 fn type_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
-    match &ctx.code()[t] {
-        Type::Fun(_) => {}
-        Type::Obj(obj) => {
-            obj_inspector(ui, ctx.clone(), t, obj);
-        }
-        Type::Ref(_) => {}
-        Type::Virtual { .. } => {}
-        Type::Abstract { .. } => {}
-        Type::Enum { .. } => {
-            enum_inspector(ui, ctx.clone(), t);
-        }
-        Type::Null(_) => {}
-        Type::Method(_) => {}
-        Type::Struct(obj) => {
-            obj_inspector(ui, ctx.clone(), t, obj);
-        }
-        Type::Packed(_) => {}
-        _ => {
-            ui.label("Unsupported type in inspector");
+    if t.is_known() {
+        ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
+        ui.separator();
+        ui.label("This is a base Hashlink type");
+    } else if ctx.code()[t].is_wrapper_type() {
+        wrapper_type_inspector(ui, ctx, t);
+    } else {
+        match &ctx.code()[t] {
+            Type::Fun(_) => {}
+            Type::Obj(obj) => {
+                obj_inspector(ui, ctx.clone(), t, obj);
+            }
+            Type::Ref(inner) => {
+                ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
+                ui.separator();
+                ui.label(format!(
+                    "Ref wrapper type for {}",
+                    inner.display::<EnhancedFmt>(ctx.code())
+                ));
+                ui.separator();
+                type_usage_report(ui, ctx, t);
+            }
+            Type::Virtual { fields } => {
+                virtual_inspector(ui, ctx.clone(), t, fields);
+            }
+            Type::Abstract { .. } => {}
+            Type::Enum { .. } => {
+                enum_inspector(ui, ctx.clone(), t);
+            }
+            Type::Null(inner) => {
+                ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
+                ui.label(format!(
+                    "Null wrapper type for {}",
+                    inner.display::<EnhancedFmt>(ctx.code())
+                ));
+                ui.separator();
+                type_usage_report(ui, ctx, t);
+            }
+            Type::Method(_) => {}
+            Type::Struct(obj) => {
+                obj_inspector(ui, ctx.clone(), t, obj);
+            }
+            Type::Packed(inner) => {
+                ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
+                ui.separator();
+                ui.label(format!(
+                    "Packed wrapper type for {}",
+                    inner.display::<EnhancedFmt>(ctx.code())
+                ));
+                ui.separator();
+                type_usage_report(ui, ctx, t);
+            }
+            other => {
+                ui.label("Type is unsupported in inspector");
+                ui.separator();
+                ui.monospace(format!("{:#?}", other));
+                type_usage_report(ui, ctx, t);
+            }
         }
     }
+}
+
+fn type_usage_report(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
+    let usages = &ctx.usage()[t];
+    if usages.is_empty() {
+        ui.label("Unused");
+    } else {
+        CollapsingHeader::new("Usage report")
+            .id_source("inspector::type::usage")
+            .default_open(true)
+            .show(ui, |ui| {
+                for usage in usages {
+                    text_stitch(ui, |ui| match usage {
+                        &UsageType::Argument(t) => {
+                            ui.label("Argument in function type");
+                            inspector_link(ui, ctx.clone(), Item::Type(t));
+                        }
+                        &UsageType::Return(t) => {
+                            ui.label("Return type in function type");
+                            inspector_link(ui, ctx.clone(), Item::Type(t));
+                        }
+                        &UsageType::Field(obj, _) => {
+                            ui.label("Type of class field");
+                            inspector_link(ui, ctx.clone(), Item::Type(obj));
+                        }
+                        &UsageType::EnumVariant(enum_, _, _) => {
+                            ui.label("Enum variant field");
+                            inspector_link(ui, ctx.clone(), Item::Type(enum_));
+                        }
+                    });
+                }
+            });
+    }
+}
+
+fn wrapper_type_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
+    ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
+    ui.separator();
+    ui.label(format!(
+        "Wrapper type for {}",
+        ctx.code()[t]
+            .get_inner()
+            .unwrap()
+            .display::<EnhancedFmt>(ctx.code())
+    ));
+    ui.separator();
+    type_usage_report(ui, ctx, t);
 }
 
 fn obj_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType, obj: &TypeObj) {
@@ -230,46 +315,55 @@ fn obj_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType, obj: &TypeObj) {
         ui.label("No fields");
     } else {
         ui.add_space(6.0);
-        ui.collapsing("Fields", |ui| {
-            Grid::new("inspector::class::fields")
-                .striped(true)
-                .num_columns(3)
-                .show(ui, |ui| {
-                    for (i, f) in obj.own_fields.iter().enumerate() {
-                        ui.label(&*f.name(code));
-                        ui.label(f.t.display::<EnhancedFmt>(code).to_string());
-                        if let Some(&binding) = obj
-                            .bindings
-                            .get(&RefField(i + obj.fields.len() - obj.own_fields.len()))
-                        {
-                            ui.monospace("bound to");
-                            inspector_link(ui, ctx.clone(), Item::Fun(binding));
-                        } else {
-                            ui.monospace("variable");
+        CollapsingHeader::new("Fields")
+            .id_source("inspector::class::fields")
+            .default_open(true)
+            .show(ui, |ui| {
+                Grid::new("inspector::class::fields::grid")
+                    .striped(true)
+                    .num_columns(3)
+                    .show(ui, |ui| {
+                        for (i, f) in obj.own_fields.iter().enumerate() {
+                            ui.label(&*f.name(code));
+                            ui.label(f.t.display::<EnhancedFmt>(code).to_string());
+                            if let Some(&binding) = obj
+                                .bindings
+                                .get(&RefField(i + obj.fields.len() - obj.own_fields.len()))
+                            {
+                                ui.monospace("bound to");
+                                inspector_link(ui, ctx.clone(), Item::Fun(binding));
+                            } else {
+                                ui.monospace("variable");
+                            }
+                            ui.end_row();
                         }
-                        ui.end_row();
-                    }
-                });
-        });
+                    });
+            });
     }
 
     if obj.protos.is_empty() {
         ui.label("No methods");
     } else {
         ui.add_space(6.0);
-        ui.collapsing("Methods", |ui| {
-            Grid::new("inspector::class::methods")
-                .striped(true)
-                .num_columns(2)
-                .show(ui, |ui| {
-                    for f in &obj.protos {
-                        ui.label(&*f.name(code));
-                        inspector_link(ui, ctx.clone(), Item::Fun(f.findex));
-                        ui.end_row();
-                    }
-                });
-        });
+        CollapsingHeader::new("Methods")
+            .id_source("inspector::class::methods")
+            .default_open(true)
+            .show(ui, |ui| {
+                Grid::new("inspector::class::methods::grid")
+                    .striped(true)
+                    .num_columns(2)
+                    .show(ui, |ui| {
+                        for f in &obj.protos {
+                            ui.label(&*f.name(code));
+                            inspector_link(ui, ctx.clone(), Item::Fun(f.findex));
+                            ui.end_row();
+                        }
+                    });
+            });
     }
+
+    ui.separator();
+    type_usage_report(ui, ctx, t);
 }
 
 fn enum_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
@@ -281,20 +375,46 @@ fn enum_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
     };
 
     ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
-    ui.horizontal(|ui| {
-        ui.label("Initialized by global");
+    text_stitch(ui, |ui| {
+        ui.label("Initialized by");
         inspector_link(ui, ctx.clone(), Item::Global(*global));
     });
 
     ui.separator();
-    for EnumConstruct { name, params } in constructs {
-        ui.horizontal(|ui| {
-            ui.label(ctx.code()[*name].as_ref());
-            for p in params {
-                ui.label(p.display::<EnhancedFmt>(ctx.code()).to_string());
+    Grid::new("inspector::enum::fields")
+        .striped(true)
+        .num_columns(2)
+        .show(ui, |ui| {
+            for EnumConstruct { name, params } in constructs {
+                ui.label(ctx.code()[*name].as_ref());
+                for &p in params {
+                    inspector_link(ui, ctx.clone(), Item::Type(p));
+                }
+                ui.end_row();
             }
         });
-    }
+
+    ui.separator();
+    type_usage_report(ui, ctx, t);
+}
+
+fn virtual_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType, fields: &[ObjField]) {
+    ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
+    ui.separator();
+    let code = ctx.code();
+    Grid::new("inspector::virtual::fields")
+        .striped(true)
+        .num_columns(2)
+        .show(ui, |ui| {
+            for f in fields {
+                ui.label(&*f.name(code));
+                inspector_link(ui, ctx.clone(), Item::Type(f.t));
+                ui.end_row();
+            }
+        });
+
+    ui.separator();
+    type_usage_report(ui, ctx, t);
 }
 
 fn global_inspector(ui: &mut Ui, ctx: AppCtxHandle, g: RefGlobal) {
@@ -318,43 +438,36 @@ fn global_inspector(ui: &mut Ui, ctx: AppCtxHandle, g: RefGlobal) {
 fn string_inspector(ui: &mut Ui, ctx: AppCtxHandle, s: RefString) {
     ui.heading(format!("string@{}", s.0));
     CollapsingHeader::new("Usage report")
+        .id_source("inspector::string::usage")
         .default_open(true)
         .show(ui, |ui| {
             for usage in &ctx.usage()[s] {
-                match usage {
+                text_stitch(ui, |ui| match usage {
                     &UsageString::Type(ty) => {
-                        ui.horizontal(|ui| {
-                            ui.label("Name of type");
-                            inspector_link(ui, ctx.clone(), Item::Type(ty));
-                        });
+                        ui.label("Name of type");
+                        inspector_link(ui, ctx.clone(), Item::Type(ty));
                     }
                     &UsageString::EnumVariant(ty, _) => {
-                        ui.horizontal(|ui| {
-                            ui.label("Name of enum variant");
-                            inspector_link(ui, ctx.clone(), Item::Type(ty));
-                        });
+                        ui.label("Name of enum variant");
+                        inspector_link(ui, ctx.clone(), Item::Type(ty));
                     }
                     &UsageString::Field(ty, _) => {
-                        ui.horizontal(|ui| {
-                            ui.label("Field name of type");
-                            inspector_link(ui, ctx.clone(), Item::Type(ty));
-                        });
+                        ui.label("Field name of type");
+                        inspector_link(ui, ctx.clone(), Item::Type(ty));
                     }
                     &UsageString::Proto(ty, _) => {
-                        ui.horizontal(|ui| {
-                            ui.label("Method name of type");
-                            inspector_link(ui, ctx.clone(), Item::Type(ty));
-                        });
+                        ui.label("Method name of type");
+                        inspector_link(ui, ctx.clone(), Item::Type(ty));
                     }
-                    UsageString::Code(f, _) => {
-                        let display = f.display_header::<EnhancedFmt>(ctx.code());
-                        ui.label(format!("Code constant {display}"));
+                    &UsageString::Code(f, _) => {
+                        ui.label("Code constant in");
+                        inspector_link(ui, ctx.clone(), Item::Fun(f));
                     }
-                    UsageString::Dyn(f, _) => {
-                        let display = f.display_header::<EnhancedFmt>(ctx.code());
-                        ui.label(format!("Dynamic access {display}"));
+                    &UsageString::Dyn(f, _) => {
+                        ui.label("Dynamic access key in");
+                        inspector_link(ui, ctx.clone(), Item::Fun(f));
                     }
-                }
+                });
             }
         });
     ui.separator();

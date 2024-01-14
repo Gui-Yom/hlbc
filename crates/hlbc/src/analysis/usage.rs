@@ -30,7 +30,7 @@ pub enum UsageFun {
 pub enum UsageType {
     /// Type used as argument of a function. RefType points to a TypeFun.
     Argument(RefType),
-    /// Type used as return type
+    /// Type used as return type. RefType points to a TypeFun.
     Return(RefType),
     /// Type used as a field type
     Field(RefType, usize),
@@ -183,6 +183,22 @@ impl FullUsageReport {
                 _ => {}
             }
         }
+    }
+}
+
+impl Index<RefType> for FullUsageReport {
+    type Output = [UsageType];
+
+    fn index(&self, index: RefType) -> &Self::Output {
+        self.types.index(index.0)
+    }
+}
+
+impl Index<RefFun> for FullUsageReport {
+    type Output = [UsageFun];
+
+    fn index(&self, index: RefFun) -> &Self::Output {
+        self.fun.index(index.0)
     }
 }
 
