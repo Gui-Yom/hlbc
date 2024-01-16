@@ -203,6 +203,14 @@ impl Resolve<RefType> for Bytecode {
     }
 }
 
+impl Resolve<RefGlobal> for Bytecode {
+    type Output<'a> = &'a RefType;
+
+    fn get(&self, index: RefGlobal) -> Self::Output<'_> {
+        &self.globals[index.0]
+    }
+}
+
 impl Resolve<RefFun> for Bytecode {
     type Output<'a> = FunPtr<'a>;
 
@@ -247,6 +255,14 @@ impl Index<RefType> for Bytecode {
 
     fn index(&self, index: RefType) -> &Self::Output {
         self.types.index(index.0)
+    }
+}
+
+impl Index<RefGlobal> for Bytecode {
+    type Output = RefType;
+
+    fn index(&self, index: RefGlobal) -> &Self::Output {
+        self.globals.index(index.0)
     }
 }
 

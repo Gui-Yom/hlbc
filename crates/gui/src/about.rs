@@ -2,7 +2,7 @@ use eframe::egui;
 use eframe::egui::load::Bytes;
 use eframe::egui::{Context, ImageSource};
 
-use crate::views::text_stitch;
+use crate::style::text_stitch;
 use crate::HLBC_ICON;
 
 pub(crate) fn about_window(ctx: &Context, open: &mut bool) {

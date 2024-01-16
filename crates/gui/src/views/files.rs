@@ -6,7 +6,8 @@ use hlbc::types::RefFun;
 use hlbc::{Bytecode, Str};
 
 use crate::model::{AppCtxHandle, Item};
-use crate::views::{impl_id, impl_view_id, singleline, AppView, DecompilerView, InspectorView};
+use crate::style::singleline;
+use crate::views::{impl_id, impl_view_id, AppView, DecompilerView, InspectorView};
 
 pub struct FilesView {
     files: Vec<(Str, Vec<RefFun>)>,

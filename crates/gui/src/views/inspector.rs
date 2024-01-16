@@ -11,7 +11,8 @@ use hlbc::types::{
 use hlbc::{Bytecode, Resolve};
 
 use crate::model::{AppCtxHandle, Item};
-use crate::views::{impl_id, impl_view_id, text_stitch, ViewId};
+use crate::style::text_stitch;
+use crate::views::{impl_id, impl_view_id, ViewId};
 use crate::{shortcuts, AppView};
 
 /// View detailed information about a bytecode element.
@@ -78,35 +79,38 @@ impl AppView for InspectorView {
 }
 
 fn inspector_ui(ui: &mut Ui, ctx: AppCtxHandle, item: Item) {
-    ScrollArea::vertical()
-        .id_source("inspector_scroll_area")
-        .auto_shrink([false, false])
-        .show(ui, |ui| match item {
-            Item::Fun(fun) => {
-                function_inspector(ui, ctx, fun);
-            }
-            Item::Type(t) => {
-                type_inspector(ui, ctx, t);
-            }
-            Item::Global(g) => {
-                global_inspector(ui, ctx, g);
-            }
-            Item::String(s) => {
-                string_inspector(ui, ctx, s);
-            }
-            _ => {
-                ui.label("Select a function or a class.");
-            }
-        });
+    match item {
+        Item::Fun(fun) => {
+            function_inspector(ui, ctx, fun);
+        }
+        Item::Type(t) => {
+            type_inspector(ui, ctx, t);
+        }
+        Item::Global(g) => {
+            global_inspector(ui, ctx, g);
+        }
+        Item::String(s) => {
+            string_inspector(ui, ctx, s);
+        }
+        _ => {
+            ui.label("Select a function or a class.");
+        }
+    }
 }
 
-fn inspector_link(ui: &mut Ui, ctx: AppCtxHandle, item: Item) {
-    let res = ui.add(Link::new(item.name(ctx.code()))).context_menu(|ui| {
-        if ui.button("Open in inspector").clicked() {
-            ctx.open_tab(InspectorView::new(item, ctx.code()));
-            ui.close_menu();
-        }
-    });
+pub(crate) fn inspector_link(ui: &mut Ui, ctx: AppCtxHandle, item: Item) {
+    let res = ui
+        .add(Link::new(item.name(ctx.code())))
+        .context_menu(|ui| {
+            if ui.button("Open in inspector").clicked() {
+                ctx.open_tab(InspectorView::new(item, ctx.code()));
+                ui.close_menu();
+            }
+        })
+        .on_hover_ui(|ui| {
+            ui.set_max_width(160.0);
+            inspector_ui(ui, ctx.clone(), item);
+        });
     if res.clicked() {
         ctx.set_selected(item);
     }
@@ -194,54 +198,34 @@ fn type_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
         wrapper_type_inspector(ui, ctx, t);
     } else {
         match &ctx.code()[t] {
-            Type::Fun(_) => {}
-            Type::Obj(obj) => {
-                obj_inspector(ui, ctx.clone(), t, obj);
-            }
-            Type::Ref(inner) => {
-                ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
-                ui.separator();
-                ui.label(format!(
-                    "Ref wrapper type for {}",
-                    inner.display::<EnhancedFmt>(ctx.code())
-                ));
+            Type::Fun(fun) | Type::Method(fun) => {
+                text_stitch(ui, |ui| {
+                    ui.heading("Function type :");
+                    ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
+                });
                 ui.separator();
                 type_usage_report(ui, ctx, t);
+            }
+            // TODO differentiate between obj and struct ?
+            Type::Obj(obj) | Type::Struct(obj) => {
+                obj_inspector(ui, ctx.clone(), t, obj);
             }
             Type::Virtual { fields } => {
                 virtual_inspector(ui, ctx.clone(), t, fields);
             }
-            Type::Abstract { .. } => {}
+            &Type::Abstract { name } => {
+                text_stitch(ui, |ui| {
+                    ui.heading("Abstract class");
+                    ui.heading(&*ctx.code()[name]);
+                });
+            }
             Type::Enum { .. } => {
                 enum_inspector(ui, ctx.clone(), t);
             }
-            Type::Null(inner) => {
-                ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
-                ui.label(format!(
-                    "Null wrapper type for {}",
-                    inner.display::<EnhancedFmt>(ctx.code())
-                ));
-                ui.separator();
-                type_usage_report(ui, ctx, t);
-            }
-            Type::Method(_) => {}
-            Type::Struct(obj) => {
-                obj_inspector(ui, ctx.clone(), t, obj);
-            }
-            Type::Packed(inner) => {
-                ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
-                ui.separator();
-                ui.label(format!(
-                    "Packed wrapper type for {}",
-                    inner.display::<EnhancedFmt>(ctx.code())
-                ));
-                ui.separator();
-                type_usage_report(ui, ctx, t);
-            }
             other => {
                 ui.label("Type is unsupported in inspector");
-                ui.separator();
                 ui.monospace(format!("{:#?}", other));
+                ui.separator();
                 type_usage_report(ui, ctx, t);
             }
         }
@@ -251,7 +235,7 @@ fn type_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
 fn type_usage_report(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
     let usages = &ctx.usage()[t];
     if usages.is_empty() {
-        ui.label("Unused");
+        ui.label("This type is unused (as per hlbc usage analysis)");
     } else {
         CollapsingHeader::new("Usage report")
             .id_source("inspector::type::usage")
@@ -284,13 +268,14 @@ fn type_usage_report(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
 fn wrapper_type_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
     ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
     ui.separator();
-    ui.label(format!(
-        "Wrapper type for {}",
-        ctx.code()[t]
-            .get_inner()
-            .unwrap()
-            .display::<EnhancedFmt>(ctx.code())
-    ));
+    text_stitch(ui, |ui| {
+        ui.label("Wrapper type for");
+        inspector_link(
+            ui,
+            ctx.clone(),
+            Item::Type(ctx.code()[t].get_inner().unwrap()),
+        );
+    });
     ui.separator();
     type_usage_report(ui, ctx, t);
 }
@@ -299,14 +284,14 @@ fn obj_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType, obj: &TypeObj) {
     let code = ctx.code();
     ui.heading(format!("Class : {}", t.display::<EnhancedFmt>(code)));
     if let Some(super_) = obj.super_ {
-        ui.horizontal(|ui| {
+        text_stitch(ui, |ui| {
             ui.label("extends");
             inspector_link(ui, ctx.clone(), Item::Type(super_));
         });
     }
     if obj.global.0 >= 1 {
-        ui.horizontal(|ui| {
-            ui.label("initialized by global");
+        text_stitch(ui, |ui| {
+            ui.label("initialized by");
             inspector_link(ui, ctx.clone(), Item::Global(RefGlobal(obj.global.0 - 1)));
         });
     }
@@ -325,13 +310,15 @@ fn obj_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType, obj: &TypeObj) {
                     .show(ui, |ui| {
                         for (i, f) in obj.own_fields.iter().enumerate() {
                             ui.label(&*f.name(code));
-                            ui.label(f.t.display::<EnhancedFmt>(code).to_string());
+                            inspector_link(ui, ctx.clone(), Item::Type(f.t));
                             if let Some(&binding) = obj
                                 .bindings
                                 .get(&RefField(i + obj.fields.len() - obj.own_fields.len()))
                             {
-                                ui.monospace("bound to");
-                                inspector_link(ui, ctx.clone(), Item::Fun(binding));
+                                text_stitch(ui, |ui| {
+                                    ui.monospace("bound to");
+                                    inspector_link(ui, ctx.clone(), Item::Fun(binding));
+                                });
                             } else {
                                 ui.monospace("variable");
                             }
@@ -376,7 +363,7 @@ fn enum_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
 
     ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
     text_stitch(ui, |ui| {
-        ui.label("Initialized by");
+        ui.label("initialized by");
         inspector_link(ui, ctx.clone(), Item::Global(*global));
     });
 
@@ -418,25 +405,34 @@ fn virtual_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType, fields: &[ObjFi
 }
 
 fn global_inspector(ui: &mut Ui, ctx: AppCtxHandle, g: RefGlobal) {
-    ui.heading(format!("Global@{}", g.0));
-    ui.label(format!(
-        "Type : {}",
-        ctx.code().globals[g.0].display::<EnhancedFmt>(ctx.code())
-    ));
+    ui.heading(format!("global{}", g));
+    text_stitch(ui, |ui| {
+        ui.label("of type");
+        inspector_link(ui, ctx.clone(), Item::Type(ctx.code()[g]));
+    });
 
-    if let (Some(&cst), Some(constants)) = (
-        ctx.code().globals_initializers.get(&g),
-        &ctx.code().constants,
-    ) {
-        let def = &constants[cst];
-        ui.label(format!("{:?}", def.fields));
+    ui.separator();
+
+    if let Some(cst) = ctx
+        .code()
+        .constants
+        .as_ref()
+        .zip(ctx.code().globals_initializers.get(&g))
+        .map(|(csts, &idx)| &csts[idx])
+    {
+        ui.label("This global is initialized by a constant definition");
+        ui.label(format!("field initializers : {:?}", cst.fields));
     } else {
         ui.label("This global is initialized with code");
+        text_stitch(ui, |ui| {
+            ui.label("The initialization code is usually in the");
+            inspector_link(ui, ctx.clone(), Item::Fun(ctx.code().entrypoint));
+        });
     }
 }
 
 fn string_inspector(ui: &mut Ui, ctx: AppCtxHandle, s: RefString) {
-    ui.heading(format!("string@{}", s.0));
+    ui.heading(format!("string{}", s));
     CollapsingHeader::new("Usage report")
         .id_source("inspector::string::usage")
         .default_open(true)

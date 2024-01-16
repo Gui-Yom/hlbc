@@ -3,7 +3,8 @@ use eframe::egui::{Color32, RichText, Ui, WidgetText};
 use hlbc::types::RefString;
 
 use crate::model::{AppCtxHandle, Item};
-use crate::views::{impl_id, impl_view_id, list_view};
+use crate::style::list_view;
+use crate::views::{impl_id, impl_view_id};
 use crate::AppView;
 
 #[derive(Default)]

@@ -12,8 +12,8 @@ pub use fmtools::fmt;
 
 use crate::opcodes::Opcode;
 use crate::types::{
-    FunPtr, Function, Native, RefEnumConstruct, RefField, RefFloat, RefInt, RefString, RefType,
-    Reg, Type, TypeFun, TypeObj,
+    FunPtr, Function, Native, RefEnumConstruct, RefField, RefFloat, RefGlobal, RefInt, RefString,
+    RefType, Reg, Type, TypeFun, TypeObj,
 };
 use crate::Resolve;
 use crate::{Bytecode, RefFun};
@@ -53,6 +53,12 @@ impl Display for RefType {
         } else {
             write!(f, "@{}", self.0)
         }
+    }
+}
+
+impl Display for RefGlobal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        write!(f, "@{}", self.0)
     }
 }
 

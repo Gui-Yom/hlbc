@@ -5,7 +5,8 @@ use hlbc::types::RefFun;
 use hlbc::Bytecode;
 use hlbc_indexing::{ClangdSearcher, Contains, Searcher, SkimSearcher};
 
-use crate::views::{impl_id, impl_view_id, singleline_simple, AppView, ViewId};
+use crate::style::singleline_simple;
+use crate::views::{impl_id, impl_view_id, AppView, ViewId};
 use crate::AppCtxHandle;
 
 pub(crate) struct SearchView {

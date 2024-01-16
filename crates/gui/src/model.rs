@@ -162,10 +162,8 @@ impl Item {
         match self {
             Item::Fun(fun) => fun.display::<EnhancedFmt>(code).to_string(),
             Item::Type(t) => t.display::<EnhancedFmt>(code).to_string(),
-            Item::Global(g) => format!("global@{}", g.0),
-            Item::String(s) => {
-                format!("string@{}", s.0)
-            }
+            Item::Global(g) => format!("global{}", g),
+            Item::String(s) => format!("string{}", s),
             _ => String::new(),
         }
     }
