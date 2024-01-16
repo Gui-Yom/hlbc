@@ -259,6 +259,14 @@ fn type_usage_report(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
                             ui.label("Enum variant field");
                             inspector_link(ui, ctx.clone(), Item::Type(enum_));
                         }
+                        &UsageType::Function(f) => {
+                            ui.label("Type of function");
+                            inspector_link(ui, ctx.clone(), Item::Fun(f));
+                        }
+                        &UsageType::Register(f) => {
+                            ui.label("Type of function register in");
+                            inspector_link(ui, ctx.clone(), Item::Fun(f));
+                        }
                     });
                 }
             });
@@ -461,6 +469,14 @@ fn string_inspector(ui: &mut Ui, ctx: AppCtxHandle, s: RefString) {
                     }
                     &UsageString::Dyn(f, _) => {
                         ui.label("Dynamic access key in");
+                        inspector_link(ui, ctx.clone(), Item::Fun(f));
+                    }
+                    &UsageString::NativeName(f) => {
+                        ui.label("Name of native");
+                        inspector_link(ui, ctx.clone(), Item::Fun(f));
+                    }
+                    &UsageString::NativeLib(f) => {
+                        ui.label("Name of native library");
                         inspector_link(ui, ctx.clone(), Item::Fun(f));
                     }
                 });

@@ -406,6 +406,11 @@ impl Function {
             .map(|parent| !self.regs.is_empty() && self.regs[0] == parent)
             .unwrap_or(false)
     }
+
+    /// Short for `.ops.iter().enumerate()`
+    pub fn ops(&self) -> impl Iterator<Item = (usize, &Opcode)> {
+        self.ops.iter().enumerate()
+    }
 }
 
 impl Index<Reg> for Function {

@@ -7,11 +7,12 @@ use std::ops::Index;
 
 use crate::opcodes::Opcode;
 use crate::types::{
-    EnumConstruct, ObjField, ObjProto, RefEnumConstruct, RefField, RefFun, RefString, RefType, Reg,
-    Type, TypeFun, TypeObj,
+    EnumConstruct, FunPtr, Function, ObjField, ObjProto, RefEnumConstruct, RefField, RefFun,
+    RefString, RefType, Reg, Type, TypeFun, TypeObj,
 };
 use crate::Bytecode;
 
+/// The different ways a function can be used
 #[derive(Debug, Clone)]
 pub enum UsageFun {
     /// Direct call
@@ -26,6 +27,7 @@ pub enum UsageFun {
     Binding(RefType, RefField),
 }
 
+/// The different ways a type can be used
 #[derive(Debug, Clone)]
 pub enum UsageType {
     /// Type used as argument of a function. RefType points to a TypeFun.
@@ -36,8 +38,13 @@ pub enum UsageType {
     Field(RefType, usize),
     /// Type of enum variant field
     EnumVariant(RefType, RefEnumConstruct, usize),
+    /// Type of a function
+    Function(RefFun),
+    /// Type of a function register
+    Register(RefFun),
 }
 
+/// The different ways a string can be used
 #[derive(Debug, Clone)]
 pub enum UsageString {
     /// Name of type (Enum, Class)
@@ -52,6 +59,10 @@ pub enum UsageString {
     Code(RefFun, usize),
     /// Dyn obj access
     Dyn(RefFun, usize),
+    /// Name of a native function
+    NativeName(RefFun),
+    /// Name of a native library
+    NativeLib(RefFun),
 }
 
 #[derive(Debug, Clone, Default)]
@@ -143,14 +154,12 @@ impl FullUsageReport {
         }
     }
 
-    fn compute_usage_all(&mut self, code: &Bytecode) {
-        // Look through all types
-        for ref_ty in (0..code.types.len()).map(RefType) {
-            self.compute_usage_type(code, ref_ty);
+    fn compute_usage_fun(&mut self, code: &Bytecode, f: &Function) {
+        self.types[f.t.0].push(UsageType::Function(f.findex));
+        for reg in &f.regs {
+            self.types[reg.0].push(UsageType::Register(f.findex));
         }
-
-        // Look through all instructions
-        for (f, (i, op)) in code.ops() {
+        for (i, op) in f.ops() {
             match op {
                 // Calls
                 Opcode::Call0 { fun, .. }
@@ -181,6 +190,26 @@ impl FullUsageReport {
                     self.strings[field.0].push(UsageString::Dyn(f.findex, i));
                 }
                 _ => {}
+            }
+        }
+    }
+
+    fn compute_usage_all(&mut self, code: &Bytecode) {
+        // Look through all types
+        for ref_ty in (0..code.types.len()).map(RefType) {
+            self.compute_usage_type(code, ref_ty);
+        }
+
+        for f in code.functions() {
+            match f {
+                FunPtr::Fun(fun) => {
+                    self.compute_usage_fun(code, fun);
+                }
+                FunPtr::Native(n) => {
+                    self.strings[n.name.0].push(UsageString::NativeName(n.findex));
+                    self.strings[n.lib.0].push(UsageString::NativeLib(n.findex));
+                    self.types[n.t.0].push(UsageType::Function(n.findex));
+                }
             }
         }
     }
