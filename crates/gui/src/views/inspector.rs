@@ -3,17 +3,17 @@ use eframe::egui::{
     WidgetText,
 };
 
+use hlbc::{Bytecode, Resolve};
 use hlbc::analysis::usage::{UsageString, UsageType};
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{
     EnumConstruct, FunPtr, ObjField, RefField, RefFun, RefGlobal, RefString, RefType, Type, TypeObj,
 };
-use hlbc::{Bytecode, Resolve};
 
+use crate::{AppView, shortcuts};
 use crate::model::{AppCtxHandle, Item};
 use crate::style::text_stitch;
 use crate::views::{impl_id, impl_view_id, ViewId};
-use crate::{shortcuts, AppView};
 
 /// View detailed information about a bytecode element.
 #[derive(Default)]
@@ -101,16 +101,16 @@ fn inspector_ui(ui: &mut Ui, ctx: AppCtxHandle, item: Item) {
 pub(crate) fn inspector_link(ui: &mut Ui, ctx: AppCtxHandle, item: Item) {
     let res = ui
         .add(Link::new(item.name(ctx.code())))
-        .context_menu(|ui| {
-            if ui.button("Open in inspector").clicked() {
-                ctx.open_tab(InspectorView::new(item, ctx.code()));
-                ui.close_menu();
-            }
-        })
         .on_hover_ui(|ui| {
             ui.set_max_width(160.0);
             inspector_ui(ui, ctx.clone(), item);
         });
+    res.context_menu(|ui| {
+        if ui.button("Open in inspector").clicked() {
+            ctx.open_tab(InspectorView::new(item, ctx.code()));
+            ui.close_menu();
+        }
+    });
     if res.clicked() {
         ctx.set_selected(item);
     }
@@ -365,9 +365,9 @@ fn enum_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
     let Type::Enum {
         constructs, global, ..
     } = &ctx.code()[t]
-    else {
-        unreachable!()
-    };
+        else {
+            unreachable!()
+        };
 
     ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
     text_stitch(ui, |ui| {

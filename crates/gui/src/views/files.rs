@@ -1,13 +1,13 @@
 use eframe::egui::{Color32, RichText, ScrollArea, TextStyle, Ui, WidgetText};
 
+use hlbc::{Bytecode, Str};
 use hlbc::analysis::files::functions_in_files;
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::RefFun;
-use hlbc::{Bytecode, Str};
 
 use crate::model::{AppCtxHandle, Item};
 use crate::style::singleline;
-use crate::views::{impl_id, impl_view_id, AppView, DecompilerView, InspectorView};
+use crate::views::{AppView, DecompilerView, impl_id, impl_view_id, InspectorView};
 
 pub struct FilesView {
     files: Vec<(Str, Vec<RefFun>)>,
@@ -49,16 +49,16 @@ impl AppView for FilesView {
                                         TextStyle::Button.resolve(ui.style().as_ref()),
                                         Color32::WHITE,
                                     ),
-                                )
-                                .context_menu(|ui| {
-                                    if ui.small_button("Open in inspector").clicked() {
-                                        let tab = InspectorView::new(item, ctx.code());
-                                        ctx.open_tab(tab);
-                                    }
-                                    if ui.small_button("Decompile").clicked() {
-                                        ctx.open_tab(DecompilerView::default());
-                                    }
-                                });
+                                );
+                            label.context_menu(|ui| {
+                                if ui.small_button("Open in inspector").clicked() {
+                                    let tab = InspectorView::new(item, ctx.code());
+                                    ctx.open_tab(tab);
+                                }
+                                if ui.small_button("Decompile").clicked() {
+                                    ctx.open_tab(DecompilerView::default());
+                                }
+                            });
                             if label.clicked() {
                                 ctx.set_selected(item);
                             }

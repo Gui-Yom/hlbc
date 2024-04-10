@@ -52,7 +52,7 @@ pub(crate) fn list_view<Elem: Copy>(
                     ),
                 );
                 if let Some(context_menu) = &context_menu {
-                    label = label.context_menu(|ui| context_menu(ui, &ctx, elem));
+                    label.context_menu(|ui| context_menu(ui, &ctx, elem));
                 }
                 if label.clicked() {
                     ctx.set_selected(create_selection(elem));
