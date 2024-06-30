@@ -1,22 +1,47 @@
 use std::collections::{HashMap, VecDeque};
 use std::fs;
-use std::io::{BufReader, Read};
+use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 use std::str::from_utf8;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
+use crate::{Bytecode, ConstantDef, Opcode, RefFun, RefFunKnown, RefGlobal, Str};
+use crate::{Error, Result};
 use crate::types::{
     EnumConstruct, Function, Native, ObjField, ObjProto, RefField, RefFloat, RefInt, RefString,
     RefType, Type, TypeFun, TypeObj,
 };
-use crate::{Bytecode, ConstantDef, Opcode, RefFun, RefFunKnown, RefGlobal, Str};
-use crate::{Error, Result};
 
 impl Bytecode {
+    /// Read the bytecode from a file. This method will skip bytes until the magic header is found.
+    ///
+    /// It uses a 512KiB buffer.
+    pub fn from_file(path: impl AsRef<Path>) -> Result<Self> {
+        Self::deserialize(&mut BufReader::with_capacity(512 * 1024, fs::File::open(path)?))
+    }
+
+    /// Load the bytecode from any source. This method will skip bytes until the magic header is found.
+    /// This also means it will read bytes indefinitely if it can't find the magic header.
+    pub fn deserialize(mut r: impl BufRead) -> Result<Self> {
+        // Search for the magic header
+        let finder = memchr::memmem::Finder::new("HLB");
+        loop {
+            let buffer = r.fill_buf()?;
+            if let Some(index) = finder.find(buffer) {
+                r.consume(index);
+                return Self::deserialize_exact(&mut r);
+            }
+            let len = buffer.len();
+            // Edge case is when this buffer ends with 'HL', we must not consume
+            // the last 2 bytes, so they can be used for the next search.
+            r.consume(len - 2);
+        }
+    }
+
     /// Load the bytecode from any source.
-    /// Must be a valid hashlink bytecode binary.
-    pub fn deserialize(r: &mut impl Read) -> Result<Bytecode> {
+    /// Must be a valid hashlink bytecode binary that starts with the magic header.
+    fn deserialize_exact(r: &mut impl Read) -> Result<Self> {
         let mut header = [0u8; 3];
         r.read_exact(&mut header)?;
         if header != [b'H', b'L', b'B'] {
@@ -128,7 +153,7 @@ impl Bytecode {
         }
 
         // Flatten types fields
-        // Start by collecting every fields in the hierarchy
+        // Start by collecting every field in the hierarchy
         // The order is important because we refer to fields by index
         let mut new_fields: Vec<Option<Vec<ObjField>>> = Vec::with_capacity(types.len());
         for t in &types {
@@ -157,8 +182,8 @@ impl Bytecode {
         // Give functions name based on object fields bindings and methods
         for (i, t) in types.iter().enumerate() {
             if let Some(TypeObj {
-                protos, bindings, ..
-            }) = t.get_type_obj()
+                            protos, bindings, ..
+                        }) = t.get_type_obj()
             {
                 for p in protos {
                     if let RefFunKnown::Fun(x) = findexes[p.findex.0] {
@@ -218,10 +243,6 @@ impl Bytecode {
             fnames,
             globals_initializers,
         })
-    }
-
-    pub fn from_file(path: impl AsRef<Path>) -> Result<Self> {
-        Self::deserialize(&mut BufReader::new(fs::File::open(path)?))
     }
 }
 
@@ -569,6 +590,14 @@ mod tests {
         assert!(code.is_ok());
     }
 
+    #[test]
+    fn test_deserialize_deadcells() {
+        let path = "E:\\Games\\DeadCells\\deadcells.exe";
+        let code = Bytecode::from_file(path);
+        assert!(code.is_ok());
+        // dbg!(code);
+    }
+
     //#[test]
     fn list_strings() {
         let code = Bytecode::from_file("E:\\Games\\Northgard\\hlboot.dat").unwrap();
@@ -582,12 +611,8 @@ mod tests {
                 .unwrap(),
         );
         let mut set = HashSet::with_capacity(code.strings.len() + code2.strings.len());
-        for s in code.strings {
-            set.insert(s);
-        }
-        for s in code2.strings {
-            set.insert(s);
-        }
+        set.extend(code.strings);
+        set.extend(code2.strings);
         for s in &set {
             file.write(s.as_bytes()).unwrap();
             file.write(b"\n").unwrap();

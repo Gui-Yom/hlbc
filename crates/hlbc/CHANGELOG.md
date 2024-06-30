@@ -4,7 +4,8 @@ This is the changelog for `hlbc`, other crates have their own changelog.
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+and this project adheres
+to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased](https://github.com/Gui-Yom/hlbc/compare/v0.7.0...HEAD)
 
@@ -13,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Disassemble Prefetch and Asm opcodes
 - Usage analysis
 - File analysis
+- Load bytecode when embedded in other files like executables
 
 ## [0.7.0](https://github.com/Gui-Yom/hlbc/compare/v0.6.1...v0.7.0) - 2023-11-16
 
@@ -49,7 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add support for hashlink `PACKED` type.
-- Bytecode formatting trait `BytecodeFmt`, and its implementations : `DebugFmt`, `DisplayFmt`, `EnhancedFmt`.
+- Bytecode formatting trait `BytecodeFmt`, and its
+  implementations : `DebugFmt`, `DisplayFmt`, `EnhancedFmt`.
 - `Index` impl for `Bytecode` to resolve most types.
 - `Resolve` trait to resolve `Ref*` elements.
 
@@ -65,7 +68,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Helper methods to access entrypoint and main functions and get a function by its name
+- Helper methods to access entrypoint and main functions and get a function by
+  its name
 - Analysis helper functions are now methods
 - IsStdFn trait implemented on functions and natives
 - More methods for `FunPtr`
@@ -87,7 +91,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Get an Opcode description (generated from its doc comment) and create an Opcode from its name.
+- Get an Opcode description (generated from its doc comment) and create an
+  Opcode from its name.
 - Derive Default on a lot of types
 - Global initializer map (global -> constant)
 - Correctly handle bytes pool

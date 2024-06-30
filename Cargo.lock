@@ -1639,6 +1639,7 @@ dependencies = [
  "flexstr",
  "fmtools",
  "hlbc-derive",
+ "memchr",
  "petgraph",
  "thiserror",
 ]

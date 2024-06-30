@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::fs;
-use std::io::BufReader;
 
 use eframe::egui;
 use eframe::egui::{Button, CentralPanel, Frame, Margin, ScrollArea, TopBottomPanel, Ui, Vec2};
@@ -126,7 +125,7 @@ impl App {
             ));
             #[cfg(target_arch = "wasm32")]
             ui.label(style::text(
-                "Your file stays local",
+                "Your file stays local and is not uploaded to any server",
                 style::get().heading_subtitle.clone(),
             ));
             ui.add_space(10.0);
@@ -138,7 +137,7 @@ impl App {
                         "Open file",
                         style::get().homepage_button.clone(),
                     ))
-                    .shortcut_text(ui.ctx().format_shortcut(&shortcuts::OPEN)),
+                        .shortcut_text(ui.ctx().format_shortcut(&shortcuts::OPEN)),
                 )
                 .on_hover_text(if cfg!(target_arch = "wasm32") {
                     "Load a bytecode file. Everything stays local."
@@ -236,7 +235,7 @@ impl App {
                 if let Some(file) = rfd::AsyncFileDialog::new().pick_file().await {
                     Ok(Some((
                         file.file_name(),
-                        Bytecode::deserialize(&mut &file.read().await[..]).unwrap(),
+                        Bytecode::deserialize(&file.read().await[..]).unwrap(),
                     )))
                 } else {
                     Ok(None)
@@ -249,7 +248,7 @@ impl App {
                 if let Some(file) = rfd::FileDialog::new().pick_file() {
                     Ok(Some((
                         file.display().to_string(),
-                        Bytecode::deserialize(&mut BufReader::new(fs::File::open(&file)?))?,
+                        Bytecode::from_file(file)?,
                     )))
                 } else {
                     Ok(None)

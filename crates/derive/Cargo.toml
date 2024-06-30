@@ -2,6 +2,7 @@
 name = "hlbc-derive"
 version = "0.8.0"
 description = "Procedural macros for the 'hlbc' crate"
+rust-version = "1.61"
 authors.workspace = true
 edition.workspace = true
 repository.workspace = true

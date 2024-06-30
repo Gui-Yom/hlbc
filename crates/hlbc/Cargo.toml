@@ -21,6 +21,8 @@ flexstr = { workspace = true }
 fmtools = { workspace = true }
 # Compile time code generation for hlbc::Opcode
 hlbc-derive = { workspace = true }
+# Search for the magic header
+memchr = { workspace = true }
 # Graph utilities
 petgraph = { workspace = true, optional = true }
 # Error types

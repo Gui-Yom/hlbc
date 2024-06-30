@@ -46,6 +46,7 @@ hlbc-derive = { version = "0.8", path = "crates/derive" }
 # Search functionality
 hlbc-indexing = { version = "0.8", path = "crates/indexing" }
 image = { version = "0.24", default-features = false, features = ["ico"] }
+memchr = "2"
 # File system watching
 notify = { version = "6", default-features = false, features = ["macos_fsevent"] }
 notify-debouncer-mini = { version = "0.4", default-features = false }

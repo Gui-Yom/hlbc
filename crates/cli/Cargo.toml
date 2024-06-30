@@ -1,7 +1,7 @@
 [package]
 name = "hlbc-cli"
 version = "0.8.0"
-rust-version = "1.70"
+rust-version = "1.74"
 description = "Hashlink bytecode disassembler, analyzer and decompiler cli"
 categories = ["command-line-utilities", "parser-implementations", "visualization", "compilers"]
 keywords = ["hashlink", "bytecode", "haxe", "disassembler", "reverse-enginneering"]
