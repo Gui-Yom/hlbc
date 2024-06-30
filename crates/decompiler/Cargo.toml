@@ -1,23 +1,23 @@
 [package]
 name = "hlbc-decompiler"
 version = "0.8.0"
-authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
-edition = "2021"
 rust-version = "1.64"
 description = "Hashlink bytecode decompiler"
-repository = "https://github.com/Gui-Yom/hlbc"
-license = "MIT"
 keywords = ["hashlink", "bytecode", "haxe", "disassembler", "reverse-enginneering"]
 categories = ["visualization", "compilers"]
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 # Advanced formatting functionalities
-fmtools = "0.1"
-hlbc = { version = "0.8", path = "../hlbc" }
+fmtools = { workspace = true }
+hlbc = { workspace = true }
 # Graph utilities
-petgraph = { version = "0.6", default-features = false, features = ["graphmap"], optional = true }
+petgraph = { workspace = true, optional = true }
 
 [features]
 default = []

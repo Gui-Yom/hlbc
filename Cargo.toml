@@ -9,6 +9,67 @@ members = [
 ]
 resolver = "2"
 
+[workspace.package]
+authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
+edition = "2021"
+repository = "https://github.com/Gui-Yom/hlbc"
+license = "MIT"
+
+[workspace.dependencies]
+# Result type
+anyhow = "1"
+# Disable colors when not a tty (piped output)
+atty = "0.2"
+# Endianess utilities
+byteorder = "1"
+# Parser for commands
+chumsky = { version = "0.9" }
+# CLI args
+clap = { version = "4", features = ["derive"] }
+console_error_panic_hook = "0.1"
+# AIO GUI framework
+eframe = { version = "0.27", default-features = false }
+# Docking tabs
+egui_dock = { version = "0.12" }
+# UI theme
+egui_ui_refresh = { version = "0.2", path = "../egui_ui_refresh" }
+# Cheaply clonable immutable string with inline storage
+flexstr = { version = "0.9" }
+fuzzy-matcher = "0.3"
+# Advanced formatting functionalities
+fmtools = "0.1"
+hlbc = { version = "0.8", path = "crates/hlbc" }
+# Decompiler
+hlbc-decompiler = { version = "0.8", path = "crates/decompiler" }
+# Compile time code generation for hlbc::Opcode
+hlbc-derive = { version = "0.8", path = "crates/derive" }
+# Search functionality
+hlbc-indexing = { version = "0.8", path = "crates/indexing" }
+image = { version = "0.24", default-features = false, features = ["ico"] }
+# File system watching
+notify = { version = "6", default-features = false, features = ["macos_fsevent"] }
+notify-debouncer-mini = { version = "0.4", default-features = false }
+# Graph utilities
+petgraph = { version = "0.6", default-features = false, features = ["graphmap"] }
+proc-macro2 = "1"
+poll-promise = { version = "0.3" }
+quote = "1"
+# Open file dialogs
+rfd = { version = "0.14", features = ["file-handle-inner"] }
+sublime_fuzzy = "0.7"
+syn = { version = "2", features = ["full", "extra-traits"] }
+syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes"] }
+tantivy = { version = "0.22" }
+# Temporary directory for compilation
+temp-dir = "0.1"
+# cli colors
+termcolor = "1"
+# Error types
+thiserror = "1"
+wasm-bindgen-futures = "0.4"
+webbrowser = "1"
+winresource = "0.1"
+
 [profile.release]
 lto = "thin"
 codegen-units = 4

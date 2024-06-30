@@ -3,17 +3,17 @@ use eframe::egui::{
     WidgetText,
 };
 
-use hlbc::{Bytecode, Resolve};
 use hlbc::analysis::usage::{UsageString, UsageType};
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::{
     EnumConstruct, FunPtr, ObjField, RefField, RefFun, RefGlobal, RefString, RefType, Type, TypeObj,
 };
+use hlbc::{Bytecode, Resolve};
 
-use crate::{AppView, shortcuts};
 use crate::model::{AppCtxHandle, Item};
 use crate::style::text_stitch;
 use crate::views::{impl_id, impl_view_id, ViewId};
+use crate::{shortcuts, AppView};
 
 /// View detailed information about a bytecode element.
 #[derive(Default)]
@@ -99,12 +99,10 @@ fn inspector_ui(ui: &mut Ui, ctx: AppCtxHandle, item: Item) {
 }
 
 pub(crate) fn inspector_link(ui: &mut Ui, ctx: AppCtxHandle, item: Item) {
-    let res = ui
-        .add(Link::new(item.name(ctx.code())))
-        .on_hover_ui(|ui| {
-            ui.set_max_width(160.0);
-            inspector_ui(ui, ctx.clone(), item);
-        });
+    let res = ui.add(Link::new(item.name(ctx.code()))).on_hover_ui(|ui| {
+        ui.set_max_width(160.0);
+        inspector_ui(ui, ctx.clone(), item);
+    });
     res.context_menu(|ui| {
         if ui.button("Open in inspector").clicked() {
             ctx.open_tab(InspectorView::new(item, ctx.code()));
@@ -242,28 +240,28 @@ fn type_usage_report(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
             .default_open(true)
             .show(ui, |ui| {
                 for usage in usages {
-                    text_stitch(ui, |ui| match usage {
-                        &UsageType::Argument(t) => {
+                    text_stitch(ui, |ui| match *usage {
+                        UsageType::Argument(t) => {
                             ui.label("Argument in function type");
                             inspector_link(ui, ctx.clone(), Item::Type(t));
                         }
-                        &UsageType::Return(t) => {
+                        UsageType::Return(t) => {
                             ui.label("Return type in function type");
                             inspector_link(ui, ctx.clone(), Item::Type(t));
                         }
-                        &UsageType::Field(obj, _) => {
+                        UsageType::Field(obj, _) => {
                             ui.label("Type of class field");
                             inspector_link(ui, ctx.clone(), Item::Type(obj));
                         }
-                        &UsageType::EnumVariant(enum_, _, _) => {
+                        UsageType::EnumVariant(enum_, _, _) => {
                             ui.label("Enum variant field");
                             inspector_link(ui, ctx.clone(), Item::Type(enum_));
                         }
-                        &UsageType::Function(f) => {
+                        UsageType::Function(f) => {
                             ui.label("Type of function");
                             inspector_link(ui, ctx.clone(), Item::Fun(f));
                         }
-                        &UsageType::Register(f) => {
+                        UsageType::Register(f) => {
                             ui.label("Type of function register in");
                             inspector_link(ui, ctx.clone(), Item::Fun(f));
                         }
@@ -365,9 +363,9 @@ fn enum_inspector(ui: &mut Ui, ctx: AppCtxHandle, t: RefType) {
     let Type::Enum {
         constructs, global, ..
     } = &ctx.code()[t]
-        else {
-            unreachable!()
-        };
+    else {
+        unreachable!()
+    };
 
     ui.heading(t.display::<EnhancedFmt>(ctx.code()).to_string());
     text_stitch(ui, |ui| {
@@ -446,36 +444,36 @@ fn string_inspector(ui: &mut Ui, ctx: AppCtxHandle, s: RefString) {
         .default_open(true)
         .show(ui, |ui| {
             for usage in &ctx.usage()[s] {
-                text_stitch(ui, |ui| match usage {
-                    &UsageString::Type(ty) => {
+                text_stitch(ui, |ui| match *usage {
+                    UsageString::Type(ty) => {
                         ui.label("Name of type");
                         inspector_link(ui, ctx.clone(), Item::Type(ty));
                     }
-                    &UsageString::EnumVariant(ty, _) => {
+                    UsageString::EnumVariant(ty, _) => {
                         ui.label("Name of enum variant");
                         inspector_link(ui, ctx.clone(), Item::Type(ty));
                     }
-                    &UsageString::Field(ty, _) => {
+                    UsageString::Field(ty, _) => {
                         ui.label("Field name of type");
                         inspector_link(ui, ctx.clone(), Item::Type(ty));
                     }
-                    &UsageString::Proto(ty, _) => {
+                    UsageString::Proto(ty, _) => {
                         ui.label("Method name of type");
                         inspector_link(ui, ctx.clone(), Item::Type(ty));
                     }
-                    &UsageString::Code(f, _) => {
+                    UsageString::Code(f, _) => {
                         ui.label("Code constant in");
                         inspector_link(ui, ctx.clone(), Item::Fun(f));
                     }
-                    &UsageString::Dyn(f, _) => {
+                    UsageString::Dyn(f, _) => {
                         ui.label("Dynamic access key in");
                         inspector_link(ui, ctx.clone(), Item::Fun(f));
                     }
-                    &UsageString::NativeName(f) => {
+                    UsageString::NativeName(f) => {
                         ui.label("Name of native");
                         inspector_link(ui, ctx.clone(), Item::Fun(f));
                     }
-                    &UsageString::NativeLib(f) => {
+                    UsageString::NativeLib(f) => {
                         ui.label("Name of native library");
                         inspector_link(ui, ctx.clone(), Item::Fun(f));
                     }

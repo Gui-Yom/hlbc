@@ -805,8 +805,7 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
     for (i, f) in obj.own_fields.iter().enumerate() {
         if obj
             .bindings
-            .get(&RefField(i + obj.fields.len() - obj.own_fields.len()))
-            .is_some()
+            .contains_key(&RefField(i + obj.fields.len() - obj.own_fields.len()))
         {
             continue;
         }
@@ -820,8 +819,7 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
         for (i, f) in ty.own_fields.iter().enumerate() {
             if ty
                 .bindings
-                .get(&RefField(i + ty.fields.len() - ty.own_fields.len()))
-                .is_some()
+                .contains_key(&RefField(i + ty.fields.len() - ty.own_fields.len()))
             {
                 continue;
             }

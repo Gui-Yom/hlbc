@@ -1,50 +1,50 @@
 [package]
 name = "hlbc-gui"
 version = "0.4.0"
-authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
-edition = "2021"
 rust-version = "1.75"
 description = "Hashlink bytecode disassembler, analyzer and decompiler gui"
-repository = "https://github.com/Gui-Yom/hlbc"
-license = "MIT"
 categories = ["command-line-utilities", "parser-implementations", "visualization", "compilers"]
 keywords = ["hashlink", "bytecode", "haxe", "disassembler", "reverse-enginneering"]
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 # AIO GUI framework
-eframe = { version = "0.27", default-features = false }
+eframe = { workspace = true }
 # Docking tabs
-egui_dock = { version = "0.12" }
+egui_dock = { workspace = true }
 # UI theme
-egui_ui_refresh = { version = "0.2", path = "../../../egui_ui_refresh" }
+egui_ui_refresh = { workspace = true }
 # Core library
-hlbc = { version = "0.8", path = "../hlbc", default-features = false }
+hlbc = { workspace = true }
 # Decompiler
-hlbc-decompiler = { version = "0.8", path = "../decompiler", default-features = false }
+hlbc-decompiler = { workspace = true }
 # Search functionality
-hlbc-indexing = { version = "0.8", path = "../indexing", optional = true }
+hlbc-indexing = { workspace = true, optional = true }
 # Open file dialogs
-rfd = { version = "0.14", features = ["file-handle-inner"] }
+rfd = { workspace = true }
 # Open link in webbrowser
-webbrowser = "0.8"
+webbrowser = { workspace = true }
 
 #[target.'cfg(not(target_os = "windows"))'.dependencies]
-image = { version = "0.24", default-features = false, features = ["ico"] }
+image = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-poll-promise = { version = "0.3" }
-syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes", "regex-onig"] }
+poll-promise = { workspace = true }
+syntect = { workspace = true, features = ["parsing", "yaml-load", "default-themes", "regex-onig"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-console_error_panic_hook = "0.1"
-poll-promise = { version = "0.3", features = ["web"] }
-syntect = { version = "5", default-features = false, features = ["parsing", "yaml-load", "default-themes", "regex-fancy"] }
-wasm-bindgen-futures = "0.4"
+console_error_panic_hook = { workspace = true }
+poll-promise = { workspace = true, features = ["web"] }
+syntect = { workspace = true, features = ["parsing", "yaml-load", "default-themes", "regex-fancy"] }
+wasm-bindgen-futures = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.build-dependencies]
-winresource = "0.1"
+winresource = { workspace = true }
 
 [features]
 default = ["glow", "search", "examples"]

@@ -1,4 +1,4 @@
-use tantivy::tokenizer::{BoxTokenStream, Token, TokenStream, Tokenizer};
+use tantivy::tokenizer::{Token, TokenStream, Tokenizer};
 
 /// Correctly tokenizes snake case and pascal case
 #[derive(Clone)]
@@ -14,12 +14,14 @@ struct FunctionTokenStream<'a> {
 }
 
 impl Tokenizer for FunctionTokenizer {
-    fn token_stream<'a>(&self, text: &'a str) -> BoxTokenStream<'a> {
-        BoxTokenStream::from(FunctionTokenStream {
+    type TokenStream<'a> = FunctionTokenStream<'a>;
+
+    fn token_stream<'a>(&self, text: &'a str) -> Self::TokenStream<'a> {
+        FunctionTokenStream {
             text,
             offset: 0,
             token: Default::default(),
-        })
+        }
     }
 }
 
@@ -80,8 +82,6 @@ impl<'a> TokenStream for FunctionTokenStream<'a> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
     use super::*;
 
     #[test]

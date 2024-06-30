@@ -3,6 +3,7 @@ use std::ops::Range;
 use chumsky::prelude::*;
 use chumsky::text::*;
 pub use chumsky::Parser;
+
 use hlbc::Str;
 
 pub type IndexRange = Range<usize>;
@@ -164,9 +165,7 @@ pub fn command_parser(ctx: &ParseContext) -> impl Parser<char, Command, Error = 
 }
 
 fn string() -> impl Parser<char, Str, Error = Simple<char>> + Clone {
-    filter(|c: &char| c != &';')
-        .repeated()
-        .map(|v| Str::from_iter(v))
+    filter(|c: &char| c != &';').repeated().map(Str::from_iter)
 }
 
 fn num() -> impl Parser<char, usize, Error = Simple<char>> {

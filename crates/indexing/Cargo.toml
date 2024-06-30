@@ -1,19 +1,19 @@
 [package]
 name = "hlbc-indexing"
 version = "0.8.0"
-authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
-edition = "2021"
 rust-version = "1.64"
 description = "Hashlink bytecode indexer"
-repository = "https://github.com/Gui-Yom/hlbc"
-license = "MIT"
 keywords = ["hashlink", "bytecode", "haxe", "disassembler", "reverse-enginneering"]
 categories = ["parser-implementations", "visualization", "compilers"]
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hlbc = { version = "0.8", path = "../hlbc" }
-tantivy = { version = "0.21", optional = true }
-sublime_fuzzy = "0.7"
-fuzzy-matcher = "0.3"
+hlbc = { workspace = true }
+tantivy = { workspace = true, optional = true }
+sublime_fuzzy = { workspace = true }
+fuzzy-matcher = { workspace = true }

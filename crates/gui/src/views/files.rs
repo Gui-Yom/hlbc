@@ -1,13 +1,13 @@
 use eframe::egui::{Color32, RichText, ScrollArea, TextStyle, Ui, WidgetText};
 
-use hlbc::{Bytecode, Str};
 use hlbc::analysis::files::functions_in_files;
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::RefFun;
+use hlbc::{Bytecode, Str};
 
 use crate::model::{AppCtxHandle, Item};
 use crate::style::singleline;
-use crate::views::{AppView, DecompilerView, impl_id, impl_view_id, InspectorView};
+use crate::views::{impl_id, impl_view_id, AppView, DecompilerView, InspectorView};
 
 pub struct FilesView {
     files: Vec<(Str, Vec<RefFun>)>,
@@ -41,15 +41,14 @@ impl AppView for FilesView {
                         for &f in funs {
                             let item = Item::Fun(f);
                             let checked = ctx.selected() == item;
-                            let label = ui
-                                .selectable_label(
-                                    checked,
-                                    singleline(
-                                        f.display_header::<EnhancedFmt>(ctx.code()).to_string(),
-                                        TextStyle::Button.resolve(ui.style().as_ref()),
-                                        Color32::WHITE,
-                                    ),
-                                );
+                            let label = ui.selectable_label(
+                                checked,
+                                singleline(
+                                    f.display_header::<EnhancedFmt>(ctx.code()).to_string(),
+                                    TextStyle::Button.resolve(ui.style().as_ref()),
+                                    Color32::WHITE,
+                                ),
+                            );
                             label.context_menu(|ui| {
                                 if ui.small_button("Open in inspector").clicked() {
                                     let tab = InspectorView::new(item, ctx.code());

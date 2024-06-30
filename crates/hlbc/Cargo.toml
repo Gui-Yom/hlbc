@@ -1,30 +1,30 @@
 [package]
 name = "hlbc"
 version = "0.8.0"
-authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
-edition = "2021"
 rust-version = "1.64"
 description = "Hashlink bytecode disassembler and analyzer"
-repository = "https://github.com/Gui-Yom/hlbc"
-license = "MIT"
 keywords = ["hashlink", "bytecode", "haxe", "disassembler", "reverse-enginneering"]
 categories = ["parser-implementations", "visualization", "compilers"]
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 # Endianess utilities
-byteorder = "1"
+byteorder = { workspace = true }
 # Cheaply clonable immutable string with inline storage
-flexstr = { version = "0.9" }
+flexstr = { workspace = true }
 # Advanced formatting functionalities
-fmtools = "0.1"
+fmtools = { workspace = true }
 # Compile time code generation for hlbc::Opcode
-hlbc-derive = { version = "0.8", path = "../derive" }
+hlbc-derive = { workspace = true }
 # Graph utilities
-petgraph = { version = "0.6", default-features = false, features = ["graphmap"], optional = true }
+petgraph = { workspace = true, optional = true }
 # Error types
-thiserror = "1"
+thiserror = { workspace = true }
 
 [features]
 default = ["graph"]

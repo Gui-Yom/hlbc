@@ -43,7 +43,7 @@ pub(crate) fn list_view<Elem: Copy>(
         |ui, range| {
             for elem in range.map(item) {
                 let checked = ctx.selected() == create_selection(elem);
-                let mut label = ui.selectable_label(
+                let label = ui.selectable_label(
                     checked,
                     singleline(
                         display(&ctx, elem),

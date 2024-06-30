@@ -1,15 +1,15 @@
 [package]
 name = "hlbc-cli"
 version = "0.8.0"
-authors = ["Guillaume Anthouard <25181283+Gui-Yom@users.noreply.github.com>"]
-edition = "2021"
 rust-version = "1.70"
 description = "Hashlink bytecode disassembler, analyzer and decompiler cli"
-repository = "https://github.com/Gui-Yom/hlbc"
-license = "MIT"
 categories = ["command-line-utilities", "parser-implementations", "visualization", "compilers"]
 keywords = ["hashlink", "bytecode", "haxe", "disassembler", "reverse-enginneering"]
 include = ["src/**/*", "README.md", "CHANGELOG.md"]
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -19,28 +19,28 @@ path = "src/main.rs"
 
 [dependencies]
 # Result type
-anyhow = "1"
+anyhow = { workspace = true }
 # Disable colors when not a tty (piped output)
-atty = "0.2"
+atty = { workspace = true }
 # Parser for commands
-chumsky = { version = "0.9" }
+chumsky = { workspace = true }
 # CLI args
-clap = { version = "4", features = ["derive"] }
+clap = { workspace = true }
 # Core functionnality
-hlbc = { version = "0.8", path = "../hlbc", default-features = false }
+hlbc = { workspace = true }
 # Decompiler
-hlbc-decompiler = { version = "0.8", path = "../decompiler" }
+hlbc-decompiler = { workspace = true }
 # File system watching
-notify = { version = "6", optional = true, default-features = false, features = ["macos_fsevent"] }
-notify-debouncer-mini = { version = "0.4", optional = true, default-features = false }
+notify = { workspace = true, optional = true }
+notify-debouncer-mini = { workspace = true, optional = true }
 # cli colors
-termcolor = "1"
+termcolor = { workspace = true }
 # Temporary directory for compilation
-temp-dir = "0.1"
-webbrowser = "0.8"
+temp-dir = { workspace = true }
+webbrowser = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.build-dependencies]
-winresource = "0.1"
+winresource = { workspace = true }
 
 [features]
 default = ["graph", "watch"]

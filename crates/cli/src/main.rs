@@ -431,20 +431,13 @@ This is the same range notation as Rust and is supported with most commands."#
             let debug_files = require_debug_info(code)?;
             match foi {
                 FileOrIndex::File(str) => {
-                    if let Some(idx) =
-                        debug_files
-                            .iter()
-                            .enumerate()
-                            .find_map(
-                                |(i, d): (usize, &Str)| {
-                                    if d == &str {
-                                        Some(i)
-                                    } else {
-                                        None
-                                    }
-                                },
-                            )
-                    {
+                    if let Some(idx) = debug_files.iter().enumerate().find_map(|(i, d)| {
+                        if d == str {
+                            Some(i)
+                        } else {
+                            None
+                        }
+                    }) {
                         println!("Functions in file@{idx} : {}", debug_files[idx]);
                         for (i, f) in code.functions.iter().enumerate() {
                             if f.debug_info.as_ref().unwrap()[f.ops.len() - 1].0 == idx {
