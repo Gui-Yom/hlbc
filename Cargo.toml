@@ -28,9 +28,9 @@ chumsky = { version = "0.9" }
 clap = { version = "4", features = ["derive"] }
 console_error_panic_hook = "0.1"
 # AIO GUI framework
-eframe = { version = "0.27", default-features = false }
+eframe = { version = "0.28", default-features = false }
 # Docking tabs
-egui_dock = { version = "0.12" }
+egui_dock = { version = "0.13" }
 # UI theme
 egui_ui_refresh = { version = "0.2", path = "../egui_ui_refresh" }
 # Cheaply clonable immutable string with inline storage

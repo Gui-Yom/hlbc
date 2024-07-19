@@ -5,7 +5,7 @@ use eframe::egui::text::{LayoutJob, TextWrapping};
 use eframe::egui::{
     Color32, FontFamily, FontId, InnerResponse, RichText, ScrollArea, TextStyle, Ui, WidgetText,
 };
-
+use egui_ui_refresh::fonts::{font_family_italic, font_family_medium};
 use crate::model::{AppCtxHandle, Item};
 
 pub(crate) struct Styles {
@@ -17,8 +17,8 @@ pub(crate) struct Styles {
 pub(crate) fn get() -> &'static Styles {
     static STYLES: OnceLock<Styles> = OnceLock::new();
     STYLES.get_or_init(|| Styles {
-        heading_title: FontId::new(50.0, FontFamily::Name(egui_ui_refresh::MEDIUM.into())),
-        heading_subtitle: FontId::new(20.0, FontFamily::Name(egui_ui_refresh::ITALIC.into())),
+        heading_title: FontId::new(50.0, font_family_medium()),
+        heading_subtitle: FontId::new(20.0, font_family_italic()),
         homepage_button: FontId::new(50.0, FontFamily::Proportional),
     })
 }

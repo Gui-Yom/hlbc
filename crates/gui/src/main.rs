@@ -1,11 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use std::io::BufReader;
+use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::{env, fs};
 
 use eframe::egui::{IconData, Vec2, ViewportBuilder};
+use egui_ui_refresh::RefreshedTheme;
 use image::ImageFormat;
 use poll_promise::Promise;
 
@@ -28,7 +28,7 @@ fn main() -> eframe::Result<()> {
         eframe::NativeOptions {
             vsync: true,
             viewport: ViewportBuilder::default()
-                .with_inner_size(Vec2::new(1280.0, 720.0))
+                .with_inner_size(Vec2::new(1600.0, 900.0))
                 .with_icon(icon_data),
             #[cfg(feature = "wgpu")]
             wgpu_options: eframe::egui_wgpu::WgpuConfiguration {
@@ -47,20 +47,20 @@ fn main() -> eframe::Result<()> {
                 Some(Promise::spawn_thread("bg_loader", move || {
                     Ok(Some((
                         args,
-                        Bytecode::deserialize(&mut BufReader::new(fs::File::open(&path)?))?,
+                        Bytecode::from_file(path)?,
                     )))
                 }))
             };
             cc.egui_ctx
                 .add_image_loader(Arc::new(image_loader::ImageCrateLoader::default()));
 
-            cc.egui_ctx.set_fonts(egui_ui_refresh::fonts());
-            cc.egui_ctx.set_style(egui_ui_refresh::style());
+            cc.egui_ctx.set_fonts(egui_ui_refresh::fonts::fonts());
+            RefreshedTheme::init_default().apply(&cc.egui_ctx);
 
             // Dock tabs styling
             let style = egui_dock::Style::from_egui(cc.egui_ctx.style().as_ref());
 
-            Box::new(App::new(loader, style))
+            Ok(Box::new(App::new(loader, style)))
         }),
     )
 }
@@ -78,13 +78,13 @@ fn main() {
                 "eframe_canvas", // hardcode it
                 web_options,
                 Box::new(|cc| {
-                    cc.egui_ctx.set_fonts(egui_ui_refresh::fonts());
-                    cc.egui_ctx.set_style(egui_ui_refresh::style());
+                    cc.egui_ctx.set_fonts(egui_ui_refresh::fonts::fonts());
+                    RefreshedTheme::init_default().apply(&cc.egui_ctx);
 
                     // Dock tabs styling
                     let mut style = egui_dock::Style::from_egui(cc.egui_ctx.style().as_ref());
 
-                    Box::new(App::new(None, style))
+                    OK(Box::new(App::new(None, style)))
                 }),
             )
             .await

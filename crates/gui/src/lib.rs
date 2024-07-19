@@ -396,10 +396,9 @@ impl App {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     if let Some(appctx) = &self.ctx {
-                        let (id, rect) = ui.allocate_space(Vec2::new(120.0, 20.0));
-                        Ui::new(ctx.clone(), ui.layer_id(), id, rect, rect)
-                            .label(appctx.selected().name(appctx.code()));
-                        ui.separator();
+                        ui.label(appctx.selected().name(appctx.code()));
+                    } else {
+                        ui.add_space(120.0);
                     }
                     ui.label(self.status.clone());
                 });
