@@ -1075,6 +1075,7 @@ dependencies = [
 [[package]]
 name = "egui_ui_refresh"
 version = "0.2.0"
+source = "git+https://github.com/Gui-Yom/egui_ui_refresh#753bba32ab840d27bc6f7c35b4f935432e9e8673"
 dependencies = [
  "egui",
  "re_format",

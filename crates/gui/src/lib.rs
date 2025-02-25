@@ -1,8 +1,7 @@
 use std::borrow::Cow;
-use std::fs;
 
 use eframe::egui;
-use eframe::egui::{Button, CentralPanel, Frame, Margin, ScrollArea, TopBottomPanel, Ui, Vec2};
+use eframe::egui::{Button, CentralPanel, Frame, Margin, ScrollArea, TopBottomPanel, Ui};
 use egui_dock::{DockArea, DockState, Node, NodeIndex, Split, SurfaceIndex};
 use poll_promise::Promise;
 
