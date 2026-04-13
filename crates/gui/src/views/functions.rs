@@ -1,10 +1,10 @@
-use eframe::egui::{Color32, RichText, Ui, WidgetText};
+use eframe::egui::{Ui, WidgetText};
 
 use hlbc::fmt::EnhancedFmt;
 use hlbc::types::RefFun;
 
 use crate::model::{AppCtxHandle, Item};
-use crate::style::list_view;
+use crate::style::{functions_icon_label, list_view};
 use crate::views::{impl_id, impl_view_id, DecompilerView, InspectorView};
 use crate::AppView;
 
@@ -22,7 +22,7 @@ impl AppView for FunctionsView {
     impl_id!(unique);
 
     fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
-        RichText::new("ƒ Functions").color(Color32::WHITE).into()
+        functions_icon_label()
     }
 
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {

@@ -12,6 +12,7 @@ use poll_promise::Promise;
 use hlbc::Bytecode;
 use hlbc_gui::{App, HLBC_ICON};
 
+mod fonts;
 #[cfg(not(target_arch = "wasm32"))]
 mod image_loader;
 
@@ -54,7 +55,7 @@ fn main() -> eframe::Result<()> {
             cc.egui_ctx
                 .add_image_loader(Arc::new(image_loader::ImageCrateLoader::default()));
 
-            cc.egui_ctx.set_fonts(egui_ui_refresh::fonts::fonts());
+            cc.egui_ctx.set_fonts(fonts::fonts());
             RefreshedTheme::init_default().apply(&cc.egui_ctx);
 
             // Dock tabs styling
@@ -78,7 +79,7 @@ fn main() {
                 "eframe_canvas", // hardcode it
                 web_options,
                 Box::new(|cc| {
-                    cc.egui_ctx.set_fonts(egui_ui_refresh::fonts::fonts());
+                    cc.egui_ctx.set_fonts(fonts::fonts());
                     RefreshedTheme::init_default().apply(&cc.egui_ctx);
 
                     // Dock tabs styling

@@ -35,7 +35,7 @@ image = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 poll-promise = { workspace = true }
-syntect = { workspace = true, features = ["parsing", "yaml-load", "default-themes", "regex-onig"] }
+syntect = { workspace = true, features = ["parsing", "yaml-load", "default-themes", "regex-fancy"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = { workspace = true }

@@ -3,8 +3,10 @@ use std::sync::OnceLock;
 
 use eframe::egui::text::{LayoutJob, TextWrapping};
 use eframe::egui::{
-    Color32, FontFamily, FontId, InnerResponse, RichText, ScrollArea, TextStyle, Ui, WidgetText,
+    Color32, FontFamily, FontId, InnerResponse, RichText, ScrollArea, TextFormat, TextStyle, Ui,
+    WidgetText,
 };
+use egui_ui_refresh::{fonts::font_icons, icons};
 use egui_ui_refresh::fonts::{font_family_italic, font_family_medium};
 use crate::model::{AppCtxHandle, Item};
 
@@ -25,6 +27,46 @@ pub(crate) fn get() -> &'static Styles {
 
 pub(crate) fn text(text: impl Into<String>, font: FontId) -> impl Into<WidgetText> {
     RichText::new(text).font(font)
+}
+
+pub(crate) fn icon_label(icon: &str, label: &str, color: Color32) -> WidgetText {
+    let mut job = LayoutJob::default();
+    job.append(
+        icon,
+        0.0,
+        TextFormat {
+            font_id: font_icons(14.0),
+            color,
+            ..Default::default()
+        },
+    );
+    job.append(
+        " ",
+        0.0,
+        TextFormat {
+            font_id: TextStyle::Button.resolve(&Default::default()),
+            color,
+            ..Default::default()
+        },
+    );
+    job.append(
+        label,
+        0.0,
+        TextFormat {
+            font_id: TextStyle::Button.resolve(&Default::default()),
+            color,
+            ..Default::default()
+        },
+    );
+    job.into()
+}
+
+pub(crate) fn info_icon_label() -> WidgetText {
+    icon_label(icons::INFO, "Info", Color32::WHITE)
+}
+
+pub(crate) fn functions_icon_label() -> WidgetText {
+    RichText::new("Functions").color(Color32::WHITE).into()
 }
 
 pub(crate) fn list_view<Elem: Copy>(

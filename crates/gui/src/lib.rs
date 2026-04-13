@@ -1,8 +1,7 @@
 use std::borrow::Cow;
-use std::fs;
 
 use eframe::egui;
-use eframe::egui::{Button, CentralPanel, Frame, Margin, ScrollArea, TopBottomPanel, Ui, Vec2};
+use eframe::egui::{Button, CentralPanel, Frame, Margin, ScrollArea, TopBottomPanel, Ui};
 use egui_dock::{DockArea, DockState, Node, NodeIndex, Split, SurfaceIndex};
 use poll_promise::Promise;
 
@@ -111,6 +110,10 @@ impl eframe::App for App {
         }
 
         self.windows(ctx);
+    }
+
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        egui::Color32::from_rgb(0x0d, 0x10, 0x11).to_normalized_gamma_f32()
     }
 }
 

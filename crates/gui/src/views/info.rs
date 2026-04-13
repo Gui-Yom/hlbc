@@ -1,5 +1,6 @@
-use eframe::egui::{Color32, Grid, RichText, ScrollArea, Ui, WidgetText};
+use eframe::egui::{Grid, ScrollArea, Ui, WidgetText};
 
+use crate::style::info_icon_label;
 use crate::views::{impl_id, impl_view_id, AppView};
 use crate::AppCtxHandle;
 
@@ -12,7 +13,7 @@ impl AppView for InfoView {
     impl_id!(unique);
 
     fn title(&self, _ctx: AppCtxHandle) -> WidgetText {
-        RichText::new("🛈 Info").color(Color32::WHITE).into()
+        info_icon_label()
     }
 
     fn ui(&mut self, ui: &mut Ui, ctx: AppCtxHandle) {

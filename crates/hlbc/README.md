@@ -49,7 +49,11 @@ Other alternatives include :
 - Tinkering directly with the [hashlink](https://github.com/HaxeFoundation/hashlink) source code in C (my first attempt
   was doing this, but it turned out that everything in C is pain in the ass)
 - Using the in-progress [**_*dashlink*_**](https://github.com/Steviegt6/dashlink) made in Haxe but probably compilable
-  to many other languages.
+  to many other languages (seems broken as of 10/13/24)
+- Using [crashlink](https://github.com/N3rdL0rd/crashlink), written in pure Python and portable to many platforms
+  (also supports bytecode patching)
+- Using the also in-development [hlbc-python](https://github.com/N3rdL0rd/hlbc-python) to access a (very small) subset of this crate from Python (not reccomended, use crashlink instead)
+- Using [Haxelink](https://github.com/LebiFur/Haxelink), a C# implementation
 
 ## Macros
 
