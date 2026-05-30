@@ -106,9 +106,11 @@ impl Scopes {
                 }
                 // Exception for Switch where a switch scope can be closed with a switch case open
                 if let ScopeData::Switch { cases, .. } = &mut scope.data {
-                    let case = self.scopes.remove(i);
-                    if let ScopeData::SwitchCase { pattern } = case.data {
-                        cases.push((pattern, case.stmts));
+                    if i < self.scopes.len() {
+                        let case = self.scopes.remove(i);
+                        if let ScopeData::SwitchCase { pattern } = case.data {
+                            cases.push((pattern, case.stmts));
+                        }
                     }
                 }
                 stmt = Some(scope.make_stmt());
@@ -132,13 +134,16 @@ impl Scopes {
             if matches!(data, ScopeData::Root) {
                 stmts
             } else {
-                panic!(
-                    "Remaining scopes other than the root scope :\n{:#?}",
-                    self.scopes
-                );
+                let mut result = stmts;
+                result.push(Statement::Comment(
+                    "decompile error: remaining scopes other than root".into(),
+                ));
+                result
             }
         } else {
-            panic!("No remaining scopes ? Not even the root scope ?");
+            vec![Statement::Comment(
+                "decompile error: no remaining scopes".into(),
+            )]
         }
     }
 
@@ -148,14 +153,22 @@ impl Scopes {
     }
 
     pub(crate) fn push_else(&mut self, len: i32) {
-        let (if_cond, stmts) = self
+        let Some((if_cond, stmts)) = self
             .scopes
             .pop()
             .and_then(|s| match s.data {
                 ScopeData::If { cond } => Some((cond, s.stmts)),
                 _ => None,
             })
-            .expect("Else without If ?");
+        else {
+            // No matching If: emit a comment and push a dummy else scope
+            self.scopes.last_mut().map(|s| {
+                s.stmts.push(Statement::Comment(
+                    "decompile error: else without if".into(),
+                ))
+            });
+            return;
+        };
 
         self.scopes.push(Scope::new(
             ScopeType::Len(len),
@@ -205,7 +218,9 @@ impl Scopes {
                 ));
             }
             _ => {
-                panic!("Pushing a switch case with no outer switch !");
+                self.scopes.last_mut().unwrap().stmts.push(Statement::Comment(
+                    "decompile error: switch case with no outer switch".into(),
+                ));
             }
         }
     }

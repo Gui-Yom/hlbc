@@ -25,8 +25,9 @@ impl FormatOptions {
     }
 
     pub fn inc_nesting(&self) -> Self {
+        let new_len = (self.indent.len() + self.inc_indent).min(INDENT.len());
         FormatOptions {
-            indent: &INDENT[..self.indent.len() + self.inc_indent],
+            indent: &INDENT[..new_len],
             ..*self
         }
     }
@@ -174,8 +175,10 @@ impl Expr {
                             .iter()
                             .enumerate()
                             .map(|(i, f)| {
+                                let val = values.get(&RefField(i));
                                 fmtools::fmt! { move
-                                    {f.name(code)}": "{disp!(values.get(&RefField(i)).unwrap())}
+                                    {f.name(code)}": "
+                                    if let Some(v) = val { {disp!(v)} } else { "[missing]" }
                                 }
                             })) }"}"
                     }

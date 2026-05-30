@@ -361,8 +361,8 @@ impl AstVisitor for Trace {
                 Expr::Field(obj, field) => match obj.as_ref() {
                     Expr::Variable(_, _) => {
                         if field == "trace" {
-                            let trace = code.function_by_name(field).unwrap();
-                            Some(call_fun(trace.findex, vec![call.args[0].clone()]))
+                            code.function_by_name(field)
+                                .map(|trace| call_fun(trace.findex, vec![call.args[0].clone()]))
                         } else {
                             None
                         }

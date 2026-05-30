@@ -254,9 +254,7 @@ impl RefType {
             9 => Type::Dyn,
             11 => Type::Array,
             14 => Type::Bytes,
-            _ => {
-                panic!("This not a known type")
-            }
+            _ => Type::Void,  // unknown type: fall back to Void
         }
     }
 
@@ -273,11 +271,11 @@ impl RefType {
     }
 
     pub fn field<'a>(&self, field: RefField, ctx: &'a Bytecode) -> Option<&'a ObjField> {
-        self.as_obj(ctx).map(|obj| &obj.fields[field.0])
+        self.as_obj(ctx).and_then(|obj| obj.fields.get(field.0))
     }
 
     pub fn method<'a>(&self, meth: usize, ctx: &'a Bytecode) -> Option<&'a ObjProto> {
-        self.as_obj(ctx).map(|obj| &obj.protos[meth])
+        self.as_obj(ctx).and_then(|obj| obj.protos.get(meth))
     }
 }
 

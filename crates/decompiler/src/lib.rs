@@ -5,6 +5,58 @@
 
 use std::collections::{HashMap, HashSet};
 
+/// Max AST node count for an inlined expression. Prevents O(n²) clone cost from
+/// deeply chained expression inlining in large functions.
+const MAX_INLINE_SIZE: usize = 50;
+
+/// Returns true if `e` has more than `remaining` nodes (short-circuits early).
+fn expr_exceeds_size(e: &Expr, remaining: &mut usize) -> bool {
+    if *remaining == 0 {
+        return true;
+    }
+    *remaining -= 1;
+    match e {
+        Expr::Constant(_) | Expr::FunRef(_) | Expr::Unknown(_) | Expr::Variable(_, _) => false,
+        Expr::Closure(_, _) => false,
+        Expr::Array(a, b) => {
+            expr_exceeds_size(a, remaining) || expr_exceeds_size(b, remaining)
+        }
+        Expr::Call(call) => {
+            expr_exceeds_size(&call.fun, remaining)
+                || call.args.iter().any(|a| expr_exceeds_size(a, remaining))
+        }
+        Expr::Constructor(c) => c.args.iter().any(|a| expr_exceeds_size(a, remaining)),
+        Expr::EnumConstr(_, _, args) => args.iter().any(|a| expr_exceeds_size(a, remaining)),
+        Expr::Field(obj, _) => expr_exceeds_size(obj, remaining),
+        Expr::IfElse { cond, .. } => expr_exceeds_size(cond, remaining),
+        Expr::Anonymous(_, fields) => fields.values().any(|v| expr_exceeds_size(v, remaining)),
+        Expr::Op(op) => match op {
+            Operation::Add(a, b)
+            | Operation::Sub(a, b)
+            | Operation::Mul(a, b)
+            | Operation::Div(a, b)
+            | Operation::Mod(a, b)
+            | Operation::Shl(a, b)
+            | Operation::Shr(a, b)
+            | Operation::And(a, b)
+            | Operation::Or(a, b)
+            | Operation::Xor(a, b)
+            | Operation::Eq(a, b)
+            | Operation::NotEq(a, b)
+            | Operation::Gt(a, b)
+            | Operation::Gte(a, b)
+            | Operation::Lt(a, b)
+            | Operation::Lte(a, b) => {
+                expr_exceeds_size(a, remaining) || expr_exceeds_size(b, remaining)
+            }
+            Operation::Neg(a)
+            | Operation::Not(a)
+            | Operation::Incr(a)
+            | Operation::Decr(a) => expr_exceeds_size(a, remaining),
+        },
+    }
+}
+
 use ast::*;
 use hlbc::fmt::EnhancedFmt;
 use hlbc::opcodes::Opcode;
@@ -89,9 +141,23 @@ impl<'c> DecompilerState<'c> {
     // Update the register state and create a statement depending on inline rules
     fn push_expr(&mut self, i: usize, dst: Reg, expr: Expr) {
         let name = self.f.var_name(self.code, i);
-        // Inline check
         if name.is_none() {
-            self.reg_state.insert(dst, expr);
+            // Inline only if the expression is small enough to avoid O(n²) clone cost.
+            let mut limit = MAX_INLINE_SIZE;
+            if !expr_exceeds_size(&expr, &mut limit) {
+                self.reg_state.insert(dst, expr);
+                return;
+            }
+            // Expression too large: materialize as a synthetic variable so future
+            // uses only clone a cheap Variable node instead of the whole tree.
+            let syn: Option<Str> = Some(Str::from(format!("_r{}", dst.0)));
+            self.reg_state.insert(dst, Expr::Variable(dst, syn.clone()));
+            let declaration = self.seen.insert(syn.clone().unwrap());
+            self.push_stmt(Statement::Assign {
+                declaration,
+                variable: Expr::Variable(dst, syn),
+                assign: expr,
+            });
         } else {
             self.reg_state
                 .insert(dst, Expr::Variable(dst, name.clone()));
@@ -179,6 +245,19 @@ impl<'c> DecompilerState<'c> {
 pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
     let mut state = DecompilerState::new(code, f);
 
+    // Precompute backward JAlways targets to avoid O(n²) scan at each backward jump.
+    // Maps loop_start -> sorted list of positions that jump back to it.
+    let mut backward_jumps_by_target: std::collections::HashMap<usize, Vec<usize>> =
+        std::collections::HashMap::new();
+    for (j, op) in f.ops.iter().enumerate() {
+        if let Opcode::JAlways { offset } = op {
+            if *offset < 0 {
+                let target = (j as i32 + offset + 1) as usize;
+                backward_jumps_by_target.entry(target).or_default().push(j);
+            }
+        }
+    }
+
     let iter = f.ops.iter().enumerate();
     for (i, o) in iter {
         // Opcodes are grouped by semantic
@@ -215,20 +294,19 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
             &Opcode::JAlways { offset } => {
                 if offset < 0 {
                     // It's either the jump backward of a loop or a continue statement
-                    let loop_start = state
-                        .scopes
-                        .last_loop_start()
-                        .expect("Backward jump but we aren't in a loop ?");
+                    let Some(loop_start) = state.scopes.last_loop_start() else {
+                        state.push_stmt(Statement::Comment(
+                            "decompile error: backward jump but not in a loop".into(),
+                        ));
+                        continue;
+                    };
 
-                    // Scan the next instructions in order to find another jump to the same place
-                    if f.ops.iter().enumerate().skip(i + 1).find_map(|(j, o)| {
-                        // We found another jump to the same place !
-                        if matches!(o, Opcode::JAlways {offset} if (j as i32 + offset + 1) as usize == loop_start) {
-                            Some(true)
-                        } else {
-                            None
-                        }
-                    }).unwrap_or(false) {
+                    // Check (in O(1)) whether a later backward jump targets the same loop_start.
+                    if backward_jumps_by_target
+                        .get(&loop_start)
+                        .map(|positions| positions.iter().any(|&p| p > i))
+                        .unwrap_or(false)
+                    {
                         // If this jump is not the last jump backward for the current loop, so it's definitely a continue; statement
                         state.push_stmt(Statement::Continue);
                     } else {
@@ -237,7 +315,9 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         if let Some(stmt) = state.scopes.end_last_loop() {
                             state.push_stmt(stmt);
                         } else {
-                            panic!("Last scope is not a loop !");
+                            state.push_stmt(Statement::Comment(
+                                "decompile error: Last scope is not a loop".into(),
+                            ));
                         }
                     }
                 } else {
@@ -245,7 +325,9 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                         if let Some(pos) = offsets.iter().position(|o| *o == i) {
                             state.scopes.push_switch_case(pos);
                         } else {
-                            panic!("no matching offset for switch case ({i})");
+                            state.push_stmt(Statement::Comment(
+                                format!("decompile error: no matching offset for switch case ({i})"),
+                            ));
                         }
                     } else if state.scopes.last_loop_start().is_some() {
                         // Check the instruction just before the jump target
@@ -451,20 +533,25 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 }
             }
             Opcode::CallThis { dst, field, args } => {
-                let method = f.regs[0].method(field.0, code).unwrap();
-                let call = call(
-                    Expr::Field(Box::new(cst_this()), method.name(code)),
-                    state.args_expr(args),
-                );
-                if method
-                    .findex
-                    .as_fn(code)
-                    .map(|fun| fun.ty(code).ret.is_void())
-                    .unwrap_or(false)
-                {
-                    state.push_stmt(stmt(call));
+                if let Some(method) = f.regs[0].method(field.0, code) {
+                    let call = call(
+                        Expr::Field(Box::new(cst_this()), method.name(code)),
+                        state.args_expr(args),
+                    );
+                    if method
+                        .findex
+                        .as_fn(code)
+                        .map(|fun| fun.ty(code).ret.is_void())
+                        .unwrap_or(false)
+                    {
+                        state.push_stmt(stmt(call));
+                    } else {
+                        state.push_expr(i, *dst, call);
+                    }
                 } else {
-                    state.push_expr(i, *dst, call);
+                    state.push_stmt(Statement::Comment(
+                        format!("decompile error: CallThis field {} out of bounds", field.0),
+                    ));
                 }
             }
             Opcode::CallClosure { dst, fun, args } => {
@@ -487,11 +574,15 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                     "closure : {}",
                     fun.display::<EnhancedFmt>(code)
                 )));
-                state.push_expr(
-                    i,
-                    dst,
-                    Expr::Closure(fun, decompile_code(code, fun.as_fn(code).unwrap())),
-                );
+                if let Some(f_inner) = fun.as_fn(code) {
+                    state.push_expr(
+                        i,
+                        dst,
+                        Expr::Closure(fun, decompile_code(code, f_inner)),
+                    );
+                } else {
+                    state.push_expr(i, dst, Expr::Unknown(format!("native closure {}", fun.display::<EnhancedFmt>(code))));
+                }
             }
             &Opcode::InstanceClosure { dst, obj, fun } => {
                 state.push_stmt(comment(format!(
@@ -501,11 +592,15 @@ pub fn decompile_code(code: &Bytecode, f: &Function) -> Vec<Statement> {
                 match &code[f[obj]] {
                     // This is an anonymous enum holding the capture for the closure
                     Type::Enum { .. } => {
-                        state.push_expr(
-                            i,
-                            dst,
-                            Expr::Closure(fun, decompile_code(code, fun.as_fn(code).unwrap())),
-                        );
+                        if let Some(f_inner) = fun.as_fn(code) {
+                            state.push_expr(
+                                i,
+                                dst,
+                                Expr::Closure(fun, decompile_code(code, f_inner)),
+                            );
+                        } else {
+                            state.push_expr(i, dst, Expr::Unknown(format!("native closure {}", fun.display::<EnhancedFmt>(code))));
+                        }
                     }
                     _ => {
                         state.push_expr(
@@ -833,30 +928,36 @@ pub fn decompile_class(code: &Bytecode, obj: &TypeObj) -> Class {
 
     let mut methods = Vec::new();
     for fun in obj.bindings.values() {
-        methods.push(Method {
-            fun: *fun,
-            static_: false,
-            dynamic: true,
-            statements: decompile_code(code, fun.as_fn(code).unwrap()),
-        })
-    }
-    if let Some(ty) = static_type {
-        for fun in ty.bindings.values() {
+        if let Some(f_inner) = fun.as_fn(code) {
             methods.push(Method {
                 fun: *fun,
-                static_: true,
-                dynamic: false,
-                statements: decompile_code(code, fun.as_fn(code).unwrap()),
+                static_: false,
+                dynamic: true,
+                statements: decompile_code(code, f_inner),
             })
         }
     }
+    if let Some(ty) = static_type {
+        for fun in ty.bindings.values() {
+            if let Some(f_inner) = fun.as_fn(code) {
+                methods.push(Method {
+                    fun: *fun,
+                    static_: true,
+                    dynamic: false,
+                    statements: decompile_code(code, f_inner),
+                })
+            }
+        }
+    }
     for f in &obj.protos {
-        methods.push(Method {
-            fun: f.findex,
-            static_: false,
-            dynamic: false,
-            statements: decompile_code(code, f.findex.as_fn(code).unwrap()),
-        })
+        if let Some(f_inner) = f.findex.as_fn(code) {
+            methods.push(Method {
+                fun: f.findex,
+                static_: false,
+                dynamic: false,
+                statements: decompile_code(code, f_inner),
+            })
+        }
     }
 
     Class {
