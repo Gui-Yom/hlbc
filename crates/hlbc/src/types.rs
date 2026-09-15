@@ -183,6 +183,8 @@ pub enum Type {
     Struct(TypeObj),
     /// Packed wrapper
     Packed(RefType),
+    /// Globally unique identifier, represented as an i64 at runtime.
+    Guid,
 }
 
 impl Type {

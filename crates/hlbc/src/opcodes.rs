@@ -748,12 +748,32 @@ pub enum Opcode {
         /// Warning ! Only non-zero values indicates valid reg. Register index is reg-1.
         reg: Reg,
     },
+    /// Declare an exception type handled by the preceding trap.
+    Catch {
+        /// Global holding the caught type.
+        global: RefGlobal,
+    },
 }
 
 #[cfg(test)]
 mod test {
     use crate::opcodes::Opcode;
-    use crate::types::Reg;
+    use crate::types::{RefGlobal, Reg};
+
+    #[test]
+    fn catch_round_trip() {
+        let opcode = Opcode::Catch {
+            global: RefGlobal(7),
+        };
+        let mut data = Vec::new();
+        opcode.write(&mut data).unwrap();
+
+        assert_eq!(data, [101, 7]);
+        match Opcode::read(&mut data.as_slice()).unwrap() {
+            Opcode::Catch { global } => assert_eq!(global, RefGlobal(7)),
+            other => panic!("expected Catch opcode, got {other:?}"),
+        }
+    }
 
     #[test]
     fn test_doc() {
