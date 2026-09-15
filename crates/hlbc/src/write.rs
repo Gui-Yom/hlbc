@@ -397,6 +397,7 @@ mod tests {
 
         assert_eq!(data, [23]);
         assert_eq!(Type::read(&mut data.as_slice()).unwrap(), Type::Guid);
+        assert_eq!(Type::Guid.to_string(), "guid");
     }
 
     //#[test]

@@ -87,6 +87,7 @@ impl Display for Type {
                     UI16 => "i16",
                     I32 => "i32",
                     I64 => "i64",
+                    Guid => "guid",
                     F32 => "f32",
                     F64 => "f64",
                     Bool => "bool",
@@ -105,7 +106,6 @@ impl Display for Type {
                     Method(_) => "<method>",
                     Struct(_) => "<struct>",
                     Packed(reftype) => "packed<"{ reftype }">",
-                    Guid => "guid",
                 }
             }
         )
