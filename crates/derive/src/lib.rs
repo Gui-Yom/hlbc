@@ -220,6 +220,12 @@ fn write_variant(enum_name: &Ident, v: &Variant, i: u8) -> TokenStream {
     let fwrite = v.fields.iter().map(|f| {
         let fname = f.ident.as_ref().unwrap();
         match ident(&f.ty).as_str() {
+            "InlineBool" => quote! {
+                write_var(w, if *#fname { 1 } else { 0 })?;
+            },
+            "InlineInt" => quote! {
+                write_var(w, *#fname)?;
+            },
             "usize" => quote!(write_var(w, #fname as i32)?;),
             "i32" => quote! {
                 write_var(w, #fname)?;
