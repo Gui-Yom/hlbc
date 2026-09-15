@@ -756,6 +756,46 @@ mod test {
     use crate::types::Reg;
 
     #[test]
+    fn inline_operands_round_trip() {
+        let opcodes = [
+            (
+                Opcode::Bool {
+                    dst: Reg(3),
+                    value: true,
+                },
+                vec![3, 3, 1],
+            ),
+            (
+                Opcode::Asm {
+                    mode: 2,
+                    value: 7,
+                    reg: Reg(0),
+                },
+                vec![100, 2, 7, 0],
+            ),
+        ];
+
+        for (opcode, expected) in opcodes {
+            let mut data = Vec::new();
+            opcode.write(&mut data).unwrap();
+            assert_eq!(data, expected);
+
+            match Opcode::read(&mut data.as_slice()).unwrap() {
+                Opcode::Bool { dst, value } => {
+                    assert_eq!(dst, Reg(3));
+                    assert!(value);
+                }
+                Opcode::Asm { mode, value, reg } => {
+                    assert_eq!(mode, 2);
+                    assert_eq!(value, 7);
+                    assert_eq!(reg, Reg(0));
+                }
+                other => panic!("unexpected opcode after round trip: {other:?}"),
+            }
+        }
+    }
+
+    #[test]
     fn test_doc() {
         assert_eq!(
             "Copy value from *src* into *dst*\n`dst = src`",
