@@ -105,6 +105,7 @@ impl Display for Type {
                     Method(_) => "<method>",
                     Struct(_) => "<struct>",
                     Packed(reftype) => "packed<"{ reftype }">",
+                    Guid => "guid",
                 }
             }
         )

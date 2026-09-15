@@ -406,6 +406,7 @@ impl Type {
             20 => Ok(Method(TypeFun::read(r)?)),
             21 => Ok(Struct(TypeObj::read(r)?)),
             22 => Ok(Packed(RefType::read(r)?)),
+            23 => Ok(Guid),
             other => Err(Error::MalformedBytecode(format!(
                 "Invalid type kind '{other}'"
             ))),

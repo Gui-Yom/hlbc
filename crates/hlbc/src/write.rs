@@ -222,6 +222,7 @@ impl Type {
                 w.write_u8(22)?;
                 inner.write(w)?;
             }
+            Type::Guid => w.write_u8(23)?,
         }
         Ok(())
     }
@@ -387,7 +388,16 @@ fn flush_repeat(
 mod tests {
     use std::fs;
 
-    use crate::Bytecode;
+    use crate::{Bytecode, Type};
+
+    #[test]
+    fn guid_type_round_trip() {
+        let mut data = Vec::new();
+        Type::Guid.write(&mut data).unwrap();
+
+        assert_eq!(data, [23]);
+        assert_eq!(Type::read(&mut data.as_slice()).unwrap(), Type::Guid);
+    }
 
     //#[test]
     fn ser_eq_deser() {
